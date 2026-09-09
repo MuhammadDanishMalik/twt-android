@@ -75,7 +75,23 @@ class FollowedSignalTracker @Inject constructor(
 
     private var watchedUserId: String? = null
 
-    init {
+    private var started = false
+
+    /**
+     * Starts watching. Called once from `TwtApplication`, not from a screen.
+     *
+     * Explicit rather than work in `init` for two reasons. A constructor that
+     * launches coroutines is a constructor with side effects, which makes this
+     * class impossible to build in a test without it immediately talking to
+     * Firestore. And injection-triggered construction would mean the alerting
+     * only starts when some screen first happens to need the tracker — so a
+     * member who opens the app straight into the chat tab would not have their
+     * followed trades watched at all until they wandered onto a signals screen.
+     */
+    fun start() {
+        if (started) return
+        started = true
+
         // Follows are per-account, so the listener follows whoever is signed in.
         // Tearing it down on sign-out matters: the next person on this device
         // must not inherit the previous member's positions, or their
@@ -84,7 +100,7 @@ class FollowedSignalTracker @Inject constructor(
             session.currentUser.collect { user ->
                 when {
                     user == null -> stop()
-                    user.id != watchedUserId -> start(user.id)
+                    user.id != watchedUserId -> startFollows(user.id)
                 }
             }
         }
@@ -108,7 +124,7 @@ class FollowedSignalTracker @Inject constructor(
     fun followFor(signalId: String): SignalFollow? =
         _follows.value.firstOrNull { it.signalId == signalId }
 
-    private fun start(userId: String) {
+    private fun startFollows(userId: String) {
         watchedUserId = userId
         _isLoading.value = true
         scope.launch {
@@ -147,13 +163,13 @@ class FollowedSignalTracker @Inject constructor(
                 // Recorded *without* announcing. The member is looking at the
                 // signal right now; they do not need to be told what it already
                 // says.
+                //
+                // The card is deliberately not posted from here. The follow
+                // document has not come back through the listener yet, so there
+                // is nothing to build one from -- `reconcile` puts it up the
+                // moment it does, which is a single code path rather than two
+                // that can disagree.
                 putLastKnown(signal.id, signal.status.stored)
-                // Only a running trade gets a card. Starting one for a signal
-                // that has already closed puts a permanent notification in the
-                // shade describing something that finished last Tuesday.
-                if (signal.status.isOngoing) {
-                    followFor(signal.id)?.let { notifier.show(signal, it) }
-                }
             }
             .onFailure { Log.w(TAG, "Could not follow ${signal.id}", it) }
     }
@@ -212,20 +228,32 @@ class FollowedSignalTracker @Inject constructor(
             val current = signal.status.stored
             known[follow.signalId] = current
 
-            // First sight. Record, say nothing.
-            if (previous == null) {
-                if (signal.status.isOngoing) notifier.show(signal, follow)
-                continue
+            // The alert is driven by the *transition*, and only by a transition
+            // this device has actually watched happen. A null `previous` is
+            // first sight -- a cold start, or a follow created on another
+            // device -- and announcing there would re-tell the member every
+            // result they have already been told about, once per launch.
+            val changed = previous != null && previous != current
+            if (changed) notifier.alertStatusChange(signal, follow)
+
+            // The card is driven by *state*, not by the transition.
+            //
+            // These have to be separate, and conflating them was a bug: posting
+            // the card only when the status moved meant a trade the member had
+            // just started following never got one at all, because `follow()`
+            // records the status it followed at, so the very next pass sees no
+            // change. Reposting is free -- same notification id, silent, and
+            // `onlyAlertOnce` -- so the card is simply asserted on every pass
+            // for anything still running, which also restores it after a reboot.
+            when {
+                signal.status.isOngoing -> notifier.show(signal, follow)
+
+                // Finished. Replace the pinned card with a dismissible one
+                // carrying the result, but only on the pass that saw it finish
+                // -- otherwise every closed-but-unrecorded follow re-posts its
+                // result on every cold start.
+                changed -> notifier.show(signal, follow)
             }
-            if (previous == current) continue
-
-            notifier.alertStatusChange(signal, follow)
-
-            // Refreshed either way. `show` sets `ongoing` from the status, so a
-            // trade that has just closed leaves a card carrying the result that
-            // the member can swipe away, rather than one pinned to the shade
-            // describing something that is over.
-            notifier.show(signal, follow)
         }
 
         writeLastKnown(known)

@@ -39,7 +39,6 @@ sealed class AppRoute(val route: String) {
     data object Marketplace : AppRoute("marketplace")
     data object Profile : AppRoute("profile")
     data object EditProfile : AppRoute("editProfile")
-    data object ContactSupport : AppRoute("contactSupport")
 
     companion object {
         /**

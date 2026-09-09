@@ -7,6 +7,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Home
@@ -19,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
@@ -47,6 +49,8 @@ private val bottomBarItems = listOf(
  */
 @Composable
 fun RootScreen(
+    pendingSignalId: String? = null,
+    onPendingSignalHandled: () -> Unit = {},
     navController: NavHostController = rememberNavController(),
     viewModel: RootViewModel = hiltViewModel()
 ) {
@@ -73,6 +77,23 @@ fun RootScreen(
             popUpTo(navController.graph.id) { inclusive = true }
             launchSingleTop = true
         }
+    }
+
+    // A notification tap, deferred until the gate has decided.
+    //
+    // Keyed on both, and that is the point: a tap while the app is dead arrives
+    // long before the session has been restored, so navigating immediately would
+    // push the signal on top of the splash screen and then have the gate wipe it
+    // away again. Waiting for `Allowed` also means a member whose code has been
+    // revoked does not get to walk through a stale notification into a screen
+    // they can no longer read.
+    LaunchedEffect(pendingSignalId, gate) {
+        val signalId = pendingSignalId ?: return@LaunchedEffect
+        if (gate != RootViewModel.Gate.Allowed) return@LaunchedEffect
+        navController.navigate(AppRoute.SignalDetail.of(signalId)) {
+            launchSingleTop = true
+        }
+        onPendingSignalHandled()
     }
 
     LaunchedEffect(wasKicked) {
@@ -108,7 +129,15 @@ fun RootScreen(
             )
         }
 
-        Box(modifier = Modifier.align(Alignment.BottomCenter)) {
+        // Lifted clear of the floating pill. A snackbar at the default bottom
+        // alignment lands underneath the bar, which is where the one message
+        // this app shows -- "you have been signed out" -- would be least
+        // readable.
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = if (currentRoute in AppRoute.bottomBarRoutes) 96.dp else 0.dp)
+        ) {
             SnackbarHost(hostState = snackbars)
         }
     }

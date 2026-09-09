@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -12,6 +13,9 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -20,15 +24,29 @@ import com.talkswithtanha.twt.core.designsystem.Spacing
 import com.talkswithtanha.twt.core.designsystem.TwtColors
 import com.talkswithtanha.twt.core.designsystem.TwtTheme
 import com.talkswithtanha.twt.core.designsystem.components.TwtScreen
+import com.talkswithtanha.twt.core.notifications.FollowedSignalNotifier
 import com.talkswithtanha.twt.core.navigation.RootScreen
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
+    /**
+     * The signal a notification was tapped to open, if any.
+     *
+     * Held as state rather than read once, because the activity is
+     * `singleTop`-launched from the notification: a member with the app already
+     * open gets [onNewIntent] rather than a fresh [onCreate], and reading the
+     * intent only at creation would make the tap do nothing at all in exactly
+     * the case where the app was already in front of them.
+     */
+    private var pendingSignalId by mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        pendingSignalId = intent.signalId()
 
         // Every view model below this point depends on Firebase, so a missing
         // `google-services.json` has to be caught before the first one is
@@ -38,10 +56,26 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             TwtTheme {
-                if (configured) RootScreen() else NotConfiguredScreen()
+                if (configured) {
+                    RootScreen(
+                        pendingSignalId = pendingSignalId,
+                        onPendingSignalHandled = { pendingSignalId = null }
+                    )
+                } else {
+                    NotConfiguredScreen()
+                }
             }
         }
     }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingSignalId = intent.signalId()
+    }
+
+    private fun Intent.signalId(): String? =
+        getStringExtra(FollowedSignalNotifier.EXTRA_SIGNAL_ID)?.takeIf { it.isNotBlank() }
 }
 
 /**

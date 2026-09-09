@@ -4,6 +4,8 @@ import android.app.Application
 import android.util.Log
 import com.google.firebase.FirebaseApp
 import com.talkswithtanha.twt.core.notifications.NotificationChannels
+import com.talkswithtanha.twt.core.notifications.PushTokenRegistrar
+import com.talkswithtanha.twt.core.signals.FollowedSignalTracker
 import com.talkswithtanha.twt.core.session.SessionRepository
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -35,6 +37,8 @@ class TwtApplication : Application() {
     @InstallIn(SingletonComponent::class)
     interface SessionEntryPoint {
         fun session(): SessionRepository
+        fun pushTokens(): PushTokenRegistrar
+        fun followedSignals(): FollowedSignalTracker
     }
 
     override fun onCreate() {
@@ -59,9 +63,13 @@ class TwtApplication : Application() {
         // Attached for as long as the process lives. This is what notices a code
         // being redeemed or revoked from the admin panel; a listener owned by a
         // screen would die with that screen.
-        EntryPointAccessors.fromApplication(this, SessionEntryPoint::class.java)
-            .session()
-            .start()
+        val entryPoint =
+            EntryPointAccessors.fromApplication(this, SessionEntryPoint::class.java)
+        entryPoint.session().start()
+        entryPoint.pushTokens().start()
+        // Watches followed trades for the life of the process, so an alert does
+        // not depend on the member having opened a signals screen this session.
+        entryPoint.followedSignals().start()
     }
 
     private companion object {

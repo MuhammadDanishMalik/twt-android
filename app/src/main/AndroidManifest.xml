@@ -2,7 +2,33 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!--
+      Android 13+. Requested at the moment a member follows their first trade,
+      not at launch: that is the first point at which they have an obvious reason
+      to say yes, having just asked to be told what happens to it.
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!--
+      Opening WhatsApp, the access page and YouTube. Package visibility on
+      Android 11+ means an ACTION_VIEW intent this app cannot "see" silently
+      resolves to nothing, so the browser and the WhatsApp deep link are
+      declared here.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="mailto" />
+        </intent>
+    </queries>
+
     <application
+        android:name=".TwtApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -10,18 +36,44 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Twtandroid">
+        android:theme="@style/Theme.Twt"
+        tools:targetApi="31">
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.Twtandroid">
+            android:theme="@style/Theme.Twt"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".core.notifications.TwtMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!--
+          The status-bar icon and accent FCM falls back to for a notification the
+          app did not build itself. Without these a data-only payload handled
+          while the app is dead renders with the launcher icon squashed into a
+          grey square.
+        -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_signal" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/twt_gold" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="general" />
     </application>
 
 </manifest>

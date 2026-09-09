@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
-    <style name="Theme.Twtandroid" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+      The platform theme, which only ever shows during the cold-start window
+      before Compose draws. Painted the app's own near-black so launching does
+      not flash white.
+    -->
+    <style name="Theme.Twt" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/twt_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
 </resources>

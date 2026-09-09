@@ -21,11 +21,12 @@ if (googleServicesFile.exists()) {
 
 android {
     namespace = "com.talkswithtanha.twt"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    // 37, because the current AndroidX stack requires it: hilt-navigation-compose
+    // 1.4.0, the 2026.09 Compose BOM and navigation-compose 2.10.1 all refuse to
+    // link against anything older. compileSdk only decides which APIs may be
+    // called; `targetSdk` below is what opts the app in to new runtime
+    // behaviour, and it stays at 36.
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.talkswithtanha.twt"

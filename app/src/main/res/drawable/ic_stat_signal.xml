@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Status-bar icon. Android renders these as a silhouette from the alpha channel
+  alone: every colour is thrown away and any solid fill becomes a white blob, so
+  this is drawn as strokes on a transparent ground.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFFFF">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M3,17.5L8.5,12L12.5,16L21,7.4L21,11.5L22.5,11.5L22.5,4.9L15.9,4.9L15.9,6.4L20,6.4L12.5,13.9L8.5,9.9L2,16.4Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M2,19.5h20v1.6h-20z" />
+</vector>

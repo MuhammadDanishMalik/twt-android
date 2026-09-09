@@ -13,3 +13,7 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Firebase config. Contains this project's API key and app id -- regenerate it
+# per developer from the Firebase console rather than sharing it through git.
+app/google-services.json

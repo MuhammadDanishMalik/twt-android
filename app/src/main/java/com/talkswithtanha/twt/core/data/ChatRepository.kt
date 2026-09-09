@@ -6,7 +6,9 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.SetOptions
 import com.talkswithtanha.twt.core.firebase.FirestorePaths.ChatRoomField as R
+import com.talkswithtanha.twt.core.firebase.FirestorePaths
 import com.talkswithtanha.twt.core.firebase.FirestorePaths.Collection
 import com.talkswithtanha.twt.core.firebase.FirestorePaths.MessageField as M
 import com.talkswithtanha.twt.core.model.ChatMessage
@@ -178,19 +180,22 @@ class FirebaseChatRepository @Inject constructor(
         lastMessage: String?
     ) {
         val payload = mutableMapOf<String, Any>(
-            R.TYPE to "support",
-            R.USER_ID to uid,
-            R.USER_NAME to userName,
-            R.USER_EMAIL to userEmail,
+            R.KIND to R.KIND_SUPPORT,
+            R.MEMBER_ID to uid,
+            R.MEMBER_NAME to userName,
+            R.MEMBER_EMAIL to userEmail,
             R.UPDATED_AT to FieldValue.serverTimestamp()
         )
         lastMessage?.let {
             payload[R.LAST_MESSAGE] = it.take(140)
             payload[R.LAST_MESSAGE_AT] = FieldValue.serverTimestamp()
+            payload[R.NEEDS_REPLY] = true
         }
+        // Merged, so opening the thread never wipes the unread flag or the last
+        // message that put it in Tanha's queue.
         db.collection(Collection.CHAT_ROOMS)
-            .document(com.talkswithtanha.twt.core.firebase.FirestorePaths.ChatRoom.support(uid))
-            .set(payload, com.google.firebase.firestore.SetOptions.merge())
+            .document(FirestorePaths.ChatRoom.support(uid))
+            .set(payload, SetOptions.merge())
             .await()
     }
 

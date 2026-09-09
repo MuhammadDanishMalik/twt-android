@@ -267,24 +267,58 @@ object FirestorePaths {
      * conversation is invisible.
      */
     object ChatRoomField {
-        const val TYPE = "type"
-        const val USER_ID = "userId"
-        const val USER_NAME = "userName"
-        const val USER_EMAIL = "userEmail"
+        /**
+         * `"support"` for a private thread. The admin panel's queue is
+         * `where(kind == 'support').orderBy(lastMessageAt desc)`, so a room
+         * document without this field is a conversation Tanha never sees —
+         * mirrored from `SupportRoomField` in the iOS project, where these names
+         * are also mirrored into `twt-admin/lib/support-repo.ts`.
+         */
+        const val KIND = "kind"
+        const val KIND_SUPPORT = "support"
+
+        const val MEMBER_ID = "memberId"
+        const val MEMBER_NAME = "memberName"
+        const val MEMBER_EMAIL = "memberEmail"
         const val LAST_MESSAGE = "lastMessage"
         const val LAST_MESSAGE_AT = "lastMessageAt"
         const val UPDATED_AT = "updatedAt"
+
+        /**
+         * True when the member has spoken last. Cleared by the admin panel when
+         * Tanha replies — it is the whole reason his queue has an order.
+         *
+         * Set, not incremented: a member sending a second message before he has
+         * read the first should not read as two unhandled threads. It is one
+         * conversation waiting on him.
+         */
+        const val NEEDS_REPLY = "needsReply"
     }
 
     object AcademyVideoField {
         const val TITLE = "title"
         const val DESCRIPTION = "description"
-        const val YOUTUBE_ID = "youtubeId"
-        const val THUMBNAIL_URL = "thumbnailURL"
+
+        /**
+         * The YouTube id, despite the name.
+         *
+         * The field is called `videoUrl` because it once held one; the admin
+         * panel now writes a bare id into it and iOS reads it as such. Renaming
+         * it would orphan every lesson already published, so the name stays
+         * wrong and this comment exists instead. The thumbnail is derived from
+         * it rather than stored, so there is no second field to keep in sync.
+         */
+        const val VIDEO_ID = "videoUrl"
+
         const val CATEGORY = "category"
         const val LEVEL = "level"
-        const val DURATION_SECONDS = "durationSeconds"
-        const val ORDER = "order"
+
+        /** Seconds. */
+        const val DURATION = "duration"
+
+        /** Points toward the learning score the academy screen shows. */
+        const val XP_REWARD = "xpReward"
+
         const val IS_PUBLISHED = "isPublished"
         const val CREATED_AT = "createdAt"
     }

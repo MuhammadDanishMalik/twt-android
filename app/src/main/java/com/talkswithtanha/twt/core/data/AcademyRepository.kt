@@ -22,35 +22,38 @@ class FirebaseAcademyRepository @Inject constructor(
 
     override fun observeVideos(): Flow<Snapshot<List<AcademyVideo>>> =
         db.collection(Collection.ACADEMY_VIDEOS)
-            .orderBy(F.ORDER, Query.Direction.ASCENDING)
+            // Drafts stay out of the app, same rule as signals: a lesson being
+            // written should not appear half-finished in someone's course list.
+            //
+            // Filters on one field and orders by another, so this needs the
+            // composite index declared in `firestore.indexes.json`. The emulator
+            // does not enforce composite indexes, so it passes locally and fails
+            // live without it.
+            .whereEqualTo(F.IS_PUBLISHED, true)
+            .orderBy(F.CREATED_AT, Query.Direction.DESCENDING)
             .snapshotFlow()
             .map { snapshot ->
                 when (snapshot) {
                     is Snapshot.Failed -> snapshot
                     is Snapshot.Data -> Snapshot.Data(
                         snapshot.value.documents.mapNotNull { document ->
-                            // A lesson with no video id is a draft row in the
-                            // admin panel, not something to put on a screen.
-                            val youtubeId = document.get(F.YOUTUBE_ID).asNonBlankString()
+                            // Without a video id there is nothing to play, so
+                            // the row is worthless — better absent than a card
+                            // that does nothing when tapped.
+                            val videoId = document.get(F.VIDEO_ID).asNonBlankString()
                                 ?: return@mapNotNull null
-                            // Unpublished lessons stay out of the app, same as
-                            // unpublished signals. Filtered here rather than in
-                            // the query so this needs no composite index --
-                            // the collection is small enough that it does not
-                            // matter, and one fewer index is one fewer thing
-                            // that has to be deployed before the app works.
-                            if (document.getBoolean(F.IS_PUBLISHED) == false) return@mapNotNull null
+                            val title = document.get(F.TITLE).asNonBlankString()
+                                ?: return@mapNotNull null
 
                             AcademyVideo(
                                 id = document.id,
-                                title = document.get(F.TITLE).asNonBlankString() ?: "Untitled lesson",
+                                title = title,
                                 description = document.get(F.DESCRIPTION).asNonBlankString(),
-                                youtubeId = youtubeId,
+                                youtubeId = videoId,
                                 category = document.get(F.CATEGORY).asNonBlankString(),
                                 level = document.get(F.LEVEL).asNonBlankString(),
-                                durationSeconds = document.get(F.DURATION_SECONDS)
-                                    .asLongOrNull()?.toInt(),
-                                order = document.get(F.ORDER).asLongOrNull()?.toInt() ?: 0,
+                                duration = document.get(F.DURATION).asLongOrNull()?.toInt() ?: 0,
+                                xpReward = document.get(F.XP_REWARD).asLongOrNull()?.toInt() ?: 0,
                                 createdAt = document.getTimestamp(F.CREATED_AT)?.toDate() ?: Date()
                             )
                         }

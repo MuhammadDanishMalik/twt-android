@@ -56,6 +56,7 @@ import com.talkswithtanha.twt.core.designsystem.components.PremiumBadge
 import com.talkswithtanha.twt.core.designsystem.components.TwtCard
 import com.talkswithtanha.twt.core.designsystem.components.TwtScreen
 import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 @Composable
@@ -158,7 +159,7 @@ fun ProfileScreen(
                             PremiumBadge()
                             Text(
                                 text = user?.membershipExpiresAt?.let {
-                                    "Access until ${dateFormat.format(it)}"
+                                    "Access until ${formatDate(it)}"
                                 } ?: "Access does not expire",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = TwtColors.TextTertiary
@@ -299,4 +300,6 @@ private fun SettingsRow(icon: ImageVector, title: String, onClick: () -> Unit) {
     }
 }
 
-private val dateFormat = SimpleDateFormat("d MMM yyyy", Locale.getDefault())
+/** Built per call — see the note in `ChatScreens.formatTime`. */
+private fun formatDate(date: Date): String =
+    SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(date)

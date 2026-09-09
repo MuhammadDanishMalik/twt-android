@@ -96,7 +96,7 @@ class FirebaseChatRepository @Inject constructor(
                     is Snapshot.Failed -> snapshot
                     is Snapshot.Data -> Snapshot.Data(
                         snapshot.value.documents
-                            .mapNotNull { map(it, currentUserId, snapshot.value.metadata.hasPendingWrites()) }
+                            .mapNotNull { map(it, currentUserId) }
                             .reversed()
                     )
                 }
@@ -115,7 +115,7 @@ class FirebaseChatRepository @Inject constructor(
             .get()
             .await()
             .documents
-            .mapNotNull { map(it, currentUserId, false) }
+            .mapNotNull { map(it, currentUserId) }
             .reversed()
 
     override suspend fun send(
@@ -201,8 +201,7 @@ class FirebaseChatRepository @Inject constructor(
 
     private fun map(
         document: DocumentSnapshot,
-        currentUserId: String,
-        hasPendingWrites: Boolean
+        currentUserId: String
     ): ChatMessage? {
         val senderId = document.get(M.SENDER_ID).asNonBlankString().orEmpty()
 
@@ -243,7 +242,11 @@ class FirebaseChatRepository @Inject constructor(
             reactions = reactions,
             isEdited = document.getBoolean(M.IS_EDITED) ?: false,
             seenBy = seenBy,
-            isPending = serverTimestamp == null && hasPendingWrites
+            // Per document, not per query. `QuerySnapshot.metadata` is true
+            // while *any* write in the query is in flight, so reading it there
+            // marks every message in the room as "sending" whenever one of them
+            // is -- including messages sent last week by other people.
+            isPending = serverTimestamp == null && document.metadata.hasPendingWrites()
         )
     }
 }

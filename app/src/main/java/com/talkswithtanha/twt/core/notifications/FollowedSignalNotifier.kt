@@ -61,7 +61,7 @@ class FollowedSignalNotifier @Inject constructor(
             .setContentIntent(openSignal(signal.id))
             .build()
 
-        manager.notify(notificationId(signal.id), notification)
+        post(notificationId(signal.id), notification)
     }
 
     /**
@@ -87,10 +87,25 @@ class FollowedSignalNotifier @Inject constructor(
 
         // A distinct id per status, so "TP1 HIT" and the later "CLOSED ✓" are
         // two entries rather than one overwriting the other.
-        manager.notify(
-            notificationId("${signal.id}:${signal.status.stored}"),
-            notification
-        )
+        post(notificationId("${signal.id}:${signal.status.stored}"), notification)
+    }
+
+    /**
+     * Posts, and swallows the refusal.
+     *
+     * [canPost] is checked before building anything, but a permission can be
+     * revoked between that check and this call — the member pulls down the
+     * shade and turns notifications off while a trade is running — and the
+     * throw lands on whichever coroutine happened to be reconciling. There is
+     * nothing useful to do about it: the member has just said they do not want
+     * these, and the in-app journal is unaffected.
+     */
+    private fun post(id: Int, notification: android.app.Notification) {
+        try {
+            manager.notify(id, notification)
+        } catch (e: SecurityException) {
+            android.util.Log.i(TAG, "Notifications are not permitted; skipping", e)
+        }
     }
 
     fun dismiss(signalId: String) {
@@ -165,5 +180,6 @@ class FollowedSignalNotifier @Inject constructor(
 
     companion object {
         const val EXTRA_SIGNAL_ID = "twt.signalId"
+        private const val TAG = "FollowedSignalNotifier"
     }
 }

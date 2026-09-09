@@ -1,6 +1,6 @@
 package com.talkswithtanha.twt.core.data
 
-import android.net.Uri
+import androidx.core.net.toUri
 import com.google.firebase.firestore.FirebaseFirestore
 import com.talkswithtanha.twt.core.firebase.FirestorePaths.Collection
 import com.talkswithtanha.twt.core.firebase.FirestorePaths.Document
@@ -125,6 +125,6 @@ class FirebaseSupportConfigRepository @Inject constructor(
      */
     private fun httpsOrNull(value: String?): String? {
         val text = value?.takeIf { it.isNotBlank() } ?: return null
-        return text.takeIf { Uri.parse(it).scheme?.lowercase() == "https" }
+        return text.takeIf { it.toUri().scheme?.lowercase() == "https" }
     }
 }

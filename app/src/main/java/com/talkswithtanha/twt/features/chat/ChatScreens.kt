@@ -270,7 +270,7 @@ private fun MessageBubble(message: ChatMessage) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = timeFormat.format(message.timestamp),
+                    text = formatTime(message.timestamp),
                     style = MaterialTheme.typography.labelSmall,
                     color = TwtColors.TextTertiary
                 )
@@ -349,4 +349,14 @@ private fun ChatInputBar(
     }
 }
 
-private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+/**
+ * Built per call, not held in a `val`.
+ *
+ * A formatter created once at class initialisation captures whatever locale was
+ * current then and keeps it for the life of the process — so a member who
+ * changes their phone's language goes on seeing timestamps in the old one until
+ * they force-quit. `SimpleDateFormat` is also not thread-safe, which a shared
+ * instance quietly ignores.
+ */
+private fun formatTime(date: Date): String =
+    SimpleDateFormat("HH:mm", Locale.getDefault()).format(date)

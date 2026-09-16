@@ -106,7 +106,7 @@ private fun NotConfiguredScreen() {
             Text(
                 text = "app/google-services.json is missing.\n\n" +
                     "Firebase console → project twt-database-9be63 → Project settings → " +
-                    "Add app → Android, with the package name com.talkswithtanha.twt. " +
+                    "Add app → Android, with the package name com.orixto.twt. " +
                     "Download the file into app/ and rebuild.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = TwtColors.TextSecondary,

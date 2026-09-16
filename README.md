@@ -9,7 +9,7 @@ security rules, same push tokens. A member who signs up on iPhone signs in on
 Android and sees their own data. Nothing server-side needs building or changing.
 
 Firebase project: `twt-database-9be63`
-Package name: `com.talkswithtanha.twt`
+Package name: `com.orixto.twt` (Kotlin namespace `com.talkswithtanha.twt`)
 
 ---
 
@@ -24,7 +24,7 @@ so a fresh clone compiles and installs for anyone. The app then shows a
 To connect it for real:
 
 1. Firebase console → project **twt-database-9be63** → Project settings
-2. **Add app → Android**, package name exactly `com.talkswithtanha.twt`
+2. **Add app → Android**, package name exactly `com.orixto.twt`
 3. Download `google-services.json` into `app/`
 4. Rebuild. The Google Services plugin applies itself on the next sync.
 

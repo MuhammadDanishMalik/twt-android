@@ -51,7 +51,7 @@ class TwtApplication : Application() {
             Log.e(
                 TAG,
                 "Firebase is not configured: app/google-services.json is missing. " +
-                    "Add the Android app `com.talkswithtanha.twt` in the Firebase console " +
+                    "Add the Android app `com.orixto.twt` in the Firebase console " +
                     "(project twt-database-9be63), download the file into app/, and rebuild. " +
                     "The app will run, but nothing that talks to the network will work."
             )

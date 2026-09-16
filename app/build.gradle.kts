@@ -11,7 +11,7 @@ plugins {
 // file is actually there.
 //
 // Drop the real file (Firebase console -> Project settings -> Add app -> Android,
-// package name `com.talkswithtanha.twt`) into `app/` and it wires itself up on the
+// package name `com.orixto.twt`) into `app/` and it wires itself up on the
 // next sync. Without it the app builds and installs but cannot reach Firebase --
 // `TwtApplication` says so in one line rather than crashing somewhere obscure.
 val googleServicesFile = file("google-services.json")
@@ -29,7 +29,10 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.talkswithtanha.twt"
+        // Must equal the package registered in the Firebase console, which is
+        // what `google-services.json` is generated for. The Kotlin `namespace`
+        // above is only where the code and R class live, and can differ.
+        applicationId = "com.orixto.twt"
         minSdk = 24
         targetSdk = 36
         versionCode = 1

@@ -6,8 +6,10 @@ import com.talkswithtanha.twt.core.data.Snapshot
 import com.talkswithtanha.twt.core.data.UserRepository
 import com.talkswithtanha.twt.core.model.LoginProvider
 import com.talkswithtanha.twt.core.model.User
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -15,6 +17,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -74,13 +78,65 @@ class SessionRepository @Inject constructor(
     private var profileJob: Job? = null
     private var watchedUid: String? = null
 
+    /**
+     * Whether the auth listener has delivered its first callback yet.
+     *
+     * Firebase calls an auth state listener once immediately on registration
+     * with whatever session it restored, and then again on every later sign-in
+     * and sign-out. Those two kinds of callback need opposite handling -- see
+     * [onAuthChanged] -- and this is how they are told apart.
+     */
+    private var initialAuthStateHandled = false
+
+    /**
+     * Every session id this installation has written during this process.
+     *
+     * A snapshot can legitimately carry an id that is not the latest one this
+     * device holds: a claim rotates the stored id *before* its write reaches the
+     * server, and a snapshot already on its way in still shows the previous one.
+     * If that previous id was ours too, nobody took the account. Only an id this
+     * device never generated is evidence of another device.
+     */
+    private val ownSessionIds = mutableSetOf<String>()
+
+    /** Serialises claims, so two can never rotate the id out from under each other. */
+    private val claimMutex = Mutex()
+
     /** Attaches the auth listener. Safe to call more than once. */
     fun start() {
         if (authListener != null) return
         authListener = authService.observeAuthState { uid -> onAuthChanged(uid) }
     }
 
+    /**
+     * ### Why a fresh sign-in is ignored here
+     *
+     * This is the bug that bounced a correct password straight back to the
+     * login screen, so it is worth spelling out.
+     *
+     * Firebase notifies this listener *during* `signInWithEmailAndPassword`,
+     * before the call returns to [establishSession]. Handling that callback here
+     * meant two paths ran for one sign-in, concurrently: this one attached the
+     * profile listener, while [establishSession] was still creating the profile
+     * and claiming the session. The listener's first snapshot carried the
+     * *previous* device's session id, which never matches this one -- so the
+     * device signed itself out four seconds after signing in. It is exactly the
+     * ordering bug §8 of the build brief warns about, arrived at by a different
+     * route.
+     *
+     * So the work is split by who owns it:
+     *
+     *  - **The first callback** is a session Firebase restored on launch. Nobody
+     *    else will handle it, so it is handled here -- by *watching only*, never
+     *    claiming. See [observeRestoredSession].
+     *  - **Every later non-null callback** is a sign-in that [establishSession]
+     *    owns end to end. Doing anything here would race it.
+     *  - **Null** is a sign-out, whenever it arrives.
+     */
     private fun onAuthChanged(uid: String?) {
+        val isInitial = !initialAuthStateHandled
+        initialAuthStateHandled = true
+
         if (uid == null) {
             profileJob?.cancel()
             profileJob = null
@@ -91,39 +147,58 @@ class SessionRepository @Inject constructor(
             return
         }
 
-        // Already watching this account. Re-attaching would tear down a healthy
-        // listener and re-run the whole first-snapshot path for nothing.
-        if (uid == watchedUid && profileJob?.isActive == true) return
+        if (!isInitial) return
 
-        if (_currentUser.value == null) _state.value = State.LoadingProfile
-
-        // A restored session on cold start. The device already holds a session
-        // id from last time, so it claims the account again before watching —
-        // same ordering as a fresh sign-in, and for the same reason.
-        scope.launch {
-            claimDeviceSession(uid)
-            observeProfile(uid)
-        }
+        _state.value = State.LoadingProfile
+        scope.launch { observeRestoredSession(uid) }
     }
 
     /**
-     * Called by the auth flow once a sign-in succeeds.
+     * A session restored on launch: watch, and do not claim.
+     *
+     * Claiming here would be wrong in a way that is easy to miss. Say this phone
+     * was signed in, its app was killed, and the member then signed in on a
+     * second phone. When this one next launches, the account belongs to the
+     * second phone -- and a restore that claimed would silently take it back and
+     * kick the device the member is actually holding. Watching instead compares
+     * against the id this device last wrote, sees the newer device's id, and
+     * signs *this* one out, which is the right way round.
+     */
+    private suspend fun observeRestoredSession(uid: String) {
+        ownSessionIds += deviceIdentity.currentSessionId()
+        observeProfile(uid)
+    }
+
+    /**
+     * Called by the auth flow once a sign-in succeeds, and the sole owner of
+     * that sign-in.
      *
      * The order of the last two steps is the whole point, and it is the bug §8
-     * of the build brief describes.
-     *
-     * Attaching the listener first means it fires with whatever
-     * `currentSessionId` the *previous* device left behind, which will never
-     * match the id this device just generated — so the watcher concludes the
-     * account is in use elsewhere and signs this device out, moments after it
-     * successfully signed in. The device taking over kicks itself out instead of
-     * taking over, and from the outside that is a login that bounces straight
-     * back to the splash screen.
-     *
-     * Claiming first makes the first snapshot the listener ever sees already
-     * contain this device's own id.
+     * of the build brief describes. Attaching the listener first means it fires
+     * with whatever `currentSessionId` the *previous* device left behind, which
+     * never matches the id this device just generated -- so the device taking
+     * over kicks itself out instead. Claiming first makes the first snapshot the
+     * listener ever sees already contain this device's own id.
      */
     suspend fun establishSession(auth: AuthResult, country: String? = null) {
+        // Run in the application scope and wait for it, rather than running in
+        // whatever scope called this.
+        //
+        // The caller is the sign-in screen's view model. The moment this marks
+        // the member signed in, the root gate navigates away from that screen,
+        // which destroys the view model and cancels its scope -- so a sign-in run
+        // in that scope was cancelled by its own success, part-way through
+        // claiming the device, and left the app stuck on a loading state. Setting
+        // up a session is not screen work and must not die with a screen.
+        scope.async { establishSessionInAppScope(auth, country) }.await()
+    }
+
+    private suspend fun establishSessionInAppScope(auth: AuthResult, country: String?) {
+        // Stop any watcher left from a previous account before touching this one.
+        profileJob?.cancel()
+        profileJob = null
+        watchedUid = null
+
         _state.value = State.LoadingProfile
         _profileError.value = null
         _wasKickedByOtherDevice.value = false
@@ -137,17 +212,26 @@ class SessionRepository @Inject constructor(
                 provider = auth.provider,
                 country = country
             )
+
+            // The profile document exists by now, which matters: the claim is an
+            // `update`, and an update against a document that is not there yet
+            // -- a brand new account whose create has not landed -- fails.
+            claimDeviceSession(auth.uid)
+
+            // Signed in only once the claim has landed. Publishing this earlier
+            // lets the gate react -- and navigate, and tear screens down -- while
+            // the session is still half set up.
             _currentUser.value = user
             _state.value = State.SignedIn
 
-            claimDeviceSession(auth.uid)
             observeProfile(auth.uid)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            // The profile could not be created or read — in practice, security
+            // The profile could not be created or read -- in practice, security
             // rules refusing `users/{uid}`. Without this branch the sign-in is
-            // thrown away: `currentUser` stays null and the caller sends a
-            // correctly-authenticated member back to the login screen, which is
-            // indistinguishable from a crash from the outside.
+            // thrown away and a correctly-authenticated member is sent back to
+            // the login screen, which is indistinguishable from a crash.
             Log.e(TAG, "Could not establish session for ${auth.uid}", e)
             _profileError.value =
                 "Signed in, but your profile could not be loaded. Pull to retry."
@@ -159,17 +243,23 @@ class SessionRepository @Inject constructor(
      * Writes this device's claim on the account.
      *
      * Deliberately non-throwing. A failed claim leaves the previous device's id
-     * in place, which is a lost takeover — annoying. A claim that throws out of
-     * sign-in is a member who cannot get in at all — much worse.
+     * in place, which is a lost takeover -- annoying. A claim that throws out of
+     * sign-in is a member who cannot get in at all -- much worse.
      */
-    private suspend fun claimDeviceSession(uid: String) {
+    private suspend fun claimDeviceSession(uid: String) = claimMutex.withLock {
         try {
+            val sessionId = deviceIdentity.rotateSessionId()
+            // Recorded before the write goes out, so a snapshot that races the
+            // write back in is already recognised as ours.
+            ownSessionIds += sessionId
             userRepository.claimDeviceSession(
                 uid = uid,
-                sessionId = deviceIdentity.rotateSessionId(),
+                sessionId = sessionId,
                 deviceId = deviceIdentity.deviceId(),
                 deviceModel = deviceIdentity.deviceModel
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "Could not claim the device session; carrying on", e)
         }
@@ -179,12 +269,10 @@ class SessionRepository @Inject constructor(
         profileJob?.cancel()
         watchedUid = uid
         profileJob = scope.launch {
-            val localSessionId = deviceIdentity.currentSessionId()
-
             userRepository.observeUser(uid).collect { snapshot ->
                 when (snapshot) {
                     is Snapshot.Failed -> onProfileListenerFailed(snapshot.error)
-                    is Snapshot.Data -> onProfileArrived(uid, snapshot.value, localSessionId)
+                    is Snapshot.Data -> onProfileArrived(uid, snapshot.value)
                 }
             }
         }
@@ -195,10 +283,9 @@ class SessionRepository @Inject constructor(
      *
      * Single-device enforcement fails open, on purpose. The only thing that may
      * sign a member out is a snapshot that actually arrived and actually carried
-     * a different session id. A network blip, a permission error, an expired
-     * token mid-refresh — none of those say anything about whether somebody else
-     * is using the account, and treating them as evidence logs a member out on a
-     * patchy connection for no reason.
+     * a session id this device never wrote. A network blip, a permission error,
+     * an expired token mid-refresh -- none of those say anything about whether
+     * somebody else is using the account.
      *
      * A permission denial is the one worth surfacing, because it means the rules
      * refused this account rather than the network failing.
@@ -213,13 +300,11 @@ class SessionRepository @Inject constructor(
             _profileError.value = "This account could not be read. Contact support."
             _state.value = State.LoadingProfile
         }
-        // Otherwise: say nothing, change nothing. The listener retries on its
-        // own, and whatever profile is already in hand stays valid.
     }
 
-    private fun onProfileArrived(uid: String, user: User?, localSessionId: String) {
+    private suspend fun onProfileArrived(uid: String, user: User?) {
         if (user == null) {
-            // The document is genuinely absent — a first sign-in whose create
+            // The document is genuinely absent -- a first sign-in whose create
             // has not landed yet, or an account deleted from the console.
             if (_currentUser.value == null) _state.value = State.LoadingProfile
             return
@@ -228,20 +313,19 @@ class SessionRepository @Inject constructor(
         val remoteSessionId = user.currentSessionId
 
         when {
-            // Somebody else took the account. This is the only path that signs
-            // anyone out: a snapshot that arrived, with a non-empty id, that is
-            // not ours.
-            !remoteSessionId.isNullOrBlank() && remoteSessionId != localSessionId -> {
+            // No prior session recorded -- an account that has never claimed, or
+            // one whose claim failed earlier. Take it now, off this collector so
+            // the snapshot that confirms it can be delivered.
+            remoteSessionId.isNullOrBlank() -> scope.launch { claimDeviceSession(uid) }
+
+            // Somebody else took the account. The only path that signs anyone
+            // out: a snapshot that arrived, carrying an id this device never
+            // generated.
+            remoteSessionId !in ownSessionIds -> {
                 Log.i(TAG, "Account claimed on another device; ending this session")
                 _wasKickedByOtherDevice.value = true
                 signOut()
                 return
-            }
-
-            // No prior session recorded — an account that has never claimed, or
-            // one whose claim failed earlier. Take it now.
-            remoteSessionId.isNullOrBlank() -> {
-                scope.launch { claimDeviceSession(uid) }
             }
         }
 
@@ -297,6 +381,7 @@ class SessionRepository @Inject constructor(
     }
 
     fun signOut() {
+        ownSessionIds.clear()
         // Cancel the profile listener first. The rules deny reads to signed-out
         // clients, so leaving it attached produces a permission error on the way
         // out — which the fail-open branch would then have to reason about.

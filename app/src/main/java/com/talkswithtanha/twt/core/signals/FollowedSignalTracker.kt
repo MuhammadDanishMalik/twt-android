@@ -16,12 +16,16 @@ import com.talkswithtanha.twt.core.session.SessionRepository
 import com.talkswithtanha.twt.core.storage.appPreferences
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -48,6 +52,7 @@ import javax.inject.Singleton
  * This class is written so the local path is complete and correct on its own,
  * and so the push path only has to deliver the same payload.
  */
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @Singleton
 class FollowedSignalTracker @Inject constructor(
     @param:ApplicationContext private val context: Context,
@@ -108,10 +113,20 @@ class FollowedSignalTracker @Inject constructor(
         // The reconciliation loop. Every time either the follow list or the
         // signals feed changes, look for followed trades whose status moved.
         scope.launch {
-            combine(
-                follows,
-                signalRepository.observeSignals()
-            ) { follows, signals -> follows to signals }
+            // Re-subscribed per signed-in account rather than opened once at
+            // launch. The rules only let a signed-in client read `signals`, and
+            // Firestore closes a listener for good after a permission error --
+            // so a listener opened while signed out would fail once and never
+            // deliver anything again, and a member who signed in afterwards
+            // would get no alerts for the rest of the process.
+            val signalsForUser = session.currentUser
+                .map { it?.id }
+                .distinctUntilChanged()
+                .flatMapLatest { uid ->
+                    if (uid == null) flowOf(null) else signalRepository.observeSignals()
+                }
+
+            combine(follows, signalsForUser) { follows, signals -> follows to signals }
                 .collect { (follows, signals) ->
                     if (signals is Snapshot.Data) reconcile(follows, signals.value)
                 }
@@ -124,10 +139,22 @@ class FollowedSignalTracker @Inject constructor(
     fun followFor(signalId: String): SignalFollow? =
         _follows.value.firstOrNull { it.signalId == signalId }
 
+    /**
+     * The live follows listener. Held so it can be cancelled.
+     *
+     * It was not, originally: signing out stopped nothing, so the listener kept
+     * querying `signalFollows` for an account that was no longer signed in and
+     * logged a permission denial every time the rules refused it -- and
+     * switching accounts stacked a second listener on top of the first, both
+     * writing into the same list.
+     */
+    private var followsJob: Job? = null
+
     private fun startFollows(userId: String) {
+        followsJob?.cancel()
         watchedUserId = userId
         _isLoading.value = true
-        scope.launch {
+        followsJob = scope.launch {
             followRepository.observeFollows(userId).collect { snapshot ->
                 when (snapshot) {
                     is Snapshot.Data -> {
@@ -149,6 +176,8 @@ class FollowedSignalTracker @Inject constructor(
     }
 
     private fun stop() {
+        followsJob?.cancel()
+        followsJob = null
         watchedUserId = null
         notifier.dismissAll(_follows.value.map { it.signalId })
         _follows.value = emptyList()

@@ -3,6 +3,9 @@ package com.talkswithtanha.twt.features.chat
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.WorkspacePremium
 import com.talkswithtanha.twt.core.data.ChatRepository
 import com.talkswithtanha.twt.core.data.Snapshot
 import com.talkswithtanha.twt.core.firebase.FirestorePaths
@@ -28,7 +31,11 @@ data class ChatRoomSummary(
     val roomId: String,
     val title: String,
     val subtitle: String,
-    val requiresAccess: Boolean
+    val requiresAccess: Boolean,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    val initials: String? = null,
+    /** Tanha's own thread wears the crown, the way it does on iOS. */
+    val crowned: Boolean = false
 )
 
 @HiltViewModel
@@ -45,16 +52,18 @@ class ChatListViewModel @Inject constructor(
                     ChatRoomSummary(
                         roomId = FirestorePaths.ChatRoom.COMMUNITY,
                         title = "Community",
-                        subtitle = "Everyone in TWT",
-                        requiresAccess = false
+                        subtitle = "Everyone on TWT",
+                        requiresAccess = false,
+                        icon = Icons.Filled.Groups
                     )
                 )
                 add(
                     ChatRoomSummary(
                         roomId = FirestorePaths.ChatRoom.PREMIUM,
-                        title = "Premium room",
-                        subtitle = "Code holders only",
-                        requiresAccess = true
+                        title = "Premium Community",
+                        subtitle = "Signals talk and Tanha's desk",
+                        requiresAccess = true,
+                        icon = Icons.Filled.WorkspacePremium
                     )
                 )
                 user?.let {
@@ -62,8 +71,10 @@ class ChatListViewModel @Inject constructor(
                         ChatRoomSummary(
                             roomId = FirestorePaths.ChatRoom.support(it.id),
                             title = "Talks with Tanha",
-                            subtitle = "Your private thread",
-                            requiresAccess = false
+                            subtitle = "Ask about your access, signals or your account",
+                            requiresAccess = false,
+                            initials = "TT",
+                            crowned = true
                         )
                     )
                 }
@@ -187,4 +198,38 @@ class ChatRoomViewModel @Inject constructor(
     }
 
     fun dismissError() { _error.value = null }
+}
+
+/**
+ * The Contact Support sheet's send button.
+ *
+ * Writes into the member's own `support_{uid}` thread, so the reply arrives in
+ * the Chat tab rather than in an email they will not check.
+ */
+@HiltViewModel
+class ContactSupportViewModel @Inject constructor(
+    private val chatRepository: ChatRepository,
+    private val session: SessionRepository
+) : ViewModel() {
+
+    fun send(message: String) {
+        val user = session.currentUser.value ?: return
+        if (message.isBlank()) return
+        viewModelScope.launch {
+            runCatching {
+                chatRepository.ensureSupportRoom(
+                    uid = user.id,
+                    userName = user.fullName,
+                    userEmail = user.email,
+                    lastMessage = message
+                )
+                chatRepository.send(
+                    roomId = FirestorePaths.ChatRoom.support(user.id),
+                    text = message,
+                    senderId = user.id,
+                    senderName = user.fullName
+                )
+            }
+        }
+    }
 }

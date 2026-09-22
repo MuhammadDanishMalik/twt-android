@@ -6,11 +6,13 @@ import com.talkswithtanha.twt.core.data.SupportConfigRepository
 import com.talkswithtanha.twt.core.model.SupportConfig
 import com.talkswithtanha.twt.core.model.User
 import com.talkswithtanha.twt.core.session.SessionRepository
+import com.talkswithtanha.twt.core.signals.FollowedSignalTracker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -19,10 +21,16 @@ import javax.inject.Inject
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     private val session: SessionRepository,
-    supportConfig: SupportConfigRepository
+    supportConfig: SupportConfigRepository,
+    tracker: FollowedSignalTracker
 ) : ViewModel() {
 
     val user: StateFlow<User?> = session.currentUser
+
+    /** Shown as "2 open" beside My Signals, the way iOS does. */
+    val openFollowCount: StateFlow<Int> = tracker.openFollows
+        .map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
     val support: StateFlow<SupportConfig> = supportConfig.observeConfig()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SupportConfig())

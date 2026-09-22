@@ -137,3 +137,30 @@ class SignalDetailViewModel @Inject constructor(
         }
     }
 }
+
+
+/**
+ * The member's journal. Reads the same tracker the alerting does, so the list
+ * and the notifications can never disagree about what is being followed.
+ */
+@HiltViewModel
+class MySignalsViewModel @Inject constructor(
+    private val tracker: FollowedSignalTracker
+) : ViewModel() {
+    val follows: StateFlow<List<SignalFollow>> = tracker.follows
+    val stats: StateFlow<TradingStats> = tracker.stats
+    val isLoading: StateFlow<Boolean> = tracker.isLoading
+
+    fun record(
+        signalId: String,
+        outcome: FollowOutcome,
+        pips: Double?,
+        amountMinor: Long?,
+        currency: String?,
+        note: String?
+    ) = viewModelScope.launch {
+        runCatching {
+            tracker.recordOutcome(signalId, outcome, pips, amountMinor, currency, note)
+        }
+    }
+}

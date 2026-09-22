@@ -29,28 +29,29 @@ sealed class AppRoute(val route: String) {
         fun of(signalId: String) = "signal/$signalId"
     }
 
+    data object RecordResult : AppRoute("record/{signalId}") {
+        const val ARG = "signalId"
+        fun of(signalId: String) = "record/$signalId"
+    }
+
     data object ChatRoom : AppRoute("chat/{roomId}") {
         const val ARG = "roomId"
         fun of(roomId: String) = "chat/$roomId"
     }
 
-    data object MySignals : AppRoute("mySignals")
     data object Academy : AppRoute("academy")
     data object Marketplace : AppRoute("marketplace")
-    data object Profile : AppRoute("profile")
+
+    // ── The settings family, presented as sheets on iOS ──────────────────
+    data object Settings : AppRoute("settings")
     data object EditProfile : AppRoute("editProfile")
+    data object MySignals : AppRoute("mySignals")
+    data object MyDeals : AppRoute("myDeals")
+    data object Appearance : AppRoute("appearance")
+    data object ContactSupport : AppRoute("contactSupport")
 
     companion object {
-        /**
-         * The three the bottom bar shows. Anything else hides it.
-         *
-         * `by lazy`, and not for performance. A sealed class's companion is
-         * initialised as part of the *parent's* static init, which runs before
-         * the nested `data object`s below it exist -- so building this set
-         * eagerly reads `Home.route` off a null reference and the app dies in
-         * `<clinit>` before drawing a frame. Deferring it to first access means
-         * the objects are there by the time it runs.
-         */
+        /** The three the bottom bar shows. Anything else hides it. */
         val bottomBarRoutes: Set<String> by lazy {
             setOf(Home.route, Signals.route, ChatList.route)
         }

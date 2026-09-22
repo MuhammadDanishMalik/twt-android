@@ -25,6 +25,17 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import com.talkswithtanha.twt.core.designsystem.IosColors
+import com.talkswithtanha.twt.features.settings.SettingsCard
+import com.talkswithtanha.twt.features.settings.SettingsDivider
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -52,67 +63,170 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/**
+ * The Chats tab, grouped the way iOS groups it: the two community rooms and the
+ * private thread with Tanha, then anything that came out of the marketplace.
+ */
 @Composable
 fun ChatListScreen(
     onOpenRoom: (String) -> Unit,
+    onOpenMarketplace: () -> Unit,
     viewModel: ChatListViewModel = hiltViewModel()
 ) {
     val rooms by viewModel.rooms.collectAsStateWithLifecycle()
     val user by viewModel.user.collectAsStateWithLifecycle()
 
-    TwtScreen {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = Spacing.lg,
-                end = Spacing.lg,
-                top = Spacing.huge,
-                bottom = 120.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md)
-        ) {
-            item {
-                Text(
-                    text = "Chat",
-                    style = MaterialTheme.typography.displayMedium,
-                    color = TwtColors.TextPrimary
-                )
-            }
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(IosColors.Background)
+            .statusBarsPadding()
+    ) {
+        Text(
+            text = "Chats",
+            color = Color.White,
+            fontSize = 34.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 20.dp, top = 12.dp, bottom = 16.dp)
+        )
 
-            items(rooms, key = { it.roomId }) { room ->
-                val locked = room.requiresAccess && user?.hasAppAccess != true
-                TwtCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { if (!locked) onOpenRoom(room.roomId) }
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = room.title,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = if (locked) TwtColors.TextTertiary else TwtColors.TextPrimary
-                            )
-                            Text(
-                                text = room.subtitle,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = TwtColors.TextTertiary
-                            )
+        LazyColumn(
+            contentPadding = PaddingValues(horizontal = 20.dp),
+            modifier = Modifier.padding(bottom = 100.dp)
+        ) {
+            item { ChatSectionHeader("Community") }
+
+            item {
+                SettingsCard {
+                    rooms.forEachIndexed { index, room ->
+                        val locked = room.requiresAccess && user?.hasAppAccess != true
+                        ChatRoomRow(
+                            title = room.title,
+                            subtitle = room.subtitle,
+                            initials = room.initials,
+                            icon = room.icon,
+                            locked = locked,
+                            crowned = room.crowned
+                        ) {
+                            if (!locked) onOpenRoom(room.roomId)
                         }
-                        if (locked) {
-                            Icon(
-                                Icons.Outlined.Lock,
-                                contentDescription = "Locked",
-                                tint = TwtColors.TextTertiary,
-                                modifier = Modifier.size(18.dp)
-                            )
+                        if (index < rooms.lastIndex) {
+                            SettingsDivider(76.dp)
                         }
                     }
                 }
             }
+
+            item { ChatSectionHeader("From the Marketplace") }
+
+            item {
+                SettingsCard {
+                    ChatRoomRow(
+                        title = "Trade with Tanha",
+                        subtitle = "Buy and sell dollars",
+                        initials = "TW",
+                        icon = null,
+                        locked = false,
+                        crowned = false,
+                        onClick = onOpenMarketplace
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatSectionHeader(title: String) {
+    Text(
+        text = title,
+        color = IosColors.TextSecondary,
+        fontSize = 15.sp,
+        modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+    )
+}
+
+/**
+ * One row. An emblem on the left — a glyph for a room, initials for a person —
+ * then the name, then a lock if the member's code does not reach it.
+ */
+@Composable
+private fun ChatRoomRow(
+    title: String,
+    subtitle: String,
+    initials: String?,
+    icon: androidx.compose.ui.graphics.vector.ImageVector?,
+    locked: Boolean,
+    crowned: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(Color(0xFF2C2C2E)),
+            contentAlignment = Alignment.Center
+        ) {
+            when {
+                icon != null -> Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.9f),
+                    modifier = Modifier.size(22.dp)
+                )
+                else -> Text(
+                    text = initials.orEmpty(),
+                    color = Color.White.copy(alpha = 0.9f),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+
+        Column(Modifier.weight(1f)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title,
+                    color = if (locked) IosColors.TextSecondary else Color.White,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                if (crowned) {
+                    Icon(
+                        Icons.Filled.WorkspacePremium,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+            Text(
+                text = subtitle,
+                color = IosColors.TextSecondary,
+                fontSize = 15.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        if (locked) {
+            Icon(
+                Icons.Outlined.Lock,
+                contentDescription = "Locked",
+                tint = IosColors.TextSecondary,
+                modifier = Modifier.size(18.dp)
+            )
         }
     }
 }

@@ -18,10 +18,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,17 +28,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.talkswithtanha.twt.core.designsystem.Haptics
-import com.talkswithtanha.twt.core.designsystem.LocalHapticsEnabled
-import com.talkswithtanha.twt.core.designsystem.Radius
-import com.talkswithtanha.twt.core.designsystem.Spacing
-import com.talkswithtanha.twt.core.designsystem.TwtColors
 
 data class BottomBarItem(
     val label: String,
@@ -48,18 +44,12 @@ data class BottomBarItem(
 )
 
 /**
- * The floating pill: 270 × 64dp, radius 32, 8dp above the system bar, 24dp
- * icons, 14sp labels.
+ * The floating tab bar.
  *
- * Three items — Home, Signals, Chat — and that count is part of the design
- * rather than an accident of what exists. The scaffold this replaced had four,
- * with Markets and Profile competing for the same space; the marketplace and
- * profile are reached from the home screen instead, which keeps the pill narrow
- * enough to actually float.
- *
- * A fixed width rather than `fillMaxWidth` with padding, because the pill is
- * meant to read as an object sitting on the content, not as a bar attached to
- * the bottom of the screen.
+ * Matched to the iOS one: a dark pill hovering above the content, three items,
+ * and the selected one wearing its own lighter pill behind the icon and label.
+ * The whole bar is sized to its contents rather than stretched across the
+ * screen, because it is meant to read as an object sitting on the content.
  */
 @Composable
 fun TwtBottomBar(
@@ -70,32 +60,25 @@ fun TwtBottomBar(
 ) {
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
-    Box(
+    Row(
         modifier = modifier
-            // 8dp above the gesture pill or the button bar, whichever the phone
-            // has. Reading the inset rather than guessing is what keeps it clear
-            // of both.
-            .padding(bottom = bottomInset + Spacing.sm)
-            .width(270.dp)
+            // Clear of the gesture pill or the button bar, whichever the phone
+            // has. Reading the inset rather than guessing keeps it off both.
+            .padding(bottom = bottomInset + 8.dp)
             .height(64.dp)
-            .clip(RoundedCornerShape(Radius.pill))
-            .background(TwtColors.BackgroundElevated)
-            .border(0.5.dp, TwtColors.HairlineStrong, RoundedCornerShape(Radius.pill)),
-        contentAlignment = Alignment.Center
+            .clip(CircleShape)
+            .background(Color(0xFF1C1C1E).copy(alpha = 0.96f))
+            .border(0.5.dp, Color.White.copy(alpha = 0.10f), CircleShape)
+            .padding(horizontal = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = Spacing.sm),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            items.forEach { item ->
-                BottomBarTab(
-                    item = item,
-                    selected = currentRoute == item.route,
-                    onClick = { onNavigate(item.route) },
-                    modifier = Modifier.weight(1f)
-                )
-            }
+        items.forEach { item ->
+            BottomBarTab(
+                item = item,
+                selected = currentRoute == item.route,
+                onClick = { onNavigate(item.route) }
+            )
         }
     }
 }
@@ -104,25 +87,26 @@ fun TwtBottomBar(
 private fun BottomBarTab(
     item: BottomBarItem,
     selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    onClick: () -> Unit
 ) {
     val haptics = LocalHapticFeedback.current
-    val hapticsEnabled = LocalHapticsEnabled.current
 
     val tint by animateColorAsState(
-        if (selected) TwtColors.Gold else TwtColors.TextTertiary,
+        if (selected) Color.White else Color.White.copy(alpha = 0.45f),
         label = "tint"
     )
     val scale by animateFloatAsState(
-        targetValue = if (selected) 1f else 0.92f,
+        targetValue = if (selected) 1f else 0.94f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
         label = "scale"
     )
 
     Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(Radius.chip))
+        modifier = Modifier
+            .clip(RoundedCornerShape(22.dp))
+            .background(
+                if (selected) Color.White.copy(alpha = 0.10f) else Color.Transparent
+            )
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -131,13 +115,16 @@ private fun BottomBarTab(
                 // confirmation that something happened, and nothing did.
                 enabled = !selected
             ) {
-                if (hapticsEnabled) Haptics.tap(haptics)
+                Haptics.tap(haptics)
                 onClick()
             }
-            .padding(vertical = Spacing.sm)
-            .scale(scale),
+            .padding(horizontal = 18.dp, vertical = 8.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            },
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Spacing.xxs)
+        verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         Icon(
             imageVector = item.icon,
@@ -147,7 +134,7 @@ private fun BottomBarTab(
         )
         Text(
             text = item.label,
-            style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp),
+            fontSize = 11.sp,
             color = tint
         )
     }

@@ -8,10 +8,6 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Forum
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.ShowChart
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
@@ -26,14 +22,21 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.talkswithtanha.twt.core.designsystem.brand.TabIcons
 import com.talkswithtanha.twt.core.designsystem.components.BottomBarItem
 import com.talkswithtanha.twt.core.designsystem.components.TwtBottomBar
 import com.talkswithtanha.twt.core.designsystem.components.TwtScreen
 
 private val bottomBarItems = listOf(
-    BottomBarItem("Home", Icons.Outlined.Home, AppRoute.Home.route),
-    BottomBarItem("Signals", Icons.Outlined.ShowChart, AppRoute.Signals.route),
-    BottomBarItem("Chat", Icons.Outlined.Forum, AppRoute.ChatList.route)
+    BottomBarItem("Home", AppRoute.Home.route) { tint, modifier ->
+        TabIcons.Home(modifier, tint)
+    },
+    BottomBarItem("Signals", AppRoute.Signals.route) { tint, modifier ->
+        TabIcons.Signals(modifier, tint)
+    },
+    BottomBarItem("Chat", AppRoute.ChatList.route) { tint, modifier ->
+        TabIcons.Chat(modifier, tint)
+    }
 )
 
 /**

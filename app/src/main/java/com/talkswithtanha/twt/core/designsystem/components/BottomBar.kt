@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,7 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -39,8 +37,9 @@ import com.talkswithtanha.twt.core.designsystem.Haptics
 
 data class BottomBarItem(
     val label: String,
-    val icon: ImageVector,
-    val route: String
+    val route: String,
+    /** Drawn, not an `ImageVector` — see [TabIcons]. */
+    val icon: @Composable (Color, Modifier) -> Unit
 )
 
 /**
@@ -69,8 +68,12 @@ fun TwtBottomBar(
             .clip(CircleShape)
             .background(Color(0xFF1C1C1E).copy(alpha = 0.96f))
             .border(0.5.dp, Color.White.copy(alpha = 0.10f), CircleShape)
-            .padding(horizontal = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+            // Inset past the pill's own corner radius. At 8dp the selected
+            // chip's corners poked out through the rounded end of the bar,
+            // because the bar's edge curves away faster than a straight inset
+            // accounts for.
+            .padding(horizontal = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         items.forEach { item ->
@@ -103,7 +106,9 @@ private fun BottomBarTab(
 
     Column(
         modifier = Modifier
-            .clip(RoundedCornerShape(22.dp))
+            // A capsule, like the bar it sits in. A rounded rectangle inside a
+            // pill reads as a button that does not quite fit.
+            .clip(CircleShape)
             .background(
                 if (selected) Color.White.copy(alpha = 0.10f) else Color.Transparent
             )
@@ -118,7 +123,7 @@ private fun BottomBarTab(
                 Haptics.tap(haptics)
                 onClick()
             }
-            .padding(horizontal = 18.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 7.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -126,12 +131,7 @@ private fun BottomBarTab(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        Icon(
-            imageVector = item.icon,
-            contentDescription = item.label,
-            tint = tint,
-            modifier = Modifier.size(24.dp)
-        )
+        item.icon(tint, Modifier.size(24.dp))
         Text(
             text = item.label,
             fontSize = 11.sp,

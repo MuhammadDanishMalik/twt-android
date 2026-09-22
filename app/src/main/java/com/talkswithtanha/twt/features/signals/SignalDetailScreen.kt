@@ -63,6 +63,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.talkswithtanha.twt.core.designsystem.Haptics
 import com.talkswithtanha.twt.core.designsystem.IosColors
+import com.talkswithtanha.twt.core.notifications.rememberNotificationPermissionRequest
 import com.talkswithtanha.twt.core.model.FollowOutcome
 import com.talkswithtanha.twt.core.model.Signal
 import java.text.SimpleDateFormat
@@ -89,6 +90,11 @@ fun SignalDetailScreen(
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
     var confirmUnfollow by remember { mutableStateOf(false) }
+
+    // Asked at the moment a member follows their first trade — the first point
+    // at which they have an obvious reason to say yes, having just asked to be
+    // told what happens to it.
+    val askForNotifications = rememberNotificationPermissionRequest()
 
     val signal = state.signal
 
@@ -152,7 +158,10 @@ fun SignalDetailScreen(
                         FollowActionButton(
                             state = state,
                             modifier = Modifier.weight(1f),
-                            onFollow = { viewModel.toggleFollow() },
+                            onFollow = {
+                                askForNotifications()
+                                viewModel.toggleFollow()
+                            },
                             onUnfollow = { confirmUnfollow = true },
                             onRecord = { onRecordResult(signal.id) }
                         )

@@ -58,6 +58,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.talkswithtanha.twt.BuildConfig
 import com.talkswithtanha.twt.core.designsystem.IosColors
+import com.talkswithtanha.twt.core.notifications.NotificationPermission
+import com.talkswithtanha.twt.core.notifications.rememberNotificationPermissionRequest
 import com.talkswithtanha.twt.features.profile.ProfileViewModel
 
 /**
@@ -81,6 +83,10 @@ fun SettingsScreen(
     val openFollows by viewModel.openFollowCount.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var confirmSignOut by remember { mutableStateOf(false) }
+    var notificationsOn by remember { mutableStateOf(NotificationPermission.isGranted(context)) }
+    val askForNotifications = rememberNotificationPermissionRequest { granted ->
+        notificationsOn = granted
+    }
 
     fun open(url: String) {
         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) }
@@ -209,8 +215,15 @@ fun SettingsScreen(
                         title = "Notifications",
                         icon = Icons.Filled.Notifications,
                         tint = IosColors.SettingsIcon.Notifications,
-                        accessory = SettingsAccessory.EXTERNAL,
-                        onClick = ::openSystemSettings
+                        value = if (notificationsOn) "On" else "Off",
+                        // Asking is what a tap means here; once the system will
+                        // not show the dialog again, the request falls through
+                        // to the app's notification settings on its own.
+                        accessory = if (notificationsOn) SettingsAccessory.EXTERNAL
+                        else SettingsAccessory.CHEVRON,
+                        onClick = {
+                            if (notificationsOn) openSystemSettings() else askForNotifications()
+                        }
                     )
                     SettingsDivider()
                     SettingsRow(

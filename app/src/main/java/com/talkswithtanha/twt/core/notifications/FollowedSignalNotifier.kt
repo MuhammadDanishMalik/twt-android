@@ -179,7 +179,16 @@ class FollowedSignalNotifier @Inject constructor(
     private fun notificationId(key: String): Int = key.hashCode()
 
     companion object {
-        const val EXTRA_SIGNAL_ID = "twt.signalId"
+        /**
+         * Deliberately the bare key the server uses, not a namespaced one.
+         *
+         * When the system tray handles a push itself — which it does whenever
+         * the app is backgrounded — it copies each `data` entry onto the launch
+         * intent under its own name. Matching that here means one extra to read
+         * whether the notification came from the tray, from the push handler or
+         * from the in-app tracker.
+         */
+        const val EXTRA_SIGNAL_ID = "signalId"
         private const val TAG = "FollowedSignalNotifier"
     }
 }

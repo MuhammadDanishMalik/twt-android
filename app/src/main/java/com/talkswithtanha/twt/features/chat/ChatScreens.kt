@@ -70,7 +70,7 @@ import java.util.Locale
 @Composable
 fun ChatListScreen(
     onOpenRoom: (String) -> Unit,
-    onOpenMarketplace: () -> Unit,
+    onOpenSellerChat: (String) -> Unit,
     viewModel: ChatListViewModel = hiltViewModel()
 ) {
     val rooms by viewModel.rooms.collectAsStateWithLifecycle()
@@ -121,14 +121,15 @@ fun ChatListScreen(
 
             item {
                 SettingsCard {
+                    val supportRoom = rooms.lastOrNull()?.roomId
                     ChatRoomRow(
                         title = "Trade with Tanha",
                         subtitle = "Buy and sell dollars",
                         initials = "TW",
                         icon = null,
-                        locked = false,
+                        locked = supportRoom == null,
                         crowned = false,
-                        onClick = onOpenMarketplace
+                        onClick = { supportRoom?.let(onOpenSellerChat) }
                     )
                 }
             }
@@ -230,247 +231,3 @@ private fun ChatRoomRow(
         }
     }
 }
-
-@Composable
-fun ChatRoomScreen(
-    onBack: () -> Unit,
-    viewModel: ChatRoomViewModel = hiltViewModel()
-) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
-    val listState = rememberLazyListState()
-
-    // Stick to the newest message. `size` rather than the list itself, so an
-    // edit or a reaction on an old message does not yank the view to the bottom
-    // while somebody is reading history.
-    LaunchedEffect(state.messages.size) {
-        if (state.messages.isNotEmpty()) {
-            listState.animateScrollToItem(state.messages.lastIndex)
-        }
-    }
-
-    TwtScreen {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .safeDrawingPadding()
-                .imePadding()
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.sm),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = TwtColors.TextPrimary
-                    )
-                }
-                Text(
-                    text = if (viewModel.isSupportRoom) "Talks with Tanha" else "Community",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = TwtColors.TextPrimary
-                )
-            }
-
-            when {
-                state.error != null -> Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = state.error!!,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TwtColors.TextSecondary,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(Spacing.xl)
-                    )
-                }
-
-                state.messages.isEmpty() && !state.isLoading -> Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    EmptyState(
-                        icon = Icons.Outlined.Forum,
-                        title = if (viewModel.isSupportRoom) "Say hello" else "Nothing here yet",
-                        message = if (viewModel.isSupportRoom) {
-                            "This thread is just you and Tanha."
-                        } else {
-                            "Be the first to post."
-                        }
-                    )
-                }
-
-                else -> LazyColumn(
-                    state = listState,
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(Spacing.lg),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm)
-                ) {
-                    items(state.messages, key = { it.id }) { message ->
-                        MessageBubble(message)
-                    }
-                }
-            }
-
-            ChatInputBar(
-                draft = state.draft,
-                enabled = state.canPost,
-                onDraftChange = viewModel::onDraftChange,
-                onSend = viewModel::send
-            )
-        }
-    }
-}
-
-@Composable
-private fun MessageBubble(message: ChatMessage) {
-    val mine = message.isCurrentUser
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = if (mine) Alignment.End else Alignment.Start
-    ) {
-        if (!mine) {
-            Text(
-                text = message.senderName,
-                style = MaterialTheme.typography.labelMedium,
-                color = TwtColors.TextTertiary,
-                modifier = Modifier.padding(start = Spacing.sm, bottom = Spacing.xxs)
-            )
-        }
-        Column(
-            modifier = Modifier
-                .widthIn(max = 280.dp)
-                .clip(
-                    RoundedCornerShape(
-                        topStart = Radius.chip,
-                        topEnd = Radius.chip,
-                        bottomStart = if (mine) Radius.chip else 4.dp,
-                        bottomEnd = if (mine) 4.dp else Radius.chip
-                    )
-                )
-                .background(if (mine) TwtColors.GoldWash else TwtColors.Surface)
-                .border(
-                    0.5.dp,
-                    if (mine) TwtColors.Gold.copy(alpha = 0.25f) else TwtColors.Hairline,
-                    RoundedCornerShape(Radius.chip)
-                )
-                .padding(horizontal = Spacing.md, vertical = Spacing.sm)
-        ) {
-            message.replyTo?.let { reply ->
-                Text(
-                    text = reply.senderName,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TwtColors.Gold
-                )
-                Text(
-                    text = reply.text,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = TwtColors.TextTertiary,
-                    maxLines = 2
-                )
-                Spacer(Modifier.height(Spacing.xs))
-            }
-            Text(
-                text = message.text,
-                style = MaterialTheme.typography.bodyLarge,
-                color = TwtColors.TextPrimary
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = formatTime(message.timestamp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TwtColors.TextTertiary
-                )
-                if (message.isEdited) {
-                    Text(
-                        text = "edited",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TwtColors.TextTertiary
-                    )
-                }
-                if (message.isPending) {
-                    // Sent, not yet acknowledged by the server. Shown rather
-                    // than hidden so a message queued offline does not look
-                    // like it silently failed.
-                    Text(
-                        text = "sending",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TwtColors.TextTertiary
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ChatInputBar(
-    draft: String,
-    enabled: Boolean,
-    onDraftChange: (String) -> Unit,
-    onSend: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(Spacing.md),
-        verticalAlignment = Alignment.Bottom,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
-    ) {
-        OutlinedTextField(
-            value = draft,
-            onValueChange = onDraftChange,
-            enabled = enabled,
-            placeholder = {
-                Text(
-                    text = if (enabled) "Message" else "You cannot post in this room.",
-                    color = TwtColors.TextTertiary
-                )
-            },
-            maxLines = 4,
-            shape = RoundedCornerShape(Radius.card),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = TwtColors.Gold,
-                unfocusedBorderColor = TwtColors.HairlineStrong,
-                disabledBorderColor = TwtColors.Hairline,
-                focusedTextColor = TwtColors.TextPrimary,
-                unfocusedTextColor = TwtColors.TextPrimary,
-                cursorColor = TwtColors.Gold
-            ),
-            modifier = Modifier.weight(1f)
-        )
-        IconButton(
-            onClick = onSend,
-            enabled = enabled && draft.isNotBlank(),
-            modifier = Modifier
-                .size(52.dp)
-                .clip(RoundedCornerShape(Radius.card))
-                .background(if (enabled && draft.isNotBlank()) TwtColors.Gold else TwtColors.Surface)
-        ) {
-            Icon(
-                Icons.AutoMirrored.Filled.Send,
-                contentDescription = "Send",
-                tint = if (enabled && draft.isNotBlank()) TwtColors.Background else TwtColors.TextTertiary
-            )
-        }
-    }
-}
-
-/**
- * Built per call, not held in a `val`.
- *
- * A formatter created once at class initialisation captures whatever locale was
- * current then and keeps it for the life of the process — so a member who
- * changes their phone's language goes on seeing timestamps in the old one until
- * they force-quit. `SimpleDateFormat` is also not thread-safe, which a shared
- * instance quietly ignores.
- */
-private fun formatTime(date: Date): String =
-    SimpleDateFormat("HH:mm", Locale.getDefault()).format(date)

@@ -67,6 +67,7 @@ import java.util.Calendar
 fun HomeScreen(
     onOpenSignal: (String) -> Unit,
     onOpenSignals: () -> Unit,
+    onWatchLive: () -> Unit,
     onOpenAcademy: () -> Unit,
     onOpenMarketplace: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -135,7 +136,7 @@ fun HomeScreen(
                 StaggeredAppear(2) {
                     HomeShortcuts(
                         layout = layout,
-                        onWatchLive = onOpenAcademy,
+                        onWatchLive = onWatchLive,
                         onOpenMarketplace = onOpenMarketplace,
                         onOpenAcademy = onOpenAcademy,
                         exchangeSubtitle = rate?.let {

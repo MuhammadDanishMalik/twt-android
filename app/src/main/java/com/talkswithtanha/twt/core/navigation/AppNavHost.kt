@@ -33,6 +33,7 @@ import com.talkswithtanha.twt.features.chat.ChatListScreen
 import com.talkswithtanha.twt.features.chat.ChatRoomScreen
 import com.talkswithtanha.twt.features.home.HomeScreen
 import com.talkswithtanha.twt.features.marketplace.MarketplaceScreen
+import com.talkswithtanha.twt.features.media.MediaHubScreen
 import com.talkswithtanha.twt.features.profile.EditProfileScreen
 import com.talkswithtanha.twt.features.settings.AppearanceScreen
 import com.talkswithtanha.twt.features.settings.ContactSupportScreen
@@ -99,6 +100,7 @@ fun AppNavHost(
             HomeScreen(
                 onOpenSignal = { navController.navigate(AppRoute.SignalDetail.of(it)) },
                 onOpenSignals = { navController.navigate(AppRoute.Signals.route) },
+                onWatchLive = { navController.navigate(AppRoute.MediaHub.route) },
                 onOpenAcademy = { navController.navigate(AppRoute.Academy.route) },
                 onOpenMarketplace = { navController.navigate(AppRoute.Marketplace.route) },
                 onOpenSettings = { navController.navigate(AppRoute.Settings.route) },
@@ -113,7 +115,9 @@ fun AppNavHost(
         composable(AppRoute.ChatList.route) {
             ChatListScreen(
                 onOpenRoom = { navController.navigate(AppRoute.ChatRoom.of(it)) },
-                onOpenMarketplace = { navController.navigate(AppRoute.Marketplace.route) }
+                // The marketplace row opens the same private thread in its
+                // seller presentation, rather than the rate screen.
+                onOpenSellerChat = { navController.navigate(AppRoute.ChatRoom.of(it, seller = true)) }
             )
         }
 
@@ -130,13 +134,23 @@ fun AppNavHost(
 
         composable(
             route = AppRoute.ChatRoom.route,
-            arguments = listOf(navArgument(AppRoute.ChatRoom.ARG) { type = NavType.StringType })
+            arguments = listOf(
+                navArgument(AppRoute.ChatRoom.ARG) { type = NavType.StringType },
+                navArgument(AppRoute.ChatRoom.SELLER_ARG) {
+                    type = NavType.StringType
+                    defaultValue = "false"
+                }
+            )
         ) {
             ChatRoomScreen(onBack = { navController.popBackStack() })
         }
 
         composable(AppRoute.Academy.route) {
             AcademyScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(AppRoute.MediaHub.route) {
+            MediaHubScreen(onBack = { navController.popBackStack() })
         }
 
         composable(AppRoute.Marketplace.route) {

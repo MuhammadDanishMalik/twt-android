@@ -89,7 +89,9 @@ data class ChatRoomUiState(
     val replyTo: ChatMessage? = null,
     val isLoading: Boolean = true,
     val error: String? = null,
-    val canPost: Boolean = false
+    val canPost: Boolean = false,
+    /** Formatted buy rate, for the marketplace quick replies. */
+    val exchangeRate: String? = null
 )
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -97,12 +99,27 @@ data class ChatRoomUiState(
 class ChatRoomViewModel @Inject constructor(
     private val chatRepository: ChatRepository,
     private val session: SessionRepository,
+    exchangeRates: com.talkswithtanha.twt.core.data.ExchangeRateRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
+    private val rate = exchangeRates.observeRate()
+        .map { it?.let { r -> com.talkswithtanha.twt.core.model.ExchangeRate.formatPaisa(r.buyPaisa) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     val roomId: String = checkNotNull(savedStateHandle[AppRoute.ChatRoom.ARG])
 
+    /** Marketplace presentation of the same thread. */
+    val isSellerChat: Boolean =
+        savedStateHandle.get<String>(AppRoute.ChatRoom.SELLER_ARG)?.toBoolean() == true
+
     val isSupportRoom: Boolean = roomId.startsWith(FirestorePaths.ChatRoom.SUPPORT_PREFIX)
+
+    val roomTitle: String = when (roomId) {
+        FirestorePaths.ChatRoom.PREMIUM -> "Premium Community"
+        FirestorePaths.ChatRoom.COMMUNITY -> "Community"
+        else -> "Talks with Tanha"
+    }
 
     private val _draft = MutableStateFlow("")
     private val _replyTo = MutableStateFlow<ChatMessage?>(null)
@@ -120,8 +137,16 @@ class ChatRoomViewModel @Inject constructor(
         _draft,
         _replyTo,
         _error,
-        session.currentUser
-    ) { snapshot, draft, replyTo, error, user ->
+        session.currentUser,
+        rate
+    ) { values ->
+        @Suppress("UNCHECKED_CAST")
+        val snapshot = values[0] as Snapshot<List<ChatMessage>>?
+        val draft = values[1] as String
+        val replyTo = values[2] as ChatMessage?
+        val error = values[3] as String?
+        val user = values[4] as com.talkswithtanha.twt.core.model.User?
+        val liveRate = values[5] as String?
         ChatRoomUiState(
             messages = (snapshot as? Snapshot.Data)?.value.orEmpty(),
             draft = draft,
@@ -141,11 +166,16 @@ class ChatRoomViewModel @Inject constructor(
             // reading, they cannot post. A member's own support thread stays
             // open even without a live code -- asking why your code will not
             // work must not require a working code.
-            canPost = user != null && (user.canPostInCommunity || isSupportRoom)
+            canPost = user != null && (user.canPostInCommunity || isSupportRoom),
+            exchangeRate = liveRate
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChatRoomUiState())
 
     fun onDraftChange(value: String) { _draft.value = value }
+
+    /** A quick reply fills the box rather than sending: the member nearly
+     *  always wants to add an amount or a sentence of their own. */
+    fun useQuickReply(text: String) { _draft.value = text }
 
     fun setReplyTo(message: ChatMessage?) { _replyTo.value = message }
 

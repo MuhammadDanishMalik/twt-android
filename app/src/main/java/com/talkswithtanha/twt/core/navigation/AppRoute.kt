@@ -34,12 +34,25 @@ sealed class AppRoute(val route: String) {
         fun of(signalId: String) = "record/$signalId"
     }
 
-    data object ChatRoom : AppRoute("chat/{roomId}") {
+    data object ChatRoom : AppRoute("chat/{roomId}?seller={seller}") {
         const val ARG = "roomId"
-        fun of(roomId: String) = "chat/$roomId"
+        const val SELLER_ARG = "seller"
+
+        /**
+         * [seller] switches the room to the marketplace presentation — the
+         * verified header and the rate quick-replies. It is the same underlying
+         * thread: `support_{uid}` is the only per-member private room the
+         * security rules allow, so the exchange conversation and the support
+         * conversation are one conversation, which is also how Tanha sees it in
+         * the admin panel's queue.
+         */
+        fun of(roomId: String, seller: Boolean = false) = "chat/$roomId?seller=$seller"
     }
 
     data object Academy : AppRoute("academy")
+
+    /** Tanha's YouTube channel, which the home screen's Watch button opens. */
+    data object MediaHub : AppRoute("mediaHub")
     data object Marketplace : AppRoute("marketplace")
 
     // ── The settings family, presented as sheets on iOS ──────────────────

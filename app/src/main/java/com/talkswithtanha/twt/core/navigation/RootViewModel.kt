@@ -86,4 +86,4 @@ class RootViewModel @Inject constructor(
  * never asked, and this is the line that stops a new requirement from locking
  * them out of an app they already have access to.
  */
-private val VERIFICATION_REQUIRED_FROM = Date(1_758_600_000_000L) // 23 Sep 2026
+internal val VERIFICATION_REQUIRED_FROM = Date(1_790_136_000_000L) // 2026-09-23T04:00:00Z

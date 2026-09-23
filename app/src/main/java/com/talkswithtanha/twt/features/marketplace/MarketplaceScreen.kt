@@ -50,7 +50,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.platform.LocalHapticFeedback
 import com.talkswithtanha.twt.core.designsystem.AnimatedNumber
+import com.talkswithtanha.twt.core.designsystem.Haptics
 import com.talkswithtanha.twt.core.designsystem.IosColors
 import com.talkswithtanha.twt.core.designsystem.pressScale
 import com.talkswithtanha.twt.core.designsystem.staggeredAppear
@@ -172,6 +174,7 @@ fun MarketplaceScreen(
 
 @Composable
 private fun ExchangeHeader(seller: MarketplaceSeller, onBack: () -> Unit) {
+    val haptics = LocalHapticFeedback.current
     Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -179,7 +182,10 @@ private fun ExchangeHeader(seller: MarketplaceSeller, onBack: () -> Unit) {
                     .size(36.dp)
                     .clip(CircleShape)
                     .background(Surface)
-                    .clickable(onClick = onBack),
+                    .clickable {
+                        Haptics.tap(haptics)
+                        onBack()
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -414,12 +420,16 @@ private fun DeltaChip(rate: ExchangeRate) {
 /** The deal already running, so a member never opens a second one by accident. */
 @Composable
 private fun ActiveDealCard(deal: Deal, onClick: () -> Unit) {
+    val haptics = LocalHapticFeedback.current
     Column(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
             .background(Surface)
-            .clickable(onClick = onClick)
+            .clickable {
+                Haptics.tap(haptics)
+                onClick()
+            }
             .padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -508,13 +518,17 @@ private fun ActionButton(
     onClick: () -> Unit
 ) {
     val interaction = remember { MutableInteractionSource() }
+    val haptics = LocalHapticFeedback.current
     Column(
         Modifier
             .fillMaxWidth()
             .pressScale(interaction)
             .clip(RoundedCornerShape(16.dp))
             .background(Brush.horizontalGradient(ActionGradient))
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .clickable(interactionSource = interaction, indication = null) {
+                Haptics.tap(haptics)
+                onClick()
+            }
             .padding(vertical = 15.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -540,13 +554,17 @@ private fun ActionButton(
 @Composable
 private fun SecondaryButton(title: String, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
+    val haptics = LocalHapticFeedback.current
     Box(
         Modifier
             .fillMaxWidth()
             .pressScale(interaction)
             .clip(RoundedCornerShape(16.dp))
             .background(Surface)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .clickable(interactionSource = interaction, indication = null) {
+                Haptics.tap(haptics)
+                onClick()
+            }
             .padding(vertical = 16.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -568,13 +586,17 @@ private fun SellerCard(
     onClick: () -> Unit
 ) {
     if (seller.name == null && !seller.hasStats) return
+    val haptics = LocalHapticFeedback.current
 
     Column(
         modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
             .background(Surface)
-            .clickable(onClick = onClick)
+            .clickable {
+                Haptics.tap(haptics)
+                onClick()
+            }
             .padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

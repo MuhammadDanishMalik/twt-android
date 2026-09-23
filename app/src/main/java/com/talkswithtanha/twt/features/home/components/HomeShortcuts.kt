@@ -213,7 +213,10 @@ private fun ShortcutDeck(
     }
 
     fun advance(step: Int, withHaptic: Boolean) {
-        if (withHaptic) Haptics.tap(haptics)
+        // A detent, not a tap. The card is snapping into a position, and the
+        // difference is what makes the deck feel like it has stops in it rather
+        // than like a button that happens to be draggable.
+        if (withHaptic) Haptics.tick(haptics)
         // Wrapped twice, because Kotlin's remainder keeps the sign of the left
         // operand: a plain `(front - 1) % count` is -1 at the front of the deck,
         // which is not an index.

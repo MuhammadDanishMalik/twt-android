@@ -51,6 +51,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.talkswithtanha.twt.core.designsystem.Haptics
 import com.talkswithtanha.twt.core.designsystem.IosColors
 import com.talkswithtanha.twt.core.designsystem.Motion
 import com.talkswithtanha.twt.core.designsystem.pressScale
@@ -83,6 +85,7 @@ internal fun AuthPrimaryButton(
     onClick: () -> Unit
 ) {
     val interaction = remember { MutableInteractionSource() }
+    val haptics = LocalHapticFeedback.current
     // Dimmed rather than greyed: the button keeps its colour so it still reads
     // as the way forward, and says "not yet" instead of "not for you".
     val alpha by animateFloatAsState(
@@ -103,7 +106,10 @@ internal fun AuthPrimaryButton(
                 interactionSource = interaction,
                 indication = null,
                 enabled = enabled && !loading,
-                onClick = onClick
+                onClick = {
+                    Haptics.tap(haptics)
+                    onClick()
+                }
             )
             .padding(vertical = 17.dp),
         contentAlignment = Alignment.Center
@@ -185,6 +191,7 @@ internal fun CodeInput(
 ) {
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
+    val haptics = LocalHapticFeedback.current
 
     // The keyboard comes up on arrival. This screen has exactly one job and
     // making somebody tap to start it is a step for nobody's benefit.
@@ -196,7 +203,12 @@ internal fun CodeInput(
     Box(modifier) {
         BasicTextField(
             value = code,
-            onValueChange = onCodeChange,
+            onValueChange = { next ->
+                // Only on a digit landing, not on a delete: backspace already
+                // has the keyboard's own feedback and doubling it feels broken.
+                if (next.length > code.length) Haptics.key(haptics)
+                onCodeChange(next)
+            },
             enabled = enabled,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
             // Transparent, not hidden: a field with no size cannot hold focus

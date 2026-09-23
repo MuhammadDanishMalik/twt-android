@@ -51,6 +51,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
 import coil3.compose.AsyncImage
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.talkswithtanha.twt.core.designsystem.Haptics
 import com.talkswithtanha.twt.core.designsystem.IosColors
 import com.talkswithtanha.twt.core.images.Cloudinary
 import com.talkswithtanha.twt.core.images.cropSquare
@@ -82,6 +84,7 @@ fun AvatarEditor(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
     var showSheet by remember { mutableStateOf(false) }
     var picked by remember { mutableStateOf<Uri?>(null) }
     var source by remember { mutableStateOf<Bitmap?>(null) }
@@ -122,7 +125,10 @@ fun AvatarEditor(
                 .fillMaxSize()
                 .clip(CircleShape)
                 .background(Brush.linearGradient(IosColors.AvatarGradient))
-                .clickable(enabled = !isUploading) { showSheet = true },
+                .clickable(enabled = !isUploading) {
+                    Haptics.sheetOpen(haptics)
+                    showSheet = true
+                },
             contentAlignment = Alignment.Center
         ) {
             val rendered = Cloudinary.avatar(photoUrl, size.value.toInt())
@@ -163,7 +169,10 @@ fun AvatarEditor(
                 .size(30.dp)
                 .clip(CircleShape)
                 .background(IosColors.Accent)
-                .clickable(enabled = !isUploading) { showSheet = true },
+                .clickable(enabled = !isUploading) {
+                    Haptics.sheetOpen(haptics)
+                    showSheet = true
+                },
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -191,7 +200,10 @@ fun AvatarEditor(
     if (showSheet) {
         val sheetState = rememberModalBottomSheetState()
         ModalBottomSheet(
-            onDismissRequest = { showSheet = false },
+            onDismissRequest = {
+                Haptics.sheetClose(haptics)
+                showSheet = false
+            },
             sheetState = sheetState,
             containerColor = IosColors.SecondaryBackground
         ) {
@@ -213,6 +225,7 @@ fun AvatarEditor(
                         tint = IosColors.SellRed
                     ) {
                         showSheet = false
+                        Haptics.failure(haptics)
                         onRemove()
                     }
                 }

@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.talkswithtanha.twt.core.designsystem.Haptics
 import com.talkswithtanha.twt.core.designsystem.IosColors
 
 /**
@@ -51,9 +53,18 @@ fun VerifyEmailScreen(
     viewModel: VerifyEmailViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val haptics = LocalHapticFeedback.current
 
+    // The two outcomes that matter on this screen, felt rather than read. A
+    // member watching the keyboard rather than the screen still knows.
     LaunchedEffect(state.isDone) {
-        if (state.isDone) onVerified()
+        if (state.isDone) {
+            Haptics.success(haptics)
+            onVerified()
+        }
+    }
+    LaunchedEffect(state.error) {
+        if (state.error != null) Haptics.failure(haptics)
     }
 
     Column(

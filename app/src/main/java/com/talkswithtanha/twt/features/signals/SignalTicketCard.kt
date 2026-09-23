@@ -178,6 +178,10 @@ fun SignalTicketCard(
                     else "Follow this signal",
                     isOn = isFollowing
                 ) {
+                    // Opposite decisions, opposite feelings: a member who
+                    // catches the bell by accident can tell which way it went
+                    // without looking at the screen.
+                    Haptics.toggle(haptics, on = !isFollowing)
                     if (isFollowing) onRequestUnfollow() else onFollow()
                 }
             }

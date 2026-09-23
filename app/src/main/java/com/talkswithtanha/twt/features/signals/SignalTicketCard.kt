@@ -60,8 +60,6 @@ import com.talkswithtanha.twt.core.designsystem.brand.PairFlagBadge
 import com.talkswithtanha.twt.core.navigation.sharedCard
 import com.talkswithtanha.twt.core.navigation.signalCardKey
 import com.talkswithtanha.twt.core.model.Signal
-import com.talkswithtanha.twt.core.navigation.sharedCard
-import com.talkswithtanha.twt.core.navigation.signalCardKey
 import com.talkswithtanha.twt.core.model.SignalType
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -247,8 +245,7 @@ fun SignalTicketCard(
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace
                         ),
-                        color = if (signal.pipsGained == null) Color.White else tint,
-                        increasing = isUpward(signal)
+                        color = if (signal.pipsGained == null) Color.White else tint
                     )
                 }
                 Text(
@@ -322,13 +319,17 @@ private fun TicketLevel(
             letterSpacing = 1.sp
         )
         Spacer(Modifier.height(5.dp))
-        Text(
-            text = value,
-            color = Color.White,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Medium,
-            fontFamily = FontFamily.Monospace,
-            maxLines = 1
+        // Tanha moves stops and targets on live trades, and this card is often
+        // on screen when she does. Rolling the digits that changed is how a
+        // member notices the level moved without the card redrawing itself.
+        AnimatedNumber(
+            value = value,
+            style = LocalTextStyle.current.copy(
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                fontFamily = FontFamily.Monospace
+            ),
+            color = Color.White
         )
     }
 }

@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Scale
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -63,6 +64,8 @@ import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.talkswithtanha.twt.core.designsystem.AnimatedNumber
+import com.talkswithtanha.twt.core.designsystem.AnimatedText
 import com.talkswithtanha.twt.core.designsystem.Haptics
 import com.talkswithtanha.twt.core.designsystem.IosColors
 import com.talkswithtanha.twt.core.notifications.rememberNotificationPermissionRequest
@@ -243,7 +246,7 @@ fun SignalDetailScreen(
                     DetailDivider()
                     DetailRow(Icons.Filled.Schedule, "Timeframe", signal.timeframe)
                     DetailDivider()
-                    DetailRow(Icons.Filled.Scale, "Risk / reward", signal.riskReward)
+                    DetailRow(Icons.Filled.Scale, "Risk / reward", signal.riskReward, numeric = true)
                     DetailDivider()
                     DetailRow(Icons.Filled.CalendarMonth, "Posted", postedUtc(signal))
                     Spacer(Modifier.height(14.dp))
@@ -451,7 +454,12 @@ fun DetailCard(
 }
 
 @Composable
-private fun DetailRow(icon: ImageVector, label: String, value: String) {
+private fun DetailRow(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    numeric: Boolean = false
+) {
     Row(
         Modifier.fillMaxWidth().height(40.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -465,13 +473,23 @@ private fun DetailRow(icon: ImageVector, label: String, value: String) {
         )
         Text(label, color = Color.White.copy(alpha = 0.6f), fontSize = 15.sp)
         Spacer(Modifier.weight(1f))
-        Text(
-            text = value,
-            color = Color.White,
+
+        val valueStyle = LocalTextStyle.current.copy(
             fontSize = 15.sp,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1
+            fontWeight = FontWeight.SemiBold
         )
+        // A ratio rolls; a word like "Scalp" has no digits to roll, so it
+        // blurs through instead of spinning one letter at a time.
+        if (numeric) {
+            AnimatedNumber(value = value, style = valueStyle, color = Color.White)
+        } else {
+            AnimatedText(
+                text = value,
+                style = valueStyle,
+                color = Color.White,
+                maxLines = 1
+            )
+        }
     }
 }
 

@@ -1,10 +1,12 @@
 package com.talkswithtanha.twt.core.designsystem
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -19,20 +21,26 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 
 /**
  * The app's motion.
@@ -111,40 +119,131 @@ fun Modifier.staggeredAppear(index: Int, enabled: Boolean = true): Modifier = co
     }
 }
 
+/** Holds the last value without making the read observable, so it survives recomposition. */
+private class LastValue(var text: String)
+
+/** Everything a number is not: separators, signs, currency marks. */
+private fun String.numericOrNull(): Double? =
+    filter { it.isDigit() || it == '.' || it == '-' }.toDoubleOrNull()
+
 /**
- * A number that rolls when it changes, rather than blinking to the new value.
+ * A number whose digits roll when it changes, rather than blinking to the new value.
  *
- * The counterpart of iOS's `contentTransition(.numericText())`. Digits that
- * increase slide up, digits that decrease slide down, so a price ticking is
- * legible as movement and its direction is readable before the number is.
+ * The counterpart of iOS's `contentTransition(.numericText())`. Only the digits
+ * that actually changed move — "2,454" ticking to "2,455" rolls the last column
+ * and leaves the rest standing, which is what makes it read as a counter rather
+ * than as the whole label being replaced. Digits roll up when the value rose and
+ * down when it fell, so the direction is readable before the number is.
+ *
+ * Figures are tabular ([fontFeatureSettings] `tnum`): in a proportional face a
+ * '1' is narrower than an '8', so without it every tick would reflow the row and
+ * nudge whatever sits beside it.
  */
 @Composable
 fun AnimatedNumber(
     value: String,
     modifier: Modifier = Modifier,
     style: TextStyle = LocalTextStyle.current,
+    color: Color = Color.Unspecified
+) {
+    // Read the previous value during composition, then record the new one once
+    // composition has committed — a plain holder rather than snapshot state,
+    // because subscribing to it here would recompose us forever.
+    val last = remember { LastValue(value) }
+    val rollUp = remember(value) {
+        val before = last.text.numericOrNull()
+        val after = value.numericOrNull()
+        if (before == null || after == null) true else after >= before
+    }
+    SideEffect { last.text = value }
+
+    val figures = style.copy(fontFeatureSettings = "tnum")
+    val characters = value.toList()
+
+    Row(modifier = modifier) {
+        characters.forEachIndexed { index, character ->
+            // Keyed by distance from the right, because numbers grow leftwards:
+            // the units column has to stay the units column when a digit is
+            // added, or every column would animate on a change of magnitude.
+            key(characters.size - index) {
+                AnimatedContent(
+                    targetState = character,
+                    transitionSpec = {
+                        if (initialState.isDigit() && targetState.isDigit()) {
+                            val direction = if (rollUp) 1 else -1
+                            (slideInVertically(Motion.gentle()) { height -> direction * height } +
+                                fadeIn(Motion.quick()))
+                                .togetherWith(
+                                    slideOutVertically(Motion.gentle()) { height -> -direction * height } +
+                                        fadeOut(Motion.quick())
+                                )
+                                // Clipped, so a digit appears from behind the
+                                // edge the way a mechanical roller would.
+                                .using(SizeTransform(clip = true))
+                        } else {
+                            // Separators and signs cross-fade. A comma doing a
+                            // barrel roll when a number crosses a thousand is
+                            // the kind of detail that reads as a bug.
+                            fadeIn(Motion.quick())
+                                .togetherWith(fadeOut(Motion.quick()))
+                                .using(SizeTransform(clip = false))
+                        }
+                    },
+                    label = "digit"
+                ) { shown ->
+                    Text(text = shown.toString(), style = figures, color = color, softWrap = false)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Text that blurs out and back in when it changes.
+ *
+ * iOS 17's `.transition(.blurReplace)`. A straight cross-fade of two strings
+ * leaves both legible at once and the eye tries to read the overlap; blurring
+ * the outgoing text destroys its shape first, so only one thing is ever
+ * readable. Below API 31 [Modifier.blur] does nothing and this degrades to the
+ * fade, which is fine — it is the same motion with less of it.
+ */
+@Composable
+fun AnimatedText(
+    text: String,
+    modifier: Modifier = Modifier,
+    style: TextStyle = LocalTextStyle.current,
     color: Color = Color.Unspecified,
-    increasing: Boolean = true
+    maxLines: Int = Int.MAX_VALUE
 ) {
     AnimatedContent(
-        targetState = value,
+        targetState = text,
         transitionSpec = {
-            val direction = if (increasing) 1 else -1
-            (slideInVertically(Motion.gentle()) { height -> direction * height } + fadeIn(Motion.quick()))
-                .togetherWith(
-                    slideOutVertically(Motion.gentle()) { height -> -direction * height } +
-                        fadeOut(Motion.quick())
-                )
-                // The box must not resize as the digits swap, or everything
-                // beside it twitches on every tick.
+            fadeIn(Motion.gentle())
+                .togetherWith(fadeOut(Motion.quick()))
                 .using(SizeTransform(clip = false))
         },
         modifier = modifier,
-        label = "number"
+        label = "text"
     ) { shown ->
-        Text(text = shown, style = style, color = color)
+        val blur by transition.animateDp(
+            transitionSpec = { Motion.gentle() },
+            label = "blur"
+        ) { state -> if (state == EnterExitState.Visible) 0.dp else BLUR_RADIUS }
+
+        Text(
+            text = shown,
+            style = style,
+            color = color,
+            maxLines = maxLines,
+            // Unbounded, or the blur would be clipped to the text box and the
+            // soft edge would end in a hard one.
+            modifier = Modifier.blur(blur, BlurredEdgeTreatment.Unbounded)
+        )
     }
 }
+
+/** How far text is blurred at the far end of a blur-replace. */
+private val BLUR_RADIUS = 7.dp
 
 /**
  * The sweep that runs across a loading placeholder.

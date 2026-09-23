@@ -241,8 +241,7 @@ private fun RateCard(rate: ExchangeRate) {
                 style = MaterialTheme.typography.displayMedium.copy(
                     fontFeatureSettings = TABULAR_FIGURES
                 ),
-                color = TwtColors.TextPrimary,
-                increasing = rate.direction != ExchangeRate.Direction.DOWN
+                color = TwtColors.TextPrimary
             )
             Spacer(Modifier.padding(horizontal = Spacing.xs))
             when (rate.direction) {

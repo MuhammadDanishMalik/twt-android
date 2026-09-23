@@ -47,7 +47,10 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.talkswithtanha.twt.R
+import androidx.compose.material3.LocalTextStyle
+import com.talkswithtanha.twt.core.designsystem.AnimatedNumber
 import com.talkswithtanha.twt.core.designsystem.Haptics
+import com.talkswithtanha.twt.core.designsystem.Motion
 import com.talkswithtanha.twt.core.designsystem.IosColors
 import com.talkswithtanha.twt.core.model.ExchangeRate
 import com.talkswithtanha.twt.features.home.components.HomeShortcuts
@@ -145,7 +148,7 @@ fun HomeScreen(
             item {
                 StaggeredAppear(1) {
                     TwtAccessCard(
-                        holderName = user?.fullName.orEmpty(),
+                        holderName = user?.fullName,
                         expiresAt = user?.membershipExpiresAt,
                         grantedAt = user?.accessGrantedAt,
                         accessCode = user?.accessCode,
@@ -185,18 +188,28 @@ fun HomeScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(Modifier.size(8.dp))
-                        if (!state.isLoading) {
+                        // The count arrives a moment after the heading, and
+                        // changes again whenever Tanha posts or closes a trade,
+                        // so it fades in once and rolls thereafter.
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = !state.isLoading,
+                            enter = androidx.compose.animation.fadeIn(Motion.gentle()) +
+                                androidx.compose.animation.scaleIn(Motion.gentle(), initialScale = 0.7f),
+                            exit = androidx.compose.animation.fadeOut(Motion.quick())
+                        ) {
                             Box(
                                 Modifier
                                     .clip(CircleShape)
                                     .background(Color.White.copy(alpha = 0.12f))
                                     .padding(horizontal = 7.dp, vertical = 3.dp)
                             ) {
-                                Text(
-                                    text = state.signals.size.toString(),
-                                    color = Color.White.copy(alpha = 0.7f),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
+                                AnimatedNumber(
+                                    value = state.signals.size.toString(),
+                                    style = LocalTextStyle.current.copy(
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = Color.White.copy(alpha = 0.7f)
                                 )
                             }
                         }

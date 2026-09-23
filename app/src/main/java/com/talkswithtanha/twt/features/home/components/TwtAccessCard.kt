@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -41,9 +42,11 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.talkswithtanha.twt.core.designsystem.Haptics
+import com.talkswithtanha.twt.core.designsystem.components.RedactedText
 import com.talkswithtanha.twt.core.designsystem.IosColors
 import com.talkswithtanha.twt.core.designsystem.brand.TwtWordmark
 import kotlinx.coroutines.delay
@@ -70,7 +73,7 @@ import kotlin.math.roundToInt
  */
 @Composable
 fun TwtAccessCard(
-    holderName: String,
+    holderName: String?,
     expiresAt: Date?,
     grantedAt: Date?,
     accessCode: String?,
@@ -226,7 +229,7 @@ fun TwtAccessCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Bottom
             ) {
-                CardField("CARDHOLDER", holderDisplay(holderName))
+                CardField("CARDHOLDER", holderDisplay(holderName), placeholderWidth = 132.dp)
                 CardField("VALID THRU", state.validThru, TextAlign.End)
             }
 
@@ -293,7 +296,12 @@ private fun StatusPill(state: AccessState) {
 }
 
 @Composable
-private fun CardField(title: String, value: String, align: TextAlign = TextAlign.Start) {
+private fun CardField(
+    title: String,
+    value: String?,
+    align: TextAlign = TextAlign.Start,
+    placeholderWidth: Dp = 96.dp
+) {
     Column(horizontalAlignment = if (align == TextAlign.End) Alignment.End else Alignment.Start) {
         Text(
             text = title,
@@ -306,20 +314,33 @@ private fun CardField(title: String, value: String, align: TextAlign = TextAlign
         // Set like embossed type on a real card — uppercase, tracked, in a
         // monospaced face so a long name and a short date sit on the same
         // baseline rhythm.
-        Text(
+        // Null while the member's record is still loading: an embossed name
+        // that cuts from "MEMBER" to the real one is the single most obvious
+        // tell that the card was drawn before the data arrived.
+        RedactedText(
             text = value,
+            placeholderWidth = placeholderWidth,
+            style = LocalTextStyle.current.copy(
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 1.2.sp
+            ),
             color = Color.White,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.SemiBold,
-            fontFamily = FontFamily.Monospace,
-            letterSpacing = 1.2.sp,
             maxLines = 1
         )
     }
 }
 
-private fun holderDisplay(name: String): String =
-    name.trim().ifEmpty { "MEMBER" }.uppercase()
+/**
+ * Null only while the member record is still in flight, so the field shimmers
+ * rather than showing a stand-in that will be replaced a moment later.
+ *
+ * A record that has loaded and simply carries no name is a different thing and
+ * still reads "MEMBER" — otherwise that member's card would shimmer forever.
+ */
+private fun holderDisplay(name: String?): String? =
+    name?.trim()?.ifEmpty { "MEMBER" }?.uppercase()
 
 /** `TWT4H2K9XQP` → `TWT  ••••  9XQP`. */
 private fun maskedCode(code: String?): String? {

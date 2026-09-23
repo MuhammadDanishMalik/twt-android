@@ -51,7 +51,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material3.LocalTextStyle
+import com.talkswithtanha.twt.core.designsystem.AnimatedNumber
 import com.talkswithtanha.twt.core.designsystem.Haptics
+import com.talkswithtanha.twt.core.designsystem.pressScale
 import com.talkswithtanha.twt.core.designsystem.IosColors
 import com.talkswithtanha.twt.core.designsystem.brand.PairFlagBadge
 import com.talkswithtanha.twt.core.model.Signal
@@ -93,6 +96,7 @@ fun SignalTicketCard(
 ) {
     val haptics = LocalHapticFeedback.current
     val clipboard = LocalClipboardManager.current
+    val interaction = remember { MutableInteractionSource() }
     var copied by remember { mutableStateOf(false) }
 
     LaunchedEffect(copied) {
@@ -107,6 +111,7 @@ fun SignalTicketCard(
     Column(
         modifier = modifier
             .then(if (width != null) Modifier.width(width) else Modifier.fillMaxWidth())
+            .then(if (onOpen != null) Modifier.pressScale(interaction, 0.985f) else Modifier)
             .clip(RoundedCornerShape(22.dp))
             .drawBehind {
                 drawRect(
@@ -126,8 +131,8 @@ fun SignalTicketCard(
             .border(0.5.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(22.dp))
             .then(
                 if (onOpen == null) Modifier else Modifier.clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = androidx.compose.material3.ripple()
+                    interactionSource = interaction,
+                    indication = null
                 ) {
                     Haptics.tap(haptics)
                     onOpen()
@@ -225,13 +230,18 @@ fun SignalTicketCard(
                         modifier = Modifier.size(22.dp)
                     )
                     Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = headline(signal),
+                    // Rolls rather than blinking: this is the number that
+                    // changes while a member is looking at the card, and the
+                    // direction it rolls says which way before the digits do.
+                    AnimatedNumber(
+                        value = headline(signal),
+                        style = LocalTextStyle.current.copy(
+                            fontSize = 34.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        ),
                         color = if (signal.pipsGained == null) Color.White else tint,
-                        fontSize = 34.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        maxLines = 1
+                        increasing = isUpward(signal)
                     )
                 }
                 Text(

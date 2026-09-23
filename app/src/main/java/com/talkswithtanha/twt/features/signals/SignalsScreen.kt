@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
@@ -45,6 +46,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.talkswithtanha.twt.core.designsystem.IosColors
+import com.talkswithtanha.twt.core.designsystem.components.SignalCardSkeleton
+import com.talkswithtanha.twt.core.designsystem.staggeredAppear
 import com.talkswithtanha.twt.core.model.Signal
 import com.talkswithtanha.twt.core.model.SignalType
 
@@ -86,20 +89,32 @@ fun SignalsScreen(
                 )
             }
 
-            if (active.isEmpty()) {
-                item {
+            when {
+                // A skeleton of the real card, so the row is the right size
+                // from the first frame and nothing jumps when data lands.
+                state.isLoading -> items(2) { index ->
+                    SignalCardSkeleton(
+                        Modifier
+                            .padding(horizontal = 16.dp)
+                            .staggeredAppear(index)
+                    )
+                }
+
+                active.isEmpty() -> item {
                     EmptyNote(
                         title = if (state.error != null) "Couldn't load signals"
                         else "No Active Signals",
                         message = state.error ?: "Tanha is scanning the market."
                     )
                 }
-            } else {
-                items(active, key = { it.id }) { signal ->
+
+                else -> itemsIndexed(active, key = { _, it -> it.id }) { index, signal ->
                     SignalTicketCard(
                         signal = signal,
                         isFollowing = signal.id in state.followedSignalIds,
-                        modifier = Modifier.padding(horizontal = 16.dp),
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp)
+                            .staggeredAppear(index),
                         onOpen = { onOpenSignal(signal.id) },
                         onFollow = { viewModel.follow(signal) },
                         onRequestUnfollow = { viewModel.unfollow(signal.id) }

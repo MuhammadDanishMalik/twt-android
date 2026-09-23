@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.talkswithtanha.twt.core.designsystem.IosColors
+import com.talkswithtanha.twt.core.designsystem.staggeredAppear
 import com.talkswithtanha.twt.core.model.FollowOutcome
 import com.talkswithtanha.twt.core.model.SignalFollow
 import com.talkswithtanha.twt.core.model.SignalType
@@ -86,7 +87,7 @@ fun MySignalsScreen(
                 item {
                     SettingsCard {
                         open.forEachIndexed { index, follow ->
-                            FollowRow(follow) { onRecord(follow) }
+                            FollowRow(follow, Modifier.staggeredAppear(index)) { onRecord(follow) }
                             if (index < open.lastIndex) {
                                 SettingsDivider(SettingsMetrics.rowPadding)
                             }
@@ -100,7 +101,7 @@ fun MySignalsScreen(
                 item {
                     SettingsCard {
                         settled.forEachIndexed { index, follow ->
-                            FollowRow(follow) { onRecord(follow) }
+                            FollowRow(follow, Modifier.staggeredAppear(index)) { onRecord(follow) }
                             if (index < settled.lastIndex) {
                                 SettingsDivider(SettingsMetrics.rowPadding)
                             }
@@ -218,9 +219,13 @@ private fun StatDivider() {
 }
 
 @Composable
-private fun FollowRow(follow: SignalFollow, onClick: () -> Unit) {
+private fun FollowRow(
+    follow: SignalFollow,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(horizontal = SettingsMetrics.rowPadding, vertical = 12.dp)

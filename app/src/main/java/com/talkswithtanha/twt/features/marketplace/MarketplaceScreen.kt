@@ -236,12 +236,13 @@ private fun RateCard(rate: ExchangeRate) {
         )
         Spacer(Modifier.height(Spacing.sm))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = ExchangeRate.formatPaisa(rate.buyPaisa),
+            com.talkswithtanha.twt.core.designsystem.AnimatedNumber(
+                value = ExchangeRate.formatPaisa(rate.buyPaisa),
                 style = MaterialTheme.typography.displayMedium.copy(
                     fontFeatureSettings = TABULAR_FIGURES
                 ),
-                color = TwtColors.TextPrimary
+                color = TwtColors.TextPrimary,
+                increasing = rate.direction != ExchangeRate.Direction.DOWN
             )
             Spacer(Modifier.padding(horizontal = Spacing.xs))
             when (rate.direction) {

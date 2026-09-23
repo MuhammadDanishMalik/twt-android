@@ -1,13 +1,13 @@
 package com.talkswithtanha.twt.core.designsystem.components
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,9 +16,10 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,21 +35,25 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.talkswithtanha.twt.core.designsystem.Haptics
+import com.talkswithtanha.twt.core.designsystem.Motion
 
 data class BottomBarItem(
     val label: String,
     val route: String,
-    /** Drawn, not an `ImageVector` — see [TabIcons]. */
+    /** Drawn, not an `ImageVector` — see `TabIcons`. */
     val icon: @Composable (Color, Modifier) -> Unit
 )
+
+/** Width of one tab, and of the indicator that slides between them. */
+private val TabWidth = 92.dp
 
 /**
  * The floating tab bar.
  *
- * Matched to the iOS one: a dark pill hovering above the content, three items,
- * and the selected one wearing its own lighter pill behind the icon and label.
- * The whole bar is sized to its contents rather than stretched across the
- * screen, because it is meant to read as an object sitting on the content.
+ * The selected state is **one indicator that slides**, not a background that
+ * appears and disappears on three separate chips. Moving a single object is
+ * what tells you the two tabs are the same control in different positions;
+ * cross-fading two highlights reads as one thing vanishing and another arriving.
  */
 @Composable
 fun TwtBottomBar(
@@ -58,30 +63,43 @@ fun TwtBottomBar(
     modifier: Modifier = Modifier
 ) {
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val selectedIndex = items.indexOfFirst { it.route == currentRoute }.coerceAtLeast(0)
 
-    Row(
+    val indicatorOffset by animateDpAsState(
+        targetValue = TabWidth * selectedIndex,
+        animationSpec = Motion.snappy(),
+        label = "indicator"
+    )
+
+    Box(
         modifier = modifier
             // Clear of the gesture pill or the button bar, whichever the phone
             // has. Reading the inset rather than guessing keeps it off both.
             .padding(bottom = bottomInset + 8.dp)
             .height(64.dp)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(32.dp))
             .background(Color(0xFF1C1C1E).copy(alpha = 0.96f))
-            .border(0.5.dp, Color.White.copy(alpha = 0.10f), CircleShape)
-            // Inset past the pill's own corner radius. At 8dp the selected
-            // chip's corners poked out through the rounded end of the bar,
-            // because the bar's edge curves away faster than a straight inset
-            // accounts for.
+            .border(0.5.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(32.dp))
             .padding(horizontal = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-        verticalAlignment = Alignment.CenterVertically
+        contentAlignment = Alignment.CenterStart
     ) {
-        items.forEach { item ->
-            BottomBarTab(
-                item = item,
-                selected = currentRoute == item.route,
-                onClick = { onNavigate(item.route) }
-            )
+        Box(
+            Modifier
+                .offset(x = indicatorOffset)
+                .width(TabWidth)
+                .height(52.dp)
+                .clip(RoundedCornerShape(26.dp))
+                .background(Color.White.copy(alpha = 0.10f))
+        )
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            items.forEachIndexed { index, item ->
+                BottomBarTab(
+                    item = item,
+                    selected = index == selectedIndex,
+                    onClick = { onNavigate(item.route) }
+                )
+            }
         }
     }
 }
@@ -93,27 +111,32 @@ private fun BottomBarTab(
     onClick: () -> Unit
 ) {
     val haptics = LocalHapticFeedback.current
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
 
     val tint by animateColorAsState(
-        if (selected) Color.White else Color.White.copy(alpha = 0.45f),
+        targetValue = if (selected) Color.White else Color.White.copy(alpha = 0.45f),
+        animationSpec = Motion.quick(),
         label = "tint"
     )
+    // A small lift on the selected tab, and a dip under a finger. Both spring,
+    // so tapping mid-animation interrupts rather than queues.
     val scale by animateFloatAsState(
-        targetValue = if (selected) 1f else 0.94f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        targetValue = when {
+            pressed -> 0.92f
+            selected -> 1f
+            else -> 0.94f
+        },
+        animationSpec = Motion.snappy(),
         label = "scale"
     )
 
     Column(
         modifier = Modifier
-            // A capsule, like the bar it sits in. A rounded rectangle inside a
-            // pill reads as a button that does not quite fit.
-            .clip(CircleShape)
-            .background(
-                if (selected) Color.White.copy(alpha = 0.10f) else Color.Transparent
-            )
+            .width(TabWidth)
+            .clip(RoundedCornerShape(26.dp))
             .clickable(
-                interactionSource = remember { MutableInteractionSource() },
+                interactionSource = interaction,
                 indication = null,
                 role = Role.Tab,
                 // Re-selecting the tab you are on should not buzz. A haptic is a
@@ -123,7 +146,7 @@ private fun BottomBarTab(
                 Haptics.tap(haptics)
                 onClick()
             }
-            .padding(horizontal = 16.dp, vertical = 7.dp)
+            .padding(vertical = 7.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -132,10 +155,6 @@ private fun BottomBarTab(
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         item.icon(tint, Modifier.size(24.dp))
-        Text(
-            text = item.label,
-            fontSize = 11.sp,
-            color = tint
-        )
+        Text(text = item.label, fontSize = 11.sp, color = tint)
     }
 }

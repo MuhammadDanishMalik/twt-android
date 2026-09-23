@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -195,6 +196,13 @@ fun HomeScreen(
                         contentPadding = PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        if (state.isLoading) {
+                            items(2) {
+                                com.talkswithtanha.twt.core.designsystem.components.SignalCardSkeleton(
+                                    Modifier.width(330.dp)
+                                )
+                            }
+                        }
                         items(state.signals, key = { it.id }) { signal ->
                             SignalTicketCard(
                                 signal = signal,

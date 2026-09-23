@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.talkswithtanha.twt.core.designsystem.Haptics
+import com.talkswithtanha.twt.core.designsystem.pressScale
 import com.talkswithtanha.twt.core.designsystem.LocalHapticsEnabled
 import com.talkswithtanha.twt.core.designsystem.Radius
 import com.talkswithtanha.twt.core.designsystem.Spacing
@@ -64,6 +65,7 @@ fun TwtCard(
     val interaction = remember { MutableInteractionSource() }
 
     val base = modifier
+        .then(if (onClick != null) Modifier.pressScale(interaction) else Modifier)
         .clip(shape)
         .background(MaterialTheme.colorScheme.surface)
         .let { if (border != null) it.border(border, shape) else it }

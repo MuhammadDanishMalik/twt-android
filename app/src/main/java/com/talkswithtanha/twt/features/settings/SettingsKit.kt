@@ -21,7 +21,9 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.NorthEast
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.talkswithtanha.twt.core.designsystem.Haptics
 import com.talkswithtanha.twt.core.designsystem.IosColors
+import com.talkswithtanha.twt.core.designsystem.pressScale
 
 /**
  * The grouped-settings kit, ported from `SettingsRow.swift`.
@@ -125,11 +128,19 @@ fun SettingsRow(
     onClick: () -> Unit
 ) {
     val haptics = LocalHapticFeedback.current
+    val interaction = remember { MutableInteractionSource() }
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable {
+            .pressScale(interaction, pressedScale = 0.985f)
+            .clickable(
+                interactionSource = interaction,
+                // A scale, not a ripple: on a near-black grouped card a ripple
+                // is close to invisible, and the rows are separated by
+                // luminance rather than by colour.
+                indication = null
+            ) {
                 Haptics.tap(haptics)
                 onClick()
             }
@@ -224,13 +235,19 @@ fun SheetPrimaryButton(
     onClick: () -> Unit
 ) {
     val haptics = LocalHapticFeedback.current
+    val interaction = remember { MutableInteractionSource() }
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(52.dp)
+            .pressScale(interaction)
             .clip(CircleShape)
             .background(if (enabled) Color.White else Color(0xFF2C2C2E))
-            .clickable(enabled = enabled) {
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                enabled = enabled
+            ) {
                 Haptics.tap(haptics)
                 onClick()
             },

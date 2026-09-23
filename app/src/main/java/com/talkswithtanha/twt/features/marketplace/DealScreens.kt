@@ -55,6 +55,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.talkswithtanha.twt.core.designsystem.Haptics
 import com.talkswithtanha.twt.core.designsystem.IosColors
+import com.talkswithtanha.twt.core.designsystem.staggeredAppear
 import com.talkswithtanha.twt.core.model.Deal
 import com.talkswithtanha.twt.core.model.DealSide
 import com.talkswithtanha.twt.core.model.DealStatus
@@ -123,7 +124,7 @@ fun MyDealsScreen(
                 item {
                     SettingsCard {
                         deals.forEachIndexed { index, deal ->
-                            DealRow(deal) { onOpenDeal(deal.id) }
+                            DealRow(deal, Modifier.staggeredAppear(index)) { onOpenDeal(deal.id) }
                             if (index < deals.lastIndex) {
                                 SettingsDivider(SettingsMetrics.rowPadding)
                             }
@@ -141,9 +142,9 @@ fun MyDealsScreen(
 }
 
 @Composable
-private fun DealRow(deal: Deal, onClick: () -> Unit) {
+private fun DealRow(deal: Deal, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(horizontal = SettingsMetrics.rowPadding, vertical = 12.dp),

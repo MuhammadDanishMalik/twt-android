@@ -7,6 +7,8 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,6 +32,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import com.talkswithtanha.twt.core.designsystem.rememberShimmerProgress
 import com.talkswithtanha.twt.core.designsystem.Radius
 import com.talkswithtanha.twt.core.designsystem.Spacing
 import com.talkswithtanha.twt.core.designsystem.TwtColors
@@ -41,29 +47,41 @@ import com.talkswithtanha.twt.core.designsystem.TwtColors
  * is: showing the geometry the real content will occupy means nothing jumps when
  * it lands.
  */
+/**
+ * A loading placeholder with a highlight sweeping across it.
+ *
+ * A sweep rather than a pulse. A block that fades in and out reads as something
+ * blinking at you; a highlight travelling left to right reads as the direction
+ * text is about to arrive from, which is why every platform settled on it.
+ */
 @Composable
 fun Shimmer(
     modifier: Modifier = Modifier,
     height: Dp = 16.dp,
     cornerRadius: Dp = 8.dp
 ) {
-    val transition = rememberInfiniteTransition(label = "shimmer")
-    val alpha by transition.animateFloat(
-        initialValue = 0.25f,
-        targetValue = 0.55f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "alpha"
-    )
+    val progress = rememberShimmerProgress()
 
-    androidx.compose.foundation.layout.Box(
+    Box(
         modifier = modifier
             .height(height)
             .clip(RoundedCornerShape(cornerRadius))
-            .alpha(alpha)
-            .background(TwtColors.SurfaceElevated)
+            .drawWithCache {
+                val base = TwtColors.SurfaceElevated
+                val highlight = Color.White.copy(alpha = 0.06f)
+                // Travels a full width beyond each edge, so the highlight
+                // enters and leaves rather than appearing in the middle.
+                val sweep = size.width * (progress * 2f - 0.5f)
+                val brush = Brush.linearGradient(
+                    colors = listOf(base, highlight, base),
+                    start = Offset(sweep - size.width * 0.4f, 0f),
+                    end = Offset(sweep + size.width * 0.4f, 0f)
+                )
+                onDrawBehind {
+                    drawRect(base)
+                    drawRect(brush)
+                }
+            }
     )
 }
 

@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.talkswithtanha.twt.core.designsystem.IosColors
+import com.talkswithtanha.twt.core.designsystem.staggeredAppear
 import com.talkswithtanha.twt.features.settings.SettingsCard
 import com.talkswithtanha.twt.features.settings.SettingsDivider
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -101,6 +102,7 @@ fun ChatListScreen(
                     rooms.forEachIndexed { index, room ->
                         val locked = room.requiresAccess && user?.hasAppAccess != true
                         ChatRoomRow(
+                            modifier = Modifier.staggeredAppear(index),
                             title = room.title,
                             subtitle = room.subtitle,
                             initials = room.initials,
@@ -153,6 +155,7 @@ private fun ChatSectionHeader(title: String) {
  */
 @Composable
 private fun ChatRoomRow(
+    modifier: Modifier = Modifier,
     title: String,
     subtitle: String,
     initials: String?,
@@ -162,7 +165,7 @@ private fun ChatRoomRow(
     onClick: () -> Unit
 ) {
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),

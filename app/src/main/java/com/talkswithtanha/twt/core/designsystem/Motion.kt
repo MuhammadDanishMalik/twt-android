@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -259,13 +260,18 @@ private val BLUR_RADIUS = 7.dp
 /**
  * The sweep that runs across a loading placeholder.
  *
- * Returned as a 0..1 position rather than a colour so each caller can decide
- * how wide the highlight is and which way it travels.
+ * Returned as the [State] rather than an unwrapped Float on purpose. Reading
+ * the value here would subscribe whoever called this, recomposing them sixty
+ * times a second to move a gradient; handing back the State lets the caller
+ * read it inside `drawBehind`, where the read subscribes only the draw phase.
+ * Same animation, no recomposition.
+ *
+ * A 0..1 position rather than a colour, so each caller decides how wide the
+ * highlight is and which way it travels.
  */
 @Composable
-fun rememberShimmerProgress(): Float {
-    val transition = rememberInfiniteTransition(label = "shimmer")
-    val progress by transition.animateFloat(
+fun rememberShimmerProgress(): State<Float> =
+    rememberInfiniteTransition(label = "shimmer").animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
@@ -274,5 +280,3 @@ fun rememberShimmerProgress(): Float {
         ),
         label = "sweep"
     )
-    return progress
-}

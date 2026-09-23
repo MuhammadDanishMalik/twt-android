@@ -45,7 +45,7 @@ import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import com.talkswithtanha.twt.core.designsystem.Motion
@@ -80,24 +80,52 @@ fun Shimmer(
         modifier = modifier
             .height(height)
             .clip(RoundedCornerShape(cornerRadius))
-            .drawWithCache {
-                val base = TwtColors.SurfaceElevated
-                val highlight = Color.White.copy(alpha = 0.06f)
-                // Travels a full width beyond each edge, so the highlight
-                // enters and leaves rather than appearing in the middle.
-                val sweep = size.width * (progress * 2f - 0.5f)
-                val brush = Brush.linearGradient(
-                    colors = listOf(base, highlight, base),
-                    start = Offset(sweep - size.width * 0.4f, 0f),
-                    end = Offset(sweep + size.width * 0.4f, 0f)
+            // drawBehind, not drawWithCache. The cache variant exists to keep
+            // expensive objects across frames, and this gradient changes every
+            // frame by definition — caching it meant rebuilding the whole
+            // modifier on each recomposition just to invalidate the cache.
+            // Reading progress here instead subscribes only the draw phase.
+            .drawBehind {
+                val (start, end) = shimmerBand(size.width, progress.value)
+                drawRect(TwtColors.SurfaceElevated)
+                drawRect(
+                    Brush.linearGradient(
+                        colors = listOf(Color.Transparent, HighlightColor, Color.Transparent),
+                        start = Offset(start, 0f),
+                        end = Offset(end, 0f)
+                    )
                 )
-                onDrawBehind {
-                    drawRect(base)
-                    drawRect(brush)
-                }
             }
     )
 }
+
+/**
+ * Where the highlight sits at [progress], in pixels along a bar of [width].
+ *
+ * Pure, and tested, because the whole effect is this arithmetic: the band has
+ * to start fully off the left edge and finish fully off the right one. Get the
+ * span wrong and the highlight is born in the middle of the bar and dies there,
+ * which does not read as travelling — it reads as a block that pulses.
+ */
+internal fun shimmerBand(width: Float, progress: Float): Pair<Float, Float> {
+    val half = width * BAND_HALF_WIDTH
+    // Travels from a full band-width left of the bar to a full band-width past
+    // its right edge.
+    val centre = -half + progress * (width + 2f * half)
+    return (centre - half) to (centre + half)
+}
+
+/** Half the highlight's width, as a fraction of the bar. */
+private const val BAND_HALF_WIDTH = 0.35f
+
+/**
+ * The brightness of the travelling band.
+ *
+ * At 6% it was technically animating and effectively invisible — on a #1C1C1E
+ * bar that is a couple of levels of grey, which reads as a static block rather
+ * than as something loading.
+ */
+private val HighlightColor = Color.White.copy(alpha = 0.16f)
 
 /**
  * A line of text that is a shimmering bar until it has something to say.

@@ -12,6 +12,10 @@ import com.google.firebase.messaging.FirebaseMessaging
 import com.talkswithtanha.twt.core.data.AcademyRepository
 import com.talkswithtanha.twt.core.data.AccessTokenRepository
 import com.talkswithtanha.twt.core.data.ChatRepository
+import com.talkswithtanha.twt.core.data.DealRepository
+import com.talkswithtanha.twt.core.data.FirebaseDealRepository
+import com.talkswithtanha.twt.core.data.FirebaseMarketplaceConfigRepository
+import com.talkswithtanha.twt.core.data.MarketplaceConfigRepository
 import com.talkswithtanha.twt.core.data.ExchangeRateRepository
 import com.talkswithtanha.twt.core.data.FirebaseAcademyRepository
 import com.talkswithtanha.twt.core.data.FirebaseAccessTokenRepository
@@ -109,4 +113,14 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun academyRepository(impl: FirebaseAcademyRepository): AcademyRepository
+
+    @Binds
+    @Singleton
+    abstract fun dealRepository(impl: FirebaseDealRepository): DealRepository
+
+    @Binds
+    @Singleton
+    abstract fun marketplaceConfigRepository(
+        impl: FirebaseMarketplaceConfigRepository
+    ): MarketplaceConfigRepository
 }

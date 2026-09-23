@@ -84,6 +84,8 @@ class MarketplaceViewModel @Inject constructor(
 fun MarketplaceScreen(
     onBack: () -> Unit,
     onOpenWhatsApp: (String) -> Unit,
+    onNewDeal: () -> Unit,
+    onMyDeals: () -> Unit,
     viewModel: MarketplaceViewModel = hiltViewModel()
 ) {
     val rate by viewModel.rate.collectAsStateWithLifecycle()
@@ -180,10 +182,24 @@ fun MarketplaceScreen(
 
                 Spacer(Modifier.height(Spacing.xl))
 
-                TwtSecondaryButton(
-                    text = "Start a deal on WhatsApp",
-                    icon = Icons.Outlined.Chat,
+                com.talkswithtanha.twt.core.designsystem.components.TwtButton(
+                    text = "Open a deal at this rate",
                     enabled = currentRate.isAcceptingDeals,
+                    onClick = onNewDeal
+                )
+
+                Spacer(Modifier.height(Spacing.md))
+
+                TwtSecondaryButton(
+                    text = "My deals",
+                    onClick = onMyDeals
+                )
+
+                Spacer(Modifier.height(Spacing.md))
+
+                TwtSecondaryButton(
+                    text = "Ask on WhatsApp",
+                    icon = Icons.Outlined.Chat,
                     onClick = {
                         val amount = usdInput.takeIf { it.isNotBlank() } ?: "some"
                         onOpenWhatsApp(

@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -193,17 +195,44 @@ fun SignalDetailScreen(
 
             Reveal(2) { SignalMilestoneTrack(signal) }
 
-            signal.chartImageUrl?.let { url ->
+            val teamImages = signal.teamImages
+            if (teamImages.isNotEmpty()) {
                 Reveal(3) {
-                    AsyncImage(
-                        model = url,
-                        contentDescription = "Chart for ${signal.pair}",
-                        contentScale = ContentScale.FillWidth,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(16f / 10f)
-                            .clip(RoundedCornerShape(22.dp))
-                    )
+                    DetailCard(
+                        title = "From the team",
+                        accessory = {
+                            Text(
+                                text = teamImages.size.toString(),
+                                color = Color.White.copy(alpha = 0.45f),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    ) {
+                        // A row rather than one big image: Tanha attaches the
+                        // chart he drew on *and* whatever else shows the setup,
+                        // and stacking those full-width pushes the details off
+                        // the screen.
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            items(teamImages) { url ->
+                                AsyncImage(
+                                    model = url,
+                                    contentDescription = "Chart for ${signal.pair}",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .width(172.dp)
+                                        .height(112.dp)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(Color(0xFF1A1A1A))
+                                        .border(
+                                            0.5.dp,
+                                            Color.White.copy(alpha = 0.10f),
+                                            RoundedCornerShape(14.dp)
+                                        )
+                                )
+                            }
+                        }
+                    }
                 }
             }
 

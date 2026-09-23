@@ -166,50 +166,6 @@ private fun ChoiceRow(
 }
 
 /**
- * My Deals.
- *
- * Empty for now, and it says so rather than showing invented history: the
- * member's side of the exchange is a WhatsApp conversation, and the `deals`
- * collection is written by the admin panel once one is actually opened.
- */
-@Composable
-fun MyDealsScreen(onClose: () -> Unit) {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(IosColors.Background)
-            .statusBarsPadding()
-    ) {
-        SheetHeader("My Deals", onClose)
-
-        Column(Modifier.padding(horizontal = SettingsMetrics.pageInset)) {
-            SettingsSectionHeader("MY DEALS")
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(SettingsMetrics.cardRadius))
-                    .background(IosColors.SecondaryBackground)
-                    .padding(SettingsMetrics.rowPadding),
-                horizontalArrangement = Arrangement.spacedBy(SettingsMetrics.iconGap),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Filled.SwapHoriz,
-                    contentDescription = null,
-                    tint = IosColors.TextSecondary,
-                    modifier = Modifier.size(28.dp)
-                )
-                Text(
-                    text = "No deals yet. Your exchange history will appear here.",
-                    color = IosColors.TextSecondary,
-                    fontSize = 15.sp
-                )
-            }
-        }
-    }
-}
-
-/**
  * Contact Support.
  *
  * Writes into the member's own `support_{uid}` thread rather than opening a mail

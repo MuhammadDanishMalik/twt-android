@@ -62,6 +62,9 @@ object FirestorePaths {
          * from the admin panel so a changed number does not need a new build.
          */
         const val SUPPORT = "support"
+
+        /** Holds the receiving accounts for the exchange desk. */
+        const val MARKETPLACE = "marketplace"
     }
 
     /**
@@ -107,6 +110,13 @@ object FirestorePaths {
         const val IS_PUBLISHED = "isPublished"
         const val TRADE_STYLE = "tradeStyle"
         const val CHART_IMAGE_URL = "chartImageURL"
+
+        /**
+         * Extra images the team attaches — the setup on another timeframe, a
+         * close-up of the entry, a screenshot of the fill. Separate from
+         * [CHART_IMAGE_URL], which is the one chart Tanha draws on.
+         */
+        const val SCREENSHOTS = "screenshots"
         const val IS_EDITED = "isEdited"
 
         object TakeProfit {
@@ -217,6 +227,50 @@ object FirestorePaths {
         const val RESULT_CURRENCY = "resultCurrency"
         const val NOTE = "note"
         const val RECORDED_AT = "recordedAt"
+    }
+
+    /**
+     * The `deals` collection, mirrored from `DealField` in the iOS project and
+     * `twt-admin/lib/deals-repo.ts`.
+     */
+    object DealField {
+        const val USER_ID = "userId"
+        const val USER_NAME = "userName"
+        const val REFERENCE = "reference"
+        const val SIDE = "side"
+
+        /** Whole dollars, as a number — what the admin panel reads. */
+        const val AMOUNT_USD = "amountUSD"
+        /** The same amount in cents. Written alongside so nothing downstream
+         *  has to trust a float for money. */
+        const val AMOUNT_USD_CENTS = "amountUsdCents"
+
+        const val LOCKED_RATE = "lockedRate"
+        const val LOCKED_RATE_PAISA = "lockedRatePaisa"
+
+        const val SELLER_ACCOUNT = "sellerAccount"
+        const val RECEIVING_ACCOUNT = "receivingAccount"
+        const val PAYMENT_REFERENCE = "paymentReference"
+        const val STATUS = "status"
+        const val EVENTS = "events"
+        const val CREATED_AT = "createdAt"
+    }
+
+    /**
+     * `config/marketplace` — the accounts a member pays into.
+     *
+     * Read live rather than compiled in. The iOS app carries Tanha's account
+     * numbers as literals in `MarketplaceSeller.tanha`, and they are
+     * placeholders — `03001234567` and a dummy IBAN. An app that shows a
+     * made-up account number on the screen where somebody is about to transfer
+     * money is worse than one that shows none, so this reads what staff have
+     * actually configured and says so when there is nothing.
+     */
+    object MarketplaceConfigField {
+        const val ACCOUNTS = "accounts"
+        const val METHOD = "method"
+        const val ACCOUNT_TITLE = "accountTitle"
+        const val ACCOUNT_NUMBER = "accountNumber"
     }
 
     object SupportConfigField {

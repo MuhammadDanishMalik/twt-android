@@ -35,10 +35,19 @@ data class Signal(
     /** A chart screenshot Tanha attaches — his drawing on the chart is the
      *  explanation the numbers cannot give. */
     val chartImageUrl: String? = null,
+    /** Everything else the team attached, in the order it was attached. */
+    val screenshots: List<String> = emptyList(),
     /** The client chose "yes, and show members it was edited" over silent edits.
      *  Someone who acted on the original numbers is entitled to know they moved. */
     val isEdited: Boolean = false
 ) {
+    /**
+     * The chart and the screenshots as one list, chart first — what the detail
+     * screen shows under "From the team".
+     */
+    val teamImages: List<String>
+        get() = listOfNotNull(chartImageUrl) + screenshots
+
     data class TakeProfit(
         val label: String,
         val price: String,

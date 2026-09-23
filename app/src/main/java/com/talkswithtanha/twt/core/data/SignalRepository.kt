@@ -117,6 +117,9 @@ class FirebaseSignalRepository @Inject constructor(
             notes = document.get(F.NOTES).asNonBlankString(),
             tradeStyle = TradeStyle.from(document.getString(F.TRADE_STYLE)),
             chartImageUrl = document.get(F.CHART_IMAGE_URL).asNonBlankString(),
+            screenshots = (document.get(F.SCREENSHOTS) as? List<*>)
+                .orEmpty()
+                .mapNotNull { it.asNonBlankString() },
             isEdited = document.getBoolean(F.IS_EDITED) ?: false
         )
     }

@@ -32,12 +32,14 @@ import com.talkswithtanha.twt.features.auth.SplashScreen
 import com.talkswithtanha.twt.features.chat.ChatListScreen
 import com.talkswithtanha.twt.features.chat.ChatRoomScreen
 import com.talkswithtanha.twt.features.home.HomeScreen
+import com.talkswithtanha.twt.features.marketplace.DealDetailScreen
 import com.talkswithtanha.twt.features.marketplace.MarketplaceScreen
+import com.talkswithtanha.twt.features.marketplace.MyDealsScreen
+import com.talkswithtanha.twt.features.marketplace.NewDealScreen
 import com.talkswithtanha.twt.features.media.MediaHubScreen
 import com.talkswithtanha.twt.features.profile.EditProfileScreen
 import com.talkswithtanha.twt.features.settings.AppearanceScreen
 import com.talkswithtanha.twt.features.settings.ContactSupportScreen
-import com.talkswithtanha.twt.features.settings.MyDealsScreen
 import com.talkswithtanha.twt.features.settings.MySignalsScreen
 import com.talkswithtanha.twt.features.settings.RecordResultScreen
 import com.talkswithtanha.twt.features.settings.SettingsScreen
@@ -156,7 +158,9 @@ fun AppNavHost(
         composable(AppRoute.Marketplace.route) {
             MarketplaceScreen(
                 onBack = { navController.popBackStack() },
-                onOpenWhatsApp = ::openUrl
+                onOpenWhatsApp = ::openUrl,
+                onNewDeal = { navController.navigate(AppRoute.NewDeal.route) },
+                onMyDeals = { navController.navigate(AppRoute.MyDeals.route) }
             )
         }
 
@@ -187,7 +191,34 @@ fun AppNavHost(
         }
 
         sheetRoute(AppRoute.MyDeals.route) {
-            MyDealsScreen(onClose = { navController.popBackStack() })
+            MyDealsScreen(
+                onClose = { navController.popBackStack() },
+                onOpenDeal = { navController.navigate(AppRoute.DealDetail.of(it)) },
+                onNewDeal = { navController.navigate(AppRoute.NewDeal.route) }
+            )
+        }
+
+        sheetRoute(AppRoute.NewDeal.route) {
+            NewDealScreen(
+                onClose = { navController.popBackStack() },
+                onOpened = { dealId ->
+                    // Straight into the deal, and the form is left behind: a
+                    // member who backs out of the detail should not land on a
+                    // filled-in form that would open a second deal.
+                    navController.popBackStack()
+                    navController.navigate(AppRoute.DealDetail.of(dealId))
+                }
+            )
+        }
+
+        sheetRoute(
+            route = AppRoute.DealDetail.route,
+            arguments = listOf(navArgument(AppRoute.DealDetail.ARG) { type = NavType.StringType })
+        ) {
+            DealDetailScreen(
+                onClose = { navController.popBackStack() },
+                onOpenChat = { navController.navigate(AppRoute.ChatList.route) }
+            )
         }
 
         sheetRoute(AppRoute.Appearance.route) {

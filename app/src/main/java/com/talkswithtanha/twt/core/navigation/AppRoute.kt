@@ -60,6 +60,12 @@ sealed class AppRoute(val route: String) {
     data object EditProfile : AppRoute("editProfile")
     data object MySignals : AppRoute("mySignals")
     data object MyDeals : AppRoute("myDeals")
+    data object NewDeal : AppRoute("newDeal")
+
+    data object DealDetail : AppRoute("deal/{dealId}") {
+        const val ARG = "dealId"
+        fun of(dealId: String) = "deal/$dealId"
+    }
     data object Appearance : AppRoute("appearance")
     data object ContactSupport : AppRoute("contactSupport")
 

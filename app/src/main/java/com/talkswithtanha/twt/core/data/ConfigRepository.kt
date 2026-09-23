@@ -5,8 +5,10 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.talkswithtanha.twt.core.firebase.FirestorePaths.Collection
 import com.talkswithtanha.twt.core.firebase.FirestorePaths.Document
 import com.talkswithtanha.twt.core.firebase.FirestorePaths.ExchangeRateField as E
+import com.talkswithtanha.twt.core.firebase.FirestorePaths.MarketplaceConfigField as M
 import com.talkswithtanha.twt.core.firebase.FirestorePaths.SupportConfigField as S
 import com.talkswithtanha.twt.core.model.ExchangeRate
+import com.talkswithtanha.twt.core.model.PaymentAccount
 import com.talkswithtanha.twt.core.model.SupportConfig
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -127,4 +129,42 @@ class FirebaseSupportConfigRepository @Inject constructor(
         val text = value?.takeIf { it.isNotBlank() } ?: return null
         return text.takeIf { it.toUri().scheme?.lowercase() == "https" }
     }
+}
+
+
+interface MarketplaceConfigRepository {
+    /**
+     * The accounts a member pays into.
+     *
+     * Empty until staff configure `config/marketplace`. The screens treat that
+     * as "Tanha will send the details", which is true, rather than showing an
+     * account number nobody can pay into.
+     */
+    fun observeAccounts(): Flow<List<PaymentAccount>>
+}
+
+@Singleton
+class FirebaseMarketplaceConfigRepository @Inject constructor(
+    private val db: FirebaseFirestore
+) : MarketplaceConfigRepository {
+
+    override fun observeAccounts(): Flow<List<PaymentAccount>> =
+        db.collection(Collection.CONFIG)
+            .document(Document.MARKETPLACE)
+            .snapshotFlow()
+            .map { snapshot ->
+                val document = (snapshot as? Snapshot.Data)?.value ?: return@map emptyList()
+                (document.get(M.ACCOUNTS) as? List<*>)
+                    .orEmpty()
+                    .filterIsInstance<Map<*, *>>()
+                    .mapNotNull { raw ->
+                        val number = raw[M.ACCOUNT_NUMBER].asNonBlankString()
+                            ?: return@mapNotNull null
+                        PaymentAccount(
+                            method = raw[M.METHOD].asNonBlankString().orEmpty(),
+                            accountTitle = raw[M.ACCOUNT_TITLE].asNonBlankString().orEmpty(),
+                            accountNumber = number
+                        )
+                    }
+            }
 }

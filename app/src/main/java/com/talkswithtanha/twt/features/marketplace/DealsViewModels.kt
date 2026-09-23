@@ -48,6 +48,8 @@ class DealsViewModel @Inject constructor(
 data class NewDealUiState(
     val side: DealSide = DealSide.BUY,
     val amount: String = "",
+    /** Index into the configured accounts, or -1 until one is chosen. */
+    val accountIndex: Int = 0,
     val isSubmitting: Boolean = false,
     val error: String? = null,
     val createdDealId: String? = null
@@ -71,6 +73,12 @@ class NewDealViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun onSideChange(side: DealSide) = _state.update { it.copy(side = side, error = null) }
+
+    fun onAccountChange(index: Int) = _state.update { it.copy(accountIndex = index, error = null) }
+
+    /** Quick amounts, in whole dollars. */
+    fun onQuickAmount(dollars: Int) =
+        _state.update { it.copy(amount = dollars.toString(), error = null) }
 
     fun onAmountChange(value: String) = _state.update {
         it.copy(amount = value.filter { c -> c.isDigit() || c == '.' }, error = null)
@@ -107,9 +115,17 @@ class NewDealViewModel @Inject constructor(
                         amountUsdCents = cents,
                         // Locked here, at the rate on screen. Re-reading it
                         // later would requote somebody mid-transfer.
-                        lockedRatePaisa = currentRate.buyPaisa,
+                        //
+                        // Per side, not always the buy rate. A sell locked at
+                        // the buy rate pays the member the wrong side of the
+                        // spread — on a $100 sell that is 34,100 rupees where
+                        // 23,000 was quoted, out of Tanha's pocket.
+                        lockedRatePaisa = currentRate.paisaFor(_state.value.side),
                         status = com.talkswithtanha.twt.core.model.DealStatus.AWAITING_PAYMENT,
-                        sellerAccount = accounts.value.firstOrNull()
+                        // The account the member actually chose, rather than
+                        // whichever happened to be configured first.
+                        sellerAccount = accounts.value.getOrNull(_state.value.accountIndex)
+                            ?: accounts.value.firstOrNull()
                     )
                 )
                 _state.update { it.copy(isSubmitting = false, createdDealId = id) }

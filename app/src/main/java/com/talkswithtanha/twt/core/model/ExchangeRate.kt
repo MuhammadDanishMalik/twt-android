@@ -47,6 +47,17 @@ data class ExchangeRate(
 
     enum class Direction { UP, DOWN, FLAT }
 
+    /**
+     * The rate that applies to a deal on [side], in paisa.
+     *
+     * Buying and selling are not the same price — the gap between them is the
+     * seller's whole margin. Locking a sell at the buy rate hands the member
+     * 341 rupees a dollar where they were quoted 230, which is not a rounding
+     * error, it is the business.
+     */
+    fun paisaFor(side: com.talkswithtanha.twt.core.model.DealSide): Long =
+        if (side == com.talkswithtanha.twt.core.model.DealSide.BUY) buyPaisa else sellPaisa
+
     /** PKR (in paisa) required to buy [usdCents] worth of USD. */
     fun pkrPaisaToBuy(usdCents: Long): Long = usdCents * buyPaisa / 100
 

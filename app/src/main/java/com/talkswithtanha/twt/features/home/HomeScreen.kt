@@ -17,7 +17,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -99,6 +102,25 @@ fun HomeScreen(
                             Color.Black.copy(alpha = 0.55f),
                             Color.Black.copy(alpha = 0.88f)
                         )
+                    )
+                )
+        )
+
+        // A second, shorter scrim behind the status bar.
+        //
+        // The photograph is lit from the top centre, which is exactly where the
+        // clock and the battery sit — white system icons on the brightest part
+        // of the image, which is the one place the app cannot restyle them. The
+        // screen-wide scrim above starts at 15% so the top stays rich; this one
+        // is local to the status bar and fades out within it, so the icons have
+        // something to sit on without dulling the light below them.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .windowInsetsTopHeight(WindowInsets.statusBars)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color.Black.copy(alpha = 0.55f), Color.Transparent)
                     )
                 )
         )

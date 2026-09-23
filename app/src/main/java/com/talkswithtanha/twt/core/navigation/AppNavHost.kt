@@ -42,6 +42,7 @@ import com.talkswithtanha.twt.features.marketplace.MarketplaceScreen
 import com.talkswithtanha.twt.features.marketplace.MyDealsScreen
 import com.talkswithtanha.twt.features.marketplace.NewDealScreen
 import com.talkswithtanha.twt.features.media.MediaHubScreen
+import com.talkswithtanha.twt.features.profile.AccountDetailsScreen
 import com.talkswithtanha.twt.features.profile.EditProfileScreen
 import com.talkswithtanha.twt.features.settings.AppearanceScreen
 import com.talkswithtanha.twt.features.settings.ContactSupportScreen
@@ -181,12 +182,17 @@ fun AppNavHost(
             sheetRoute(sharedScope, AppRoute.Settings.route) {
             SettingsScreen(
                 onClose = { navController.popBackStack() },
+                onViewProfile = { navController.navigate(AppRoute.AccountDetails.route) },
                 onEditProfile = { navController.navigate(AppRoute.EditProfile.route) },
                 onMySignals = { navController.navigate(AppRoute.MySignals.route) },
                 onMyDeals = { navController.navigate(AppRoute.MyDeals.route) },
                 onAppearance = { navController.navigate(AppRoute.Appearance.route) },
                 onContactSupport = { navController.navigate(AppRoute.ContactSupport.route) }
             )
+        }
+
+            sheetRoute(sharedScope, AppRoute.AccountDetails.route) {
+            AccountDetailsScreen(onClose = { navController.popBackStack() })
         }
 
             sheetRoute(sharedScope, AppRoute.EditProfile.route) {

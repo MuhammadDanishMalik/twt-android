@@ -57,6 +57,8 @@ sealed class AppRoute(val route: String) {
 
     // ── The settings family, presented as sheets on iOS ──────────────────
     data object Settings : AppRoute("settings")
+    /** Read-only "View Profile"; editing is [EditProfile]. */
+    data object AccountDetails : AppRoute("accountDetails")
     data object EditProfile : AppRoute("editProfile")
     data object MySignals : AppRoute("mySignals")
     data object MyDeals : AppRoute("myDeals")

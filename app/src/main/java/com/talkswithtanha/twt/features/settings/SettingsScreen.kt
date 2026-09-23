@@ -71,6 +71,7 @@ import com.talkswithtanha.twt.features.profile.ProfileViewModel
 @Composable
 fun SettingsScreen(
     onClose: () -> Unit,
+    onViewProfile: () -> Unit,
     onEditProfile: () -> Unit,
     onMySignals: () -> Unit,
     onMyDeals: () -> Unit,
@@ -122,7 +123,7 @@ fun SettingsScreen(
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .clickable(onClick = onEditProfile)
+                            .clickable(onClick = onViewProfile)
                             .padding(
                                 horizontal = SettingsMetrics.rowPadding,
                                 vertical = 8.dp
@@ -188,7 +189,7 @@ fun SettingsScreen(
                         title = "Account Settings",
                         icon = Icons.Filled.Group,
                         tint = IosColors.SettingsIcon.Account,
-                        onClick = onEditProfile
+                        onClick = onViewProfile
                     )
                     SettingsDivider()
                     SettingsRow(

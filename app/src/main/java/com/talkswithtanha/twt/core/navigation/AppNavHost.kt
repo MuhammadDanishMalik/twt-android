@@ -114,14 +114,12 @@ fun AppNavHost(
 
             screen(sharedScope, AppRoute.VerifyEmail.route) {
             VerifyEmailScreen(
-                // Verified members fall through to the access gate, which is
-                // the next thing standing between them and the signals.
-                onVerified = {
-                    navController.navigate(AppRoute.AccessGate.route) {
-                        popUpTo(AppRoute.SignIn.route) { inclusive = true }
-                    }
-                },
-                onBack = { navController.popBackStack() }
+                // No navigation here. Verifying flips the gate, and the gate
+                // moves the whole stack — anything pushed from this screen
+                // would be wiped a frame later. Signing out is the honest exit
+                // for somebody who typed the wrong address: the account exists
+                // and has to be abandoned, not backed out of.
+                onVerified = {}
             )
         }
 

@@ -47,8 +47,7 @@ import com.talkswithtanha.twt.core.designsystem.IosColors
  */
 @Composable
 fun VerifyEmailScreen(
-    onVerified: () -> Unit,
-    onBack: () -> Unit,
+    onVerified: () -> Unit = {},
     viewModel: VerifyEmailViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -72,7 +71,7 @@ fun VerifyEmailScreen(
                 .size(38.dp)
                 .clip(CircleShape)
                 .background(AuthSurface)
-                .clickable(onClick = onBack),
+                .clickable { viewModel.abandon() },
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -151,11 +150,11 @@ fun VerifyEmailScreen(
         Spacer(Modifier.height(12.dp))
 
         Text(
-            text = "Wrong address? Go back and sign up again.",
+            text = "Wrong address? Sign out and start again.",
             color = Color.White.copy(alpha = 0.45f),
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
-            modifier = Modifier.clickable(onClick = onBack)
+            modifier = Modifier.clickable { viewModel.abandon() }
         )
 
         Spacer(Modifier.height(40.dp))

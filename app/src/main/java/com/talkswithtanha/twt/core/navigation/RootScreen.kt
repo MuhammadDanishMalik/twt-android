@@ -70,6 +70,7 @@ fun RootScreen(
         val destination = when (gate) {
             RootViewModel.Gate.Undecided -> null
             RootViewModel.Gate.SignedOut -> AppRoute.Onboarding.route
+            RootViewModel.Gate.NeedsEmailVerification -> AppRoute.VerifyEmail.route
             RootViewModel.Gate.NeedsAccessCode -> AppRoute.AccessGate.route
             RootViewModel.Gate.Allowed -> AppRoute.Home.route
         } ?: return@LaunchedEffect

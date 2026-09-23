@@ -123,6 +123,15 @@ class VerifyEmailViewModel @Inject constructor(
 
     fun dismissNotice() = _state.update { it.copy(notice = null, error = null) }
 
+    /**
+     * The way out for somebody who mistyped their address.
+     *
+     * Signing out rather than going back, because there is nothing to go back
+     * to: the account exists, it is signed in, and the address on it is wrong.
+     * It has to be abandoned and started again.
+     */
+    fun abandon() = auth.signOut()
+
     private fun startResendCountdown(seconds: Int) {
         viewModelScope.launch {
             for (remaining in seconds downTo 0) {

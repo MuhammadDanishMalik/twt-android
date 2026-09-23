@@ -8,6 +8,9 @@ import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.google.firebase.auth.userProfileChangeRequest
 import com.talkswithtanha.twt.core.model.LoginProvider
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -64,13 +67,28 @@ class AuthService @Inject constructor(
     /** The signed-in member's address, for "we sent a code to…" lines. */
     val currentEmail: String? get() = auth.currentUser?.email
 
+    private val _emailVerified = MutableStateFlow(auth.currentUser?.isEmailVerified == true)
+
+    /**
+     * Whether the address is confirmed, as something that can be observed.
+     *
+     * The routing gate needs this reactively. A plain getter would be read once
+     * when the gate was computed and never again, so a member who had just
+     * typed a correct code would sit on the verification screen forever — the
+     * flag changes server-side and nothing would tell the gate to look.
+     */
+    val emailVerified: StateFlow<Boolean> = _emailVerified.asStateFlow()
+
     /**
      * Emits the uid on every auth state change, and once immediately with the
      * restored session — which is what makes a returning member skip the login
      * screen.
      */
     fun observeAuthState(onChange: (String?) -> Unit): AutoCloseable {
-        val listener = FirebaseAuth.AuthStateListener { onChange(it.currentUser?.uid) }
+        val listener = FirebaseAuth.AuthStateListener {
+            _emailVerified.value = it.currentUser?.isEmailVerified == true
+            onChange(it.currentUser?.uid)
+        }
         auth.addAuthStateListener(listener)
         return AutoCloseable { auth.removeAuthStateListener(listener) }
     }
@@ -125,6 +143,7 @@ class AuthService @Inject constructor(
     suspend fun reload(): Boolean {
         val user = auth.currentUser ?: return false
         runCatching { user.reload().await() }
+        _emailVerified.value = user.isEmailVerified
         return user.isEmailVerified
     }
 

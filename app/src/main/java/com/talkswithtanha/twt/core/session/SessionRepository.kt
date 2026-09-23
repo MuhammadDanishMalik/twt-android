@@ -362,13 +362,15 @@ class SessionRepository @Inject constructor(
         fullName: String? = null,
         phone: String? = null,
         country: String? = null,
-        bio: String? = null
+        bio: String? = null,
+        profilePhoto: String? = null
     ) {
         val uid = _currentUser.value?.id ?: return
         userRepository.updateProfile(
             uid = uid,
             fullName = fullName,
             phone = phone,
+            profilePhoto = profilePhoto,
             country = country,
             bio = bio
         )

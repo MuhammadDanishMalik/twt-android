@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Where the camera is allowed to write.
+
+    One directory, inside the app's own cache, because the only thing that goes
+    through the provider is the temporary full-size photo a member just took on
+    the way to being cropped and uploaded. Nothing else is shared, so nothing
+    else is listed.
+-->
+<paths>
+    <cache-path name="camera" path="camera/" />
+</paths>

@@ -103,6 +103,10 @@ dependencies {
 
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    // Declared rather than leaned on as a Coil transitive: the Cloudinary
+    // uploader posts multipart bodies with it directly.
+    implementation(libs.okhttp)
+    implementation(libs.androidx.exifinterface)
 
     // Home-screen widget for the followed signal.
     implementation(libs.androidx.glance.appwidget)

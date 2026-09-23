@@ -32,10 +32,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.layout.ContentScale
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil3.compose.AsyncImage
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.talkswithtanha.twt.core.designsystem.AnimatedText
 import com.talkswithtanha.twt.core.designsystem.IosColors
+import com.talkswithtanha.twt.core.images.Cloudinary
 import com.talkswithtanha.twt.core.designsystem.brand.CrownGlyph
 import com.talkswithtanha.twt.core.designsystem.components.RedactedText
 import com.talkswithtanha.twt.core.designsystem.staggeredAppear
@@ -149,15 +152,27 @@ private fun Identity(user: User?, modifier: Modifier = Modifier) {
                 .background(Brush.linearGradient(IosColors.AvatarGradient)),
             contentAlignment = Alignment.Center
         ) {
-            // The initial, not a photograph: profilePhoto is only ever
-            // populated by Apple and Google sign-in, and most members here
-            // signed up with an email address.
-            Text(
-                text = user?.fullName?.take(1)?.uppercase() ?: "T",
-                color = Color.White,
-                fontSize = 30.sp,
-                fontWeight = FontWeight.SemiBold
+            val photo = Cloudinary.avatar(
+                user?.profilePhoto?.takeIf { it.isNotBlank() },
+                size = 76
             )
+            if (photo != null) {
+                AsyncImage(
+                    model = photo,
+                    contentDescription = "Profile photo",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().clip(CircleShape)
+                )
+            } else {
+                // The initial stands in until a member sets a photo. Accounts
+                // created through Google arrive with one already.
+                Text(
+                    text = user?.fullName?.take(1)?.uppercase() ?: "T",
+                    color = Color.White,
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
 
         AnimatedText(

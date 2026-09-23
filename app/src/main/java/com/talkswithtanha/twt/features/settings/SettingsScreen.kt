@@ -58,6 +58,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.talkswithtanha.twt.BuildConfig
 import com.talkswithtanha.twt.core.designsystem.IosColors
+import com.talkswithtanha.twt.core.images.Cloudinary
 import com.talkswithtanha.twt.core.notifications.NotificationPermission
 import com.talkswithtanha.twt.core.notifications.rememberNotificationPermissionRequest
 import com.talkswithtanha.twt.features.profile.ProfileViewModel
@@ -139,7 +140,10 @@ fun SettingsScreen(
                                 .background(Brush.linearGradient(IosColors.AvatarGradient)),
                             contentAlignment = Alignment.Center
                         ) {
-                            val photo = user?.profilePhoto
+                            val photo = Cloudinary.avatar(
+                                user?.profilePhoto?.takeIf { it.isNotBlank() },
+                                size = 44
+                            )
                             if (photo != null) {
                                 AsyncImage(
                                     model = photo,

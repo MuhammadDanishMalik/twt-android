@@ -3,6 +3,12 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Optional, so a device without a camera can still install and use the
+         gallery half of the avatar picker. No CAMERA permission is declared:
+         ACTION_IMAGE_CAPTURE hands the work to the camera app, and declaring
+         the permission would only oblige the app to ask for one it never uses. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
     <!--
       Android 13+. Requested at the moment a member follows their first trade,
       not at launch: that is the first point at which they have an obvious reason
@@ -73,6 +79,19 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="general" />
+        <!-- Hands the camera app a URI it may write to, without exposing the
+             app's storage. Authority is derived from the package so debug and
+             release builds installed side by side do not collide. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
     </application>
 
 </manifest>

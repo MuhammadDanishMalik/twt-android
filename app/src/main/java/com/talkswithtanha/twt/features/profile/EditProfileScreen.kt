@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.profile
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -62,6 +63,20 @@ fun EditProfileScreen(
                     text = "Edit profile",
                     style = MaterialTheme.typography.headlineLarge,
                     color = TwtColors.TextPrimary
+                )
+            }
+
+            Spacer(Modifier.height(Spacing.lg))
+
+            // The photo sits above the fields and saves on its own, because it
+            // is chosen and confirmed rather than typed.
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                AvatarEditor(
+                    photoUrl = state.photoUrl?.takeIf { it.isNotBlank() },
+                    initial = state.fullName.take(1).uppercase().ifBlank { "T" },
+                    isUploading = state.isUploadingPhoto,
+                    onCropped = viewModel::onPhotoCropped,
+                    onRemove = viewModel::onPhotoRemoved
                 )
             }
 

@@ -54,6 +54,21 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    // The deployed twt-admin, which holds the Resend key and the Admin SDK.
+    //
+    // Set `adminApiBase` in gradle.properties or pass -PadminApiBase=... so the
+    // URL is not compiled into the source tree, and staging and production
+    // builds differ by a property rather than by an edit somebody forgets to
+    // revert. Empty is a valid state: the app says email is unavailable rather
+    // than crashing.
+    defaultConfig {
+        buildConfigField(
+            "String",
+            "ADMIN_API_BASE",
+            "\"${project.findProperty("adminApiBase") ?: ""}\""
+        )
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true
@@ -96,7 +111,6 @@ dependencies {
     // Google sign-in through Credential Manager.
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
-    implementation(libs.googleid)
 
     // @AppStorage's counterpart.
     implementation(libs.androidx.datastore.preferences)

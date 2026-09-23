@@ -15,6 +15,12 @@ sealed class AppRoute(val route: String) {
     data object SignIn : AppRoute("signIn")
     data object SignUp : AppRoute("signUp")
 
+    /** Confirming the address with a six-digit code, straight after sign-up. */
+    data object VerifyEmail : AppRoute("verifyEmail")
+
+    /** Recovering an account through the inbox. */
+    data object ResetPassword : AppRoute("resetPassword")
+
     /** The gate the whole app turns on. Signed in, no live access code. */
     data object AccessGate : AppRoute("accessGate")
 

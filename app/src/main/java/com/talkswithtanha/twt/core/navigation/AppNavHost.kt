@@ -32,6 +32,8 @@ import com.talkswithtanha.twt.features.academy.AcademyScreen
 import com.talkswithtanha.twt.features.access.AccessGateScreen
 import com.talkswithtanha.twt.features.auth.AuthMode
 import com.talkswithtanha.twt.features.auth.AuthScreen
+import com.talkswithtanha.twt.features.auth.ResetPasswordScreen
+import com.talkswithtanha.twt.features.auth.VerifyEmailScreen
 import com.talkswithtanha.twt.features.auth.OnboardingScreen
 import com.talkswithtanha.twt.features.auth.SplashScreen
 import com.talkswithtanha.twt.features.chat.ChatListScreen
@@ -93,7 +95,9 @@ fun AppNavHost(
                 mode = AuthMode.SignIn,
                 onSwitchMode = {
                     navController.navigate(AppRoute.SignUp.route) { launchSingleTop = true }
-                }
+                },
+                onVerifyEmail = { navController.navigate(AppRoute.VerifyEmail.route) },
+                onForgotPassword = { navController.navigate(AppRoute.ResetPassword.route) }
             )
         }
 
@@ -102,7 +106,33 @@ fun AppNavHost(
                 mode = AuthMode.SignUp,
                 onSwitchMode = {
                     navController.navigate(AppRoute.SignIn.route) { launchSingleTop = true }
-                }
+                },
+                onVerifyEmail = { navController.navigate(AppRoute.VerifyEmail.route) },
+                onForgotPassword = { navController.navigate(AppRoute.ResetPassword.route) }
+            )
+        }
+
+            screen(sharedScope, AppRoute.VerifyEmail.route) {
+            VerifyEmailScreen(
+                // Verified members fall through to the access gate, which is
+                // the next thing standing between them and the signals.
+                onVerified = {
+                    navController.navigate(AppRoute.AccessGate.route) {
+                        popUpTo(AppRoute.SignIn.route) { inclusive = true }
+                    }
+                },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+            screen(sharedScope, AppRoute.ResetPassword.route) {
+            ResetPasswordScreen(
+                onDone = {
+                    navController.navigate(AppRoute.SignIn.route) {
+                        popUpTo(AppRoute.SignIn.route) { inclusive = true }
+                    }
+                },
+                onBack = { navController.popBackStack() }
             )
         }
 

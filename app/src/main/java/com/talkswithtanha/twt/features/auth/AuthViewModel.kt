@@ -51,20 +51,16 @@ class AuthViewModel @Inject constructor(
         session.establishSession(result)
     }
 
-    fun signUp(country: String?) = submit {
+    fun signUp(country: String?, onCreated: () -> Unit = {}) = submit {
         val result = authService.signUp(
             email = _state.value.email,
             password = _state.value.password,
             fullName = _state.value.fullName.trim()
         )
         session.establishSession(result, country)
+        onCreated()
     }
 
-    /** [idToken] comes from Credential Manager — see [GoogleSignIn]. */
-    fun signInWithGoogle(idToken: String, country: String?) = submit {
-        val result = authService.signInWithGoogle(idToken)
-        session.establishSession(result, country)
-    }
 
     fun sendPasswordReset() {
         val email = _state.value.email
@@ -84,8 +80,6 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun onGoogleSignInFailed(message: String) =
-        _state.update { it.copy(isSubmitting = false, error = message) }
 
     fun setSubmitting(value: Boolean) = _state.update { it.copy(isSubmitting = value) }
 

@@ -5,7 +5,6 @@ import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException
-import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.userProfileChangeRequest
 import com.talkswithtanha.twt.core.model.LoginProvider
 import kotlinx.coroutines.tasks.await
@@ -62,6 +61,9 @@ class AuthService @Inject constructor(
 
     val currentUid: String? get() = auth.currentUser?.uid
 
+    /** The signed-in member's address, for "we sent a code to…" lines. */
+    val currentEmail: String? get() = auth.currentUser?.email
+
     /**
      * Emits the uid on every auth state change, and once immediately with the
      * restored session — which is what makes a returning member skip the login
@@ -90,15 +92,40 @@ class AuthService @Inject constructor(
         user.toAuthResult(LoginProvider.EMAIL).copy(fullName = fullName.ifBlank { null })
     }
 
-    /** [idToken] comes from Credential Manager — see `GoogleSignInClient`. */
-    suspend fun signInWithGoogle(idToken: String): AuthResult = wrap {
-        val credential = GoogleAuthProvider.getCredential(idToken, null)
-        val result = auth.signInWithCredential(credential).await()
-        result.user!!.toAuthResult(LoginProvider.GOOGLE)
-    }
-
     suspend fun sendPasswordReset(email: String) = wrap {
         auth.sendPasswordResetEmail(email.trim()).await()
+    }
+
+    /**
+     * A fresh Firebase ID token for the signed-in member.
+     *
+     * The admin routes verify this rather than trusting anything in the request
+     * body, so it is what proves a caller is who they say they are. Null when
+     * nobody is signed in.
+     */
+    suspend fun idToken(): String? = auth.currentUser?.let { user ->
+        runCatching { user.getIdToken(false).await().token }.getOrNull()
+    }
+
+    /**
+     * Whether Firebase considers this address confirmed.
+     *
+     * Read from the local user record, which is a cached copy — call [reload]
+     * first when the answer needs to reflect a change made server-side.
+     */
+    val isEmailVerified: Boolean get() = auth.currentUser?.isEmailVerified == true
+
+    /**
+     * Re-reads the account from Firebase.
+     *
+     * The verify route flips `emailVerified` with the Admin SDK, which the
+     * phone's cached user knows nothing about until it asks again. Without this
+     * a member who just typed a correct code would still look unverified.
+     */
+    suspend fun reload(): Boolean {
+        val user = auth.currentUser ?: return false
+        runCatching { user.reload().await() }
+        return user.isEmailVerified
     }
 
     fun signOut() = auth.signOut()

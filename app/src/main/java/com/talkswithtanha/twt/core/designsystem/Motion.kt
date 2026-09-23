@@ -36,6 +36,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
@@ -160,7 +162,16 @@ fun AnimatedNumber(
     val figures = style.copy(fontFeatureSettings = "tnum")
     val characters = value.toList()
 
-    Row(modifier = modifier) {
+    Row(
+        modifier = modifier
+            // One node, not one per digit. Splitting the number into a column
+            // per character is what makes the roll possible, but it also puts
+            // every character in the accessibility tree on its own — a screen
+            // reader would announce "341.00 PKR" as "three, four, one, dot,
+            // zero, zero, P, K, R". This collapses the subtree back into the
+            // single string a person actually reads.
+            .clearAndSetSemantics { contentDescription = value }
+    ) {
         characters.forEachIndexed { index, character ->
             // Keyed by distance from the right, because numbers grow leftwards:
             // the units column has to stay the units column when a digit is

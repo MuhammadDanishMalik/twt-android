@@ -271,6 +271,23 @@ object FirestorePaths {
         const val METHOD = "method"
         const val ACCOUNT_TITLE = "accountTitle"
         const val ACCOUNT_NUMBER = "accountNumber"
+
+        /**
+         * The seller's shopfront: the name, handle and record shown above the
+         * rate.
+         *
+         * Every one of these is optional and the screen omits whatever is
+         * missing. They are claims about a person a member is about to send
+         * money to, so they are Tanha's to state in the admin panel — an app
+         * that ships "4.9 ★" as a constant is inventing a reputation.
+         */
+        const val SELLER_NAME = "sellerName"
+        const val SELLER_HANDLE = "sellerHandle"
+        const val IS_VERIFIED = "isVerified"
+        const val DEALS_COMPLETED = "dealsCompleted"
+        const val RATING = "rating"
+        /** Typical minutes from approved payment to released funds. */
+        const val RELEASE_MINUTES = "releaseMinutes"
     }
 
     object SupportConfigField {

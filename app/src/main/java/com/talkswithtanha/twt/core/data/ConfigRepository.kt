@@ -8,6 +8,7 @@ import com.talkswithtanha.twt.core.firebase.FirestorePaths.ExchangeRateField as 
 import com.talkswithtanha.twt.core.firebase.FirestorePaths.MarketplaceConfigField as M
 import com.talkswithtanha.twt.core.firebase.FirestorePaths.SupportConfigField as S
 import com.talkswithtanha.twt.core.model.ExchangeRate
+import com.talkswithtanha.twt.core.model.MarketplaceSeller
 import com.talkswithtanha.twt.core.model.PaymentAccount
 import com.talkswithtanha.twt.core.model.SupportConfig
 import kotlinx.coroutines.flow.Flow
@@ -141,6 +142,14 @@ interface MarketplaceConfigRepository {
      * account number nobody can pay into.
      */
     fun observeAccounts(): Flow<List<PaymentAccount>>
+
+    /**
+     * The seller's name, handle and record.
+     *
+     * Every field is absent until staff set it, and the Exchange screen renders
+     * only what is there.
+     */
+    fun observeSeller(): Flow<MarketplaceSeller>
 }
 
 @Singleton
@@ -166,5 +175,25 @@ class FirebaseMarketplaceConfigRepository @Inject constructor(
                             accountNumber = number
                         )
                     }
+            }
+
+    override fun observeSeller(): Flow<MarketplaceSeller> =
+        db.collection(Collection.CONFIG)
+            .document(Document.MARKETPLACE)
+            .snapshotFlow()
+            .map { snapshot ->
+                val document = (snapshot as? Snapshot.Data)?.value
+                    ?: return@map MarketplaceSeller()
+                MarketplaceSeller(
+                    name = document.get(M.SELLER_NAME).asNonBlankString(),
+                    handle = document.get(M.SELLER_HANDLE).asNonBlankString(),
+                    isVerified = document.getBoolean(M.IS_VERIFIED) == true,
+                    // Firestore hands back a Long or a Double depending on how
+                    // the value was written, so both are accepted rather than
+                    // the row silently vanishing because staff typed 4 not 4.0.
+                    dealsCompleted = (document.get(M.DEALS_COMPLETED) as? Number)?.toLong(),
+                    rating = (document.get(M.RATING) as? Number)?.toDouble(),
+                    releaseMinutes = (document.get(M.RELEASE_MINUTES) as? Number)?.toInt()
+                )
             }
 }

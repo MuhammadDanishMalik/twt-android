@@ -171,7 +171,13 @@ fun AppNavHost(
                 onBack = { navController.popBackStack() },
                 onOpenWhatsApp = ::openUrl,
                 onNewDeal = { navController.navigate(AppRoute.NewDeal.route) },
-                onMyDeals = { navController.navigate(AppRoute.MyDeals.route) }
+                onMyDeals = { navController.navigate(AppRoute.MyDeals.route) },
+                onOpenDeal = { navController.navigate(AppRoute.DealDetail.of(it)) },
+                // The seller thread, not the support one: this is a
+                // conversation about an amount and a rate.
+                onOpenSellerChat = {
+                    navController.navigate(AppRoute.ChatRoom.of(it, seller = true))
+                }
             )
         }
 

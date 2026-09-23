@@ -40,6 +40,33 @@ data class Deal(
             DealSide.BUY -> amountUsdCents
             DealSide.SELL -> amountUsdCents * lockedRatePaisa / 100
         }
+
+    /** `34,100 PKR` — the amount leaving the member, with its currency. */
+    fun payLabel(): String = minorWithCurrency(payTotalMinor, side.payCurrency)
+
+    /** `100.00 USD` — the amount arriving. */
+    fun receiveLabel(): String = minorWithCurrency(receiveTotalMinor, side.receiveCurrency)
+
+    companion object {
+        /**
+         * Currency as a suffix, because these read as amounts of a thing rather
+         * than as prices: a member thinks "thirty-four thousand rupees", not
+         * "PKR thirty-four thousand".
+         *
+         * PKR drops its paisa. Nobody quotes a rupee amount to two decimals,
+         * and the extra `.00` on a five-figure number is pure noise beside the
+         * USD leg that genuinely needs its cents.
+         */
+        fun minorWithCurrency(minor: Long, currency: String): String {
+            val sign = if (minor < 0) "-" else ""
+            val abs = kotlin.math.abs(minor)
+            return if (currency == "PKR") {
+                "%s%,d %s".format(sign, abs / 100, currency)
+            } else {
+                "%s%,d.%02d %s".format(sign, abs / 100, abs % 100, currency)
+            }
+        }
+    }
 }
 
 enum class DealSide(val stored: String, val title: String) {

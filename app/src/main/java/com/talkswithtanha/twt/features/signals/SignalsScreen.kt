@@ -10,7 +10,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.talkswithtanha.twt.core.designsystem.Motion
+import com.talkswithtanha.twt.core.designsystem.components.SegmentedControl
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
@@ -53,12 +64,53 @@ fun SignalsScreen(
     val today = closed.filter { isToday(it.timestamp.time) }
     val older = closed.filterNot { isToday(it.timestamp.time) }
 
+    // Which half of the screen is showing. Remembered across recomposition but
+    // deliberately not across navigation: coming back to Signals should show
+    // the trades, which is what the tab in the bar promises.
+    var tab by rememberSaveable { mutableIntStateOf(0) }
+
+    // Only signals Tanha actually attached a chart to. A card with an empty
+    // frame where the analysis should be is worse than one fewer card.
+    val analysed = state.signals.filter { it.teamImages.isNotEmpty() }
+
     Column(
         Modifier
             .fillMaxSize()
             .background(IosColors.Background)
             .statusBarsPadding()
     ) {
+        SegmentedControl(
+            options = listOf("Trades", "Analysis"),
+            selectedIndex = tab,
+            onSelect = { tab = it },
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+        )
+
+        // Slides rather than cuts, in the direction of travel, so the two
+        // halves read as one screen seen two ways.
+        AnimatedContent(
+            targetState = tab,
+            transitionSpec = {
+                val forward = targetState > initialState
+                val direction = if (forward) 1 else -1
+                (slideInHorizontally(Motion.gentle()) { w -> direction * w } + fadeIn(Motion.quick()))
+                    .togetherWith(
+                        slideOutHorizontally(Motion.gentle()) { w -> -direction * w } +
+                            fadeOut(Motion.quick())
+                    )
+            },
+            label = "signalsTab"
+        ) { selected ->
+            if (selected == 1) {
+                AnalysisTab(
+                    isLoading = state.isLoading,
+                    signals = analysed,
+                    followedIds = state.followedSignalIds,
+                    onOpenSignal = onOpenSignal,
+                    onFollow = viewModel::follow,
+                    onUnfollow = viewModel::unfollow
+                )
+            } else {
         LazyColumn(
             contentPadding = PaddingValues(top = 16.dp, bottom = 120.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
@@ -138,6 +190,44 @@ fun SignalsScreen(
                         onOpen = { onOpenSignal(signal.id) }
                     )
                 }
+            }
+        }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnalysisTab(
+    isLoading: Boolean,
+    signals: List<Signal>,
+    followedIds: Set<String>,
+    onOpenSignal: (String) -> Unit,
+    onFollow: (Signal) -> Unit,
+    onUnfollow: (String) -> Unit
+) {
+    LazyColumn(
+        contentPadding = PaddingValues(top = 6.dp, bottom = 120.dp)
+    ) {
+        when {
+            isLoading -> items(2) { index ->
+                SignalCardSkeleton(
+                    Modifier
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .staggeredAppear(index)
+                )
+            }
+
+            signals.isEmpty() -> item { AnalysisEmpty() }
+
+            else -> item {
+                AnalysisFeed(
+                    signals = signals,
+                    followedIds = followedIds,
+                    onOpenSignal = onOpenSignal,
+                    onFollow = onFollow,
+                    onUnfollow = onUnfollow
+                )
             }
         }
     }

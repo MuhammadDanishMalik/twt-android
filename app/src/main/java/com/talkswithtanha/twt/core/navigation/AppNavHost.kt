@@ -9,7 +9,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -20,6 +24,7 @@ import com.talkswithtanha.twt.core.designsystem.IosColors
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.talkswithtanha.twt.core.firebase.FirestorePaths
@@ -47,6 +52,7 @@ import com.talkswithtanha.twt.features.signals.SignalDetailScreen
 import com.talkswithtanha.twt.features.signals.SignalsScreen
 import com.talkswithtanha.twt.features.signals.MySignalsViewModel
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun AppNavHost(
     navController: NavHostController,
@@ -62,22 +68,26 @@ fun AppNavHost(
         navController.navigate(AppRoute.ChatList.route)
     }
 
-    NavHost(
-        navController = navController,
-        startDestination = AppRoute.Splash.route,
-        modifier = modifier
-    ) {
-        // ── Pre-auth ─────────────────────────────────────────────────────
-        composable(AppRoute.Splash.route) { SplashScreen() }
+    // One layout wrapping the whole graph, because a shared element has to be
+    // measured against something both screens live inside.
+    SharedTransitionLayout(modifier = modifier) {
+        val sharedScope = this
 
-        composable(AppRoute.Onboarding.route) {
+        NavHost(
+            navController = navController,
+            startDestination = AppRoute.Splash.route
+        ) {
+        // ── Pre-auth ─────────────────────────────────────────────────────
+            screen(sharedScope, AppRoute.Splash.route) { SplashScreen() }
+
+            screen(sharedScope, AppRoute.Onboarding.route) {
             OnboardingScreen(
                 onSignIn = { navController.navigate(AppRoute.SignIn.route) },
                 onCreateAccount = { navController.navigate(AppRoute.SignUp.route) }
             )
         }
 
-        composable(AppRoute.SignIn.route) {
+            screen(sharedScope, AppRoute.SignIn.route) {
             AuthScreen(
                 mode = AuthMode.SignIn,
                 onSwitchMode = {
@@ -86,7 +96,7 @@ fun AppNavHost(
             )
         }
 
-        composable(AppRoute.SignUp.route) {
+            screen(sharedScope, AppRoute.SignUp.route) {
             AuthScreen(
                 mode = AuthMode.SignUp,
                 onSwitchMode = {
@@ -95,10 +105,10 @@ fun AppNavHost(
             )
         }
 
-        composable(AppRoute.AccessGate.route) { AccessGateScreen() }
+            screen(sharedScope, AppRoute.AccessGate.route) { AccessGateScreen() }
 
         // ── Bottom bar ───────────────────────────────────────────────────
-        composable(AppRoute.Home.route) {
+            screen(sharedScope, AppRoute.Home.route) {
             HomeScreen(
                 onOpenSignal = { navController.navigate(AppRoute.SignalDetail.of(it)) },
                 onOpenSignals = { navController.navigate(AppRoute.Signals.route) },
@@ -110,11 +120,11 @@ fun AppNavHost(
             )
         }
 
-        composable(AppRoute.Signals.route) {
+            screen(sharedScope, AppRoute.Signals.route) {
             SignalsScreen(onOpenSignal = { navController.navigate(AppRoute.SignalDetail.of(it)) })
         }
 
-        composable(AppRoute.ChatList.route) {
+            screen(sharedScope, AppRoute.ChatList.route) {
             ChatListScreen(
                 onOpenRoom = { navController.navigate(AppRoute.ChatRoom.of(it)) },
                 // The marketplace row opens the same private thread in its
@@ -124,7 +134,7 @@ fun AppNavHost(
         }
 
         // ── Pushed ───────────────────────────────────────────────────────
-        composable(
+            composable(
             route = AppRoute.SignalDetail.route,
             arguments = listOf(navArgument(AppRoute.SignalDetail.ARG) { type = NavType.StringType })
         ) {
@@ -134,7 +144,7 @@ fun AppNavHost(
             )
         }
 
-        composable(
+            composable(
             route = AppRoute.ChatRoom.route,
             arguments = listOf(
                 navArgument(AppRoute.ChatRoom.ARG) { type = NavType.StringType },
@@ -147,15 +157,15 @@ fun AppNavHost(
             ChatRoomScreen(onBack = { navController.popBackStack() })
         }
 
-        composable(AppRoute.Academy.route) {
+            screen(sharedScope, AppRoute.Academy.route) {
             AcademyScreen(onBack = { navController.popBackStack() })
         }
 
-        composable(AppRoute.MediaHub.route) {
+            screen(sharedScope, AppRoute.MediaHub.route) {
             MediaHubScreen(onBack = { navController.popBackStack() })
         }
 
-        composable(AppRoute.Marketplace.route) {
+            screen(sharedScope, AppRoute.Marketplace.route) {
             MarketplaceScreen(
                 onBack = { navController.popBackStack() },
                 onOpenWhatsApp = ::openUrl,
@@ -168,7 +178,7 @@ fun AppNavHost(
         //
         // Presented as sheets on iOS, so they rise from the bottom here rather
         // than sliding in from the side. Same gesture, same mental model.
-        sheetRoute(AppRoute.Settings.route) {
+            sheetRoute(sharedScope, AppRoute.Settings.route) {
             SettingsScreen(
                 onClose = { navController.popBackStack() },
                 onEditProfile = { navController.navigate(AppRoute.EditProfile.route) },
@@ -179,18 +189,18 @@ fun AppNavHost(
             )
         }
 
-        sheetRoute(AppRoute.EditProfile.route) {
+            sheetRoute(sharedScope, AppRoute.EditProfile.route) {
             EditProfileScreen(onBack = { navController.popBackStack() })
         }
 
-        sheetRoute(AppRoute.MySignals.route) {
+            sheetRoute(sharedScope, AppRoute.MySignals.route) {
             MySignalsScreen(
                 onClose = { navController.popBackStack() },
                 onRecord = { navController.navigate(AppRoute.RecordResult.of(it.signalId)) }
             )
         }
 
-        sheetRoute(AppRoute.MyDeals.route) {
+            sheetRoute(sharedScope, AppRoute.MyDeals.route) {
             MyDealsScreen(
                 onClose = { navController.popBackStack() },
                 onOpenDeal = { navController.navigate(AppRoute.DealDetail.of(it)) },
@@ -198,7 +208,7 @@ fun AppNavHost(
             )
         }
 
-        sheetRoute(AppRoute.NewDeal.route) {
+            sheetRoute(sharedScope, AppRoute.NewDeal.route) {
             NewDealScreen(
                 onClose = { navController.popBackStack() },
                 onOpened = { dealId ->
@@ -211,7 +221,8 @@ fun AppNavHost(
             )
         }
 
-        sheetRoute(
+            sheetRoute(
+            sharedScope,
             route = AppRoute.DealDetail.route,
             arguments = listOf(navArgument(AppRoute.DealDetail.ARG) { type = NavType.StringType })
         ) {
@@ -221,11 +232,11 @@ fun AppNavHost(
             )
         }
 
-        sheetRoute(AppRoute.Appearance.route) {
+            sheetRoute(sharedScope, AppRoute.Appearance.route) {
             AppearanceScreen(onClose = { navController.popBackStack() })
         }
 
-        sheetRoute(AppRoute.ContactSupport.route) {
+            sheetRoute(sharedScope, AppRoute.ContactSupport.route) {
             val viewModel: com.talkswithtanha.twt.features.chat.ContactSupportViewModel =
                 hiltViewModel()
             ContactSupportScreen(
@@ -234,7 +245,8 @@ fun AppNavHost(
             )
         }
 
-        sheetRoute(
+            sheetRoute(
+            sharedScope,
             route = AppRoute.RecordResult.route,
             arguments = listOf(navArgument(AppRoute.RecordResult.ARG) { type = NavType.StringType })
         ) { entry ->
@@ -268,13 +280,45 @@ fun AppNavHost(
                 )
             }
         }
+        }
+    }
+}
+
+/**
+ * A destination, with the two scopes a shared element needs already in scope.
+ *
+ * Every screen provides them, not just the two ends of a transition: a card can
+ * appear on any screen, and a card that only animates from some of them is
+ * worse than one that never does.
+ */
+@OptIn(ExperimentalSharedTransitionApi::class)
+private fun NavGraphBuilder.screen(
+    sharedScope: SharedTransitionScope,
+    route: String,
+    arguments: List<androidx.navigation.NamedNavArgument> = emptyList(),
+    content: @Composable (androidx.navigation.NavBackStackEntry) -> Unit
+) {
+    composable(route = route, arguments = arguments) { entry ->
+        CompositionLocalProvider(
+            LocalSharedTransitionScope provides sharedScope,
+            LocalNavAnimatedVisibilityScope provides this
+        ) {
+            content(entry)
+        }
     }
 }
 
 /**
  * A destination that rises from the bottom, the way a sheet does on iOS.
+ *
+ * The slide is deliberately kept even where a shared element is flying at the
+ * same time: the card carries the eye to the right place, and the sheet coming
+ * up underneath is what says this is a new surface rather than the same screen
+ * rearranging itself.
  */
-private fun androidx.navigation.NavGraphBuilder.sheetRoute(
+@OptIn(ExperimentalSharedTransitionApi::class)
+private fun NavGraphBuilder.sheetRoute(
+    sharedScope: SharedTransitionScope,
     route: String,
     arguments: List<androidx.navigation.NamedNavArgument> = emptyList(),
     content: @Composable (androidx.navigation.NavBackStackEntry) -> Unit
@@ -285,7 +329,13 @@ private fun androidx.navigation.NavGraphBuilder.sheetRoute(
         enterTransition = { slideInVertically(tween(320)) { it } + fadeIn(tween(220)) },
         exitTransition = { fadeOut(tween(160)) },
         popEnterTransition = { fadeIn(tween(160)) },
-        popExitTransition = { slideOutVertically(tween(280)) { it } + fadeOut(tween(220)) },
-        content = { entry -> content(entry) }
-    )
+        popExitTransition = { slideOutVertically(tween(280)) { it } + fadeOut(tween(220)) }
+    ) { entry ->
+        CompositionLocalProvider(
+            LocalSharedTransitionScope provides sharedScope,
+            LocalNavAnimatedVisibilityScope provides this
+        ) {
+            content(entry)
+        }
+    }
 }

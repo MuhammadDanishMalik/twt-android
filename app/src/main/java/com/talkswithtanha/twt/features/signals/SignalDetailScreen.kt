@@ -146,15 +146,16 @@ fun SignalDetailScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Reveal(0) {
-                SignalTicketCard(
-                    signal = signal,
-                    isFollowing = state.isFollowing,
-                    showsFollowButton = false
-                )
-            }
+            // Deliberately not wrapped in `Reveal`: the hero is not arriving,
+            // it is the card the member just tapped, still in flight. Fading it
+            // in on top of that would fight the transition carrying it here.
+            SignalTicketCard(
+                signal = signal,
+                isFollowing = state.isFollowing,
+                showsFollowButton = false
+            )
 
-            Reveal(1) {
+            Reveal(0) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         FollowActionButton(
@@ -193,11 +194,11 @@ fun SignalDetailScreen(
                 }
             }
 
-            Reveal(2) { SignalMilestoneTrack(signal) }
+            Reveal(1) { SignalMilestoneTrack(signal) }
 
             val teamImages = signal.teamImages
             if (teamImages.isNotEmpty()) {
-                Reveal(3) {
+                Reveal(2) {
                     DetailCard(
                         title = "From the team",
                         accessory = {
@@ -236,7 +237,7 @@ fun SignalDetailScreen(
                 }
             }
 
-            Reveal(4) {
+            Reveal(3) {
                 DetailCard(title = "Details") {
                     DetailRow(Icons.Filled.Bolt, "Trade style", signal.tradeStyle.stored)
                     DetailDivider()
@@ -255,7 +256,7 @@ fun SignalDetailScreen(
             }
 
             signal.notes?.let { notes ->
-                Reveal(5) {
+                Reveal(4) {
                     DetailCard(title = "Tanha's note") {
                         Text(
                             text = notes,
@@ -268,11 +269,11 @@ fun SignalDetailScreen(
             }
 
             if (signal.status.isWon || signal.status.isLost) {
-                Reveal(6) { ResultCard(signal) }
+                Reveal(5) { ResultCard(signal) }
             }
 
             state.follow?.takeIf { it.isSettled }?.let { follow ->
-                Reveal(7) {
+                Reveal(6) {
                     DetailCard(title = "Your result") {
                         Row(
                             Modifier.fillMaxWidth(),

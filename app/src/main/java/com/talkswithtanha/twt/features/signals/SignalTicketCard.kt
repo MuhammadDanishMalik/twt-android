@@ -57,7 +57,11 @@ import com.talkswithtanha.twt.core.designsystem.Haptics
 import com.talkswithtanha.twt.core.designsystem.pressScale
 import com.talkswithtanha.twt.core.designsystem.IosColors
 import com.talkswithtanha.twt.core.designsystem.brand.PairFlagBadge
+import com.talkswithtanha.twt.core.navigation.sharedCard
+import com.talkswithtanha.twt.core.navigation.signalCardKey
 import com.talkswithtanha.twt.core.model.Signal
+import com.talkswithtanha.twt.core.navigation.sharedCard
+import com.talkswithtanha.twt.core.navigation.signalCardKey
 import com.talkswithtanha.twt.core.model.SignalType
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -112,6 +116,9 @@ fun SignalTicketCard(
         modifier = modifier
             .then(if (width != null) Modifier.width(width) else Modifier.fillMaxWidth())
             .then(if (onOpen != null) Modifier.pressScale(interaction, 0.985f) else Modifier)
+            // The same object on both screens: tapping this card flies it into
+            // the detail hero rather than replacing one screen with another.
+            .sharedCard(signalCardKey(signal.id))
             .clip(RoundedCornerShape(22.dp))
             .drawBehind {
                 drawRect(

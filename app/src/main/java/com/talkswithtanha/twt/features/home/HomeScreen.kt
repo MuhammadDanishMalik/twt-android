@@ -59,6 +59,9 @@ import com.talkswithtanha.twt.features.signals.SignalTicketCard
 import androidx.compose.ui.platform.LocalHapticFeedback
 import java.util.Calendar
 
+/** How far the bottom scrim reaches up behind the floating tab bar. */
+private val BottomScrimHeight = 160.dp
+
 /**
  * The home screen, over the photograph.
  *
@@ -124,6 +127,25 @@ fun HomeScreen(
                 .background(
                     Brush.verticalGradient(
                         listOf(Color.Black.copy(alpha = 0.55f), Color.Transparent)
+                    )
+                )
+        )
+
+        // The matching scrim at the bottom.
+        //
+        // The floating tab bar sits over the feed, and a card scrolling behind
+        // it used to slide under a hard edge. This gives it something to fade
+        // into instead, and darkens the gesture bar the same way the top scrim
+        // darkens the clock. Taller than the inset it covers, because the tab
+        // bar floats above the inset rather than sitting in it.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(BottomScrimHeight)
+                .align(Alignment.BottomCenter)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f))
                     )
                 )
         )
@@ -252,6 +274,26 @@ fun HomeScreen(
                 }
             }
         }
+        // The matching scrim at the bottom, drawn *over* the feed.
+        //
+        // Behind the list it did nothing: the photograph is already black down
+        // there and the cards scroll in front of it. The cards are the point —
+        // the floating tab bar sits over the feed, and one sliding under it hit
+        // a hard edge. Now it fades out first, the way the top scrim gives the
+        // clock something to sit on. Decorative only: no pointer input, so taps
+        // still reach the tab bar and the feed beneath it.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(BottomScrimHeight)
+                .align(Alignment.BottomCenter)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.92f))
+                    )
+                )
+        )
+
     }
 }
 

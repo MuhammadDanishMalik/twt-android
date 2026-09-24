@@ -50,6 +50,7 @@ import com.talkswithtanha.twt.R
 import androidx.compose.material3.LocalTextStyle
 import com.talkswithtanha.twt.core.designsystem.AnimatedNumber
 import com.talkswithtanha.twt.core.designsystem.Haptics
+import com.talkswithtanha.twt.core.designsystem.components.MemberAvatar
 import com.talkswithtanha.twt.core.designsystem.Motion
 import com.talkswithtanha.twt.core.designsystem.IosColors
 import com.talkswithtanha.twt.core.model.ExchangeRate
@@ -161,7 +162,8 @@ fun HomeScreen(
                 StaggeredAppear(0) {
                     HomeHeader(
                         firstName = user?.firstName ?: "Trader",
-                        initial = user?.fullName?.take(1)?.uppercase() ?: "T",
+                        fullName = user?.fullName,
+                        photoUrl = user?.profilePhoto,
                         onOpenSettings = onOpenSettings
                     )
                 }
@@ -300,7 +302,8 @@ fun HomeScreen(
 @Composable
 private fun HomeHeader(
     firstName: String,
-    initial: String,
+    fullName: String?,
+    photoUrl: String?,
     onOpenSettings: () -> Unit
 ) {
     val haptics = LocalHapticFeedback.current
@@ -326,24 +329,15 @@ private fun HomeHeader(
             )
         }
 
-        Box(
-            Modifier
-                .size(38.dp)
-                .clip(CircleShape)
-                .background(Brush.linearGradient(IosColors.AvatarGradient))
-                .clickable {
-                    Haptics.tap(haptics)
-                    onOpenSettings()
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = initial,
-                color = Color.White,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
+        MemberAvatar(
+            photoUrl = photoUrl,
+            name = fullName,
+            size = 38.dp,
+            modifier = Modifier.clickable {
+                Haptics.tap(haptics)
+                onOpenSettings()
+            }
+        )
     }
 }
 

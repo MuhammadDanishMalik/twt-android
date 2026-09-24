@@ -58,7 +58,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.talkswithtanha.twt.BuildConfig
 import com.talkswithtanha.twt.core.designsystem.IosColors
-import com.talkswithtanha.twt.core.images.Cloudinary
+import com.talkswithtanha.twt.core.designsystem.components.MemberAvatar
 import com.talkswithtanha.twt.core.notifications.NotificationPermission
 import com.talkswithtanha.twt.core.notifications.rememberNotificationPermissionRequest
 import com.talkswithtanha.twt.features.profile.ProfileViewModel
@@ -133,33 +133,11 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.spacedBy(SettingsMetrics.iconGap),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            Modifier
-                                .size(44.dp)
-                                .clip(CircleShape)
-                                .background(Brush.linearGradient(IosColors.AvatarGradient)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            val photo = Cloudinary.avatar(
-                                user?.profilePhoto?.takeIf { it.isNotBlank() },
-                                size = 44
-                            )
-                            if (photo != null) {
-                                AsyncImage(
-                                    model = photo,
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize().clip(CircleShape)
-                                )
-                            } else {
-                                Text(
-                                    text = user?.fullName?.take(1)?.uppercase() ?: "T",
-                                    color = Color.White,
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
+                        MemberAvatar(
+                            photoUrl = user?.profilePhoto,
+                            name = user?.fullName,
+                            size = 44.dp
+                        )
                         Column(Modifier.weight(1f)) {
                             Text(
                                 text = user?.fullName ?: "Trader",

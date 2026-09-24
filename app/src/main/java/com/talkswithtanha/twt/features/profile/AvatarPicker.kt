@@ -54,7 +54,7 @@ import coil3.compose.AsyncImage
 import androidx.compose.ui.platform.LocalHapticFeedback
 import com.talkswithtanha.twt.core.designsystem.Haptics
 import com.talkswithtanha.twt.core.designsystem.IosColors
-import com.talkswithtanha.twt.core.images.Cloudinary
+import com.talkswithtanha.twt.core.designsystem.components.MemberAvatar
 import com.talkswithtanha.twt.core.images.cropSquare
 import com.talkswithtanha.twt.core.images.decodeForCrop
 import kotlinx.coroutines.launch
@@ -124,29 +124,13 @@ fun AvatarEditor(
             Modifier
                 .fillMaxSize()
                 .clip(CircleShape)
-                .background(Brush.linearGradient(IosColors.AvatarGradient))
                 .clickable(enabled = !isUploading) {
                     Haptics.sheetOpen(haptics)
                     showSheet = true
                 },
             contentAlignment = Alignment.Center
         ) {
-            val rendered = Cloudinary.avatar(photoUrl, size.value.toInt())
-            if (rendered != null) {
-                AsyncImage(
-                    model = rendered,
-                    contentDescription = "Profile photo",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().clip(CircleShape)
-                )
-            } else {
-                Text(
-                    text = initial,
-                    color = Color.White,
-                    fontSize = (size.value * 0.4f).sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
+            MemberAvatar(photoUrl = photoUrl, name = initial, size = size)
 
             if (isUploading) {
                 Box(

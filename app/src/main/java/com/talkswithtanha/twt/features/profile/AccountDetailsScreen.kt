@@ -38,7 +38,7 @@ import coil3.compose.AsyncImage
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.talkswithtanha.twt.core.designsystem.AnimatedText
 import com.talkswithtanha.twt.core.designsystem.IosColors
-import com.talkswithtanha.twt.core.images.Cloudinary
+import com.talkswithtanha.twt.core.designsystem.components.MemberAvatar
 import com.talkswithtanha.twt.core.designsystem.brand.CrownGlyph
 import com.talkswithtanha.twt.core.designsystem.components.RedactedText
 import com.talkswithtanha.twt.core.designsystem.staggeredAppear
@@ -145,35 +145,11 @@ private fun Identity(user: User?, modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Box(
-            Modifier
-                .size(76.dp)
-                .clip(CircleShape)
-                .background(Brush.linearGradient(IosColors.AvatarGradient)),
-            contentAlignment = Alignment.Center
-        ) {
-            val photo = Cloudinary.avatar(
-                user?.profilePhoto?.takeIf { it.isNotBlank() },
-                size = 76
-            )
-            if (photo != null) {
-                AsyncImage(
-                    model = photo,
-                    contentDescription = "Profile photo",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().clip(CircleShape)
-                )
-            } else {
-                // The initial stands in until a member sets a photo. Accounts
-                // created through Google arrive with one already.
-                Text(
-                    text = user?.fullName?.take(1)?.uppercase() ?: "T",
-                    color = Color.White,
-                    fontSize = 30.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
+        MemberAvatar(
+            photoUrl = user?.profilePhoto,
+            name = user?.fullName,
+            size = 76.dp
+        )
 
         AnimatedText(
             text = user?.fullName ?: "Trader",

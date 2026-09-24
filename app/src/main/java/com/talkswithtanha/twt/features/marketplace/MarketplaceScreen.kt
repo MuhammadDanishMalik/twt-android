@@ -53,6 +53,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.platform.LocalHapticFeedback
 import com.talkswithtanha.twt.core.designsystem.AnimatedNumber
 import com.talkswithtanha.twt.core.designsystem.Haptics
+import com.talkswithtanha.twt.core.designsystem.components.MemberAvatar
 import com.talkswithtanha.twt.core.designsystem.IosColors
 import com.talkswithtanha.twt.core.designsystem.pressScale
 import com.talkswithtanha.twt.core.designsystem.staggeredAppear
@@ -600,20 +601,13 @@ private fun SellerCard(
             .padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(Brush.linearGradient(IosColors.AvatarGradient)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = seller.name?.take(1)?.uppercase() ?: "T",
-                    color = Color.White,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
+            // The seller's own avatar. No photo field on the config yet, so
+            // this is the initial today and one line from a picture later.
+            MemberAvatar(
+                photoUrl = null,
+                name = seller.name,
+                size = 44.dp
+            )
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

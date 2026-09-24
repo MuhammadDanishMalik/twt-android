@@ -123,13 +123,7 @@ fun RootScreen(
             TwtBottomBar(
                 items = bottomBarItems,
                 currentRoute = currentRoute,
-                onNavigate = { route ->
-                    navController.navigate(route) {
-                        popUpTo(AppRoute.Home.route) { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                }
+                onNavigate = { route -> navController.navigateToTab(route) }
             )
         }
 

@@ -67,8 +67,10 @@ fun AppNavHost(
         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) }
     }
 
+    // The chat list is a tab, so it is opened as one: a plain navigate() would
+    // stack a second copy of it above Home and confuse the tab bar.
     fun openSupportThread() {
-        navController.navigate(AppRoute.ChatList.route)
+        navController.navigateToTab(AppRoute.ChatList.route)
     }
 
     // One layout wrapping the whole graph, because a shared element has to be
@@ -140,7 +142,7 @@ fun AppNavHost(
             screen(sharedScope, AppRoute.Home.route) {
             HomeScreen(
                 onOpenSignal = { navController.navigate(AppRoute.SignalDetail.of(it)) },
-                onOpenSignals = { navController.navigate(AppRoute.Signals.route) },
+                onOpenSignals = { navController.navigateToTab(AppRoute.Signals.route) },
                 onWatchLive = { navController.navigate(AppRoute.MediaHub.route) },
                 onOpenAcademy = { navController.navigate(AppRoute.Academy.route) },
                 onOpenMarketplace = { navController.navigate(AppRoute.Marketplace.route) },
@@ -268,7 +270,7 @@ fun AppNavHost(
         ) {
             DealDetailScreen(
                 onClose = { navController.popBackStack() },
-                onOpenChat = { navController.navigate(AppRoute.ChatList.route) }
+                onOpenChat = { navController.navigateToTab(AppRoute.ChatList.route) }
             )
         }
 

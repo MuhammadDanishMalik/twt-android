@@ -16,8 +16,12 @@ import javax.inject.Inject
 @HiltViewModel
 class RootViewModel @Inject constructor(
     private val session: SessionRepository,
-    private val auth: AuthService
+    private val auth: AuthService,
+    private val activity: com.talkswithtanha.twt.core.analytics.ActivityTracker
 ) : ViewModel() {
+
+    /** Counts a screen view towards today's usage, for the admin panel. */
+    fun screenShown(route: String?) = activity.screen(route)
 
     /**
      * The states the shell can be in, plus "not yet known".

@@ -84,11 +84,17 @@ data class SignalDetailUiState(
 class SignalDetailViewModel @Inject constructor(
     private val signalRepository: SignalRepository,
     private val tracker: FollowedSignalTracker,
+    activity: com.talkswithtanha.twt.core.analytics.ActivityTracker,
     savedStateHandle: androidx.lifecycle.SavedStateHandle
 ) : ViewModel() {
 
     private val signalId: String =
         checkNotNull(savedStateHandle[com.talkswithtanha.twt.core.navigation.AppRoute.SignalDetail.ARG])
+
+    init {
+        // A line in the member's timeline on the admin panel.
+        activity.log("signal_open", mapOf("signalId" to signalId))
+    }
 
     val state: StateFlow<SignalDetailUiState> = combine(
         signalRepository.observeSignal(signalId),

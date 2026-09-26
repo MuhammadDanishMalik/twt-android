@@ -64,6 +64,8 @@ fun RootScreen(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
 
+    LaunchedEffect(currentRoute) { viewModel.screenShown(currentRoute) }
+
     // The gate moves the whole stack rather than pushing, so there is never a
     // back gesture from the access screen into the app a member has no code for.
     LaunchedEffect(gate) {

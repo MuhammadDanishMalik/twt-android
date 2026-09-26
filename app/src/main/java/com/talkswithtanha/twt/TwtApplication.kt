@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt
 
+import com.talkswithtanha.twt.core.analytics.ActivityTracker
 import android.app.Application
 import android.util.Log
 import com.google.firebase.FirebaseApp
@@ -39,6 +40,7 @@ class TwtApplication : Application() {
         fun session(): SessionRepository
         fun pushTokens(): PushTokenRegistrar
         fun followedSignals(): FollowedSignalTracker
+        fun activity(): ActivityTracker
     }
 
     override fun onCreate() {
@@ -70,6 +72,8 @@ class TwtApplication : Application() {
         // Watches followed trades for the life of the process, so an alert does
         // not depend on the member having opened a signals screen this session.
         entryPoint.followedSignals().start()
+        // Time in the app and the member's activity timeline, for the admin panel.
+        entryPoint.activity().start()
     }
 
     private companion object {

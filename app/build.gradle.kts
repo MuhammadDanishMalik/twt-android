@@ -1,3 +1,4 @@
+import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -41,9 +42,37 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Release signing, read from a file that is not in the repo.
+    //
+    // keystore.properties and the .jks beside it are gitignored: whoever holds
+    // both can publish an update as you, so they belong on your machine and in
+    // CI secrets, nowhere else. When the file is absent — which is every clone
+    // that is not yours — the release build simply goes unsigned rather than
+    // failing, so CI can still compile and check it.
+    val keystoreProperties = Properties().apply {
+        val file = rootProject.file("keystore.properties")
+        if (file.exists()) file.inputStream().use { load(it) }
+    }
+
+    signingConfigs {
+        if (keystoreProperties.isNotEmpty()) {
+            create("release") {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release")
+            // R8 on. It strips the unused half of Firebase and Compose, which
+            // is most of the download size, and it obfuscates — the rules in
+            // proguard-rules.pro say what must survive and why.
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

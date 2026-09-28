@@ -1,7 +1,10 @@
 package com.talkswithtanha.twt.features.auth
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -36,7 +39,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -435,5 +440,147 @@ internal fun AuthTextField(
                 )
             }
         }
+    }
+}
+
+/**
+ * Fields stacked in one bordered box, divided by hairlines.
+ *
+ * The Airbnb pattern, and it earns its place: separate boxes make each field
+ * look like an independent decision, while one box with rules inside says
+ * "these belong together, fill them both". On a two-field login that is the
+ * difference between a form and a checklist.
+ *
+ * The border lifts when anything inside has focus, so the group answers a tap
+ * as a unit rather than leaving the member hunting for which box woke up.
+ */
+@Composable
+internal fun GroupedFields(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    var focused by remember { mutableStateOf(false) }
+    val border by animateColorAsState(
+        targetValue = if (focused) Color.White.copy(alpha = 0.28f) else Color.White.copy(alpha = 0.10f),
+        animationSpec = Motion.quick(),
+        label = "groupBorder"
+    )
+
+    Column(
+        modifier
+            .fillMaxWidth()
+            .onFocusChanged { focused = it.hasFocus }
+            .clip(RoundedCornerShape(14.dp))
+            .background(AuthSurface)
+            .border(1.dp, border, RoundedCornerShape(14.dp)),
+        content = content
+    )
+}
+
+/** One row inside a [GroupedFields] box: label above, value below. */
+@Composable
+internal fun GroupedField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    isPassword: Boolean = false,
+    passwordVisible: Boolean = false,
+    enabled: Boolean = true,
+    onTogglePasswordVisibility: (() -> Unit)? = null
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = label,
+                color = Color.White.copy(alpha = 0.45f),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(Modifier.height(3.dp))
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                enabled = enabled,
+                singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 16.sp),
+                cursorBrush = SolidColor(IosColors.Accent),
+                keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+                visualTransformation = if (isPassword && !passwordVisible) {
+                    androidx.compose.ui.text.input.PasswordVisualTransformation()
+                } else {
+                    androidx.compose.ui.text.input.VisualTransformation.None
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        if (isPassword && onTogglePasswordVisibility != null) {
+            Icon(
+                imageVector = if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                tint = Color.White.copy(alpha = 0.4f),
+                modifier = Modifier
+                    .size(20.dp)
+                    .clickable(onClick = onTogglePasswordVisibility)
+            )
+        }
+    }
+}
+
+/** The hairline between two grouped fields. */
+@Composable
+internal fun GroupedDivider() {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(Color.White.copy(alpha = 0.09f))
+    )
+}
+
+/** `────── or ──────`, the seam between the primary path and the alternatives. */
+@Composable
+internal fun OrDivider(modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.weight(1f).height(1.dp).background(Color.White.copy(alpha = 0.10f)))
+        Text(
+            text = "or",
+            color = Color.White.copy(alpha = 0.4f),
+            fontSize = 13.sp,
+            modifier = Modifier.padding(horizontal = 14.dp)
+        )
+        Box(Modifier.weight(1f).height(1.dp).background(Color.White.copy(alpha = 0.10f)))
+    }
+}
+
+/** An outlined full-width alternative, below the divider. */
+@Composable
+internal fun AuthOutlinedButton(
+    text: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val haptics = LocalHapticFeedback.current
+    Box(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(14.dp))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {
+                Haptics.tap(haptics)
+                onClick()
+            }
+            .padding(vertical = 15.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text = text, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
     }
 }

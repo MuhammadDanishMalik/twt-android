@@ -84,74 +84,68 @@ fun AuthScreen(
 
         Spacer(Modifier.height(32.dp))
 
-        AuthHeading(
-            title = when (mode) {
-                AuthMode.SignIn -> "Welcome back"
+        Text(
+            text = when (mode) {
+                AuthMode.SignIn -> "Log in or sign up"
                 AuthMode.SignUp -> "Create your account"
             },
-            subtitle = when (mode) {
-                AuthMode.SignIn -> "Sign in to reach your signals."
-                AuthMode.SignUp -> "We'll email you a code to confirm it's you."
-            }
+            color = Color.White,
+            fontSize = 26.sp,
+            fontWeight = FontWeight.Bold
         )
 
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(22.dp))
 
-        if (mode == AuthMode.SignUp) {
-            AuthTextField(
-                value = state.fullName,
-                onValueChange = viewModel::onFullNameChange,
-                label = "Full name",
+        // One box, hairlines inside. Separate boxes make each field look like
+        // an independent decision; this says fill them both.
+        GroupedFields {
+            if (mode == AuthMode.SignUp) {
+                GroupedField(
+                    value = state.fullName,
+                    onValueChange = viewModel::onFullNameChange,
+                    label = "Full name",
+                    enabled = !state.isSubmitting
+                )
+                GroupedDivider()
+            }
+            GroupedField(
+                value = state.email,
+                onValueChange = viewModel::onEmailChange,
+                label = "Email",
+                keyboardType = KeyboardType.Email,
                 enabled = !state.isSubmitting
             )
-            Spacer(Modifier.height(14.dp))
-        }
-
-        AuthTextField(
-            value = state.email,
-            onValueChange = viewModel::onEmailChange,
-            label = "Email",
-            keyboardType = KeyboardType.Email,
-            enabled = !state.isSubmitting
-        )
-
-        Spacer(Modifier.height(14.dp))
-
-        AuthTextField(
-            value = state.password,
-            onValueChange = viewModel::onPasswordChange,
-            label = "Password",
-            keyboardType = KeyboardType.Password,
-            isPassword = true,
-            passwordVisible = passwordVisible,
-            enabled = !state.isSubmitting,
-            onTogglePasswordVisibility = { passwordVisible = !passwordVisible }
-        )
-
-        if (mode == AuthMode.SignIn) {
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = "Forgot your password?",
-                color = IosColors.Accent,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier
-                    .align(Alignment.End)
-                    .clip(RoundedCornerShape(6.dp))
-                    .clickable(onClick = onForgotPassword)
-                    .padding(horizontal = 4.dp, vertical = 2.dp)
+            GroupedDivider()
+            GroupedField(
+                value = state.password,
+                onValueChange = viewModel::onPasswordChange,
+                label = "Password",
+                keyboardType = KeyboardType.Password,
+                isPassword = true,
+                passwordVisible = passwordVisible,
+                enabled = !state.isSubmitting,
+                onTogglePasswordVisibility = { passwordVisible = !passwordVisible }
             )
         }
+
+        Spacer(Modifier.height(10.dp))
+
+        Text(
+            text = when (mode) {
+                AuthMode.SignIn -> "We'll never share your email. Signing in keeps your access code linked to this account."
+                AuthMode.SignUp -> "We'll email you a six-digit code to confirm it's you."
+            },
+            color = Color.White.copy(alpha = 0.42f),
+            fontSize = 12.sp,
+            lineHeight = 17.sp
+        )
 
         AuthError(state.error)
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(20.dp))
 
         AuthPrimaryButton(
-            text = when (mode) {
-                AuthMode.SignIn -> "Sign in"
-                AuthMode.SignUp -> "Create account"
-            },
+            text = "Continue",
             enabled = when (mode) {
                 AuthMode.SignIn -> state.canSignIn
                 AuthMode.SignUp -> state.canSignUp
@@ -160,41 +154,26 @@ fun AuthScreen(
             onClick = {
                 when (mode) {
                     AuthMode.SignIn -> viewModel.signIn()
-                    // The account exists the moment this returns; the next
-                    // screen is where the address gets proved.
                     AuthMode.SignUp -> viewModel.signUp(country, onCreated = onVerifyEmail)
                 }
             }
         )
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(22.dp))
 
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = when (mode) {
-                    AuthMode.SignIn -> "New here?"
-                    AuthMode.SignUp -> "Already have an account?"
-                },
-                color = Color.White.copy(alpha = 0.45f),
-                fontSize = 14.sp
-            )
-            Spacer(Modifier.size(6.dp))
-            Text(
-                text = when (mode) {
-                    AuthMode.SignIn -> "Create an account"
-                    AuthMode.SignUp -> "Sign in"
-                },
-                color = IosColors.Accent,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .clickable(onClick = onSwitchMode)
-                    .padding(horizontal = 4.dp, vertical = 2.dp)
-            )
+        OrDivider()
+
+        Spacer(Modifier.height(18.dp))
+
+        when (mode) {
+            AuthMode.SignIn -> {
+                AuthOutlinedButton("Create an account", onClick = onSwitchMode)
+                Spacer(Modifier.height(10.dp))
+                AuthOutlinedButton("Forgot your password?", onClick = onForgotPassword)
+            }
+            AuthMode.SignUp -> {
+                AuthOutlinedButton("I already have an account", onClick = onSwitchMode)
+            }
         }
 
         if (mode == AuthMode.SignUp) {

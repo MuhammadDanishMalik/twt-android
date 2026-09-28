@@ -82,6 +82,13 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // java.time on API 24. ActivityTracker keys its usage documents by
+        // LocalDate.now().toString(), and that call does not exist before API
+        // 26 — on a phone running Android 7 it would throw the first time the
+        // app recorded a session. Desugaring is the fix rather than rewriting
+        // the call, because the document id has to keep reading exactly
+        // "2026-09-28"; the admin panel queries by it.
+        isCoreLibraryDesugaringEnabled = true
     }
     // The deployed twt-admin, which holds the Resend key and the Admin SDK.
     //
@@ -151,6 +158,7 @@ dependencies {
     // uploader posts multipart bodies with it directly.
     implementation(libs.okhttp)
     implementation(libs.androidx.exifinterface)
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     // Home-screen widget for the followed signal.
     implementation(libs.androidx.glance.appwidget)

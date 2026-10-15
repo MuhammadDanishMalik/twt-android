@@ -12,6 +12,7 @@ import com.talkswithtanha.twt.core.model.Signal
 import com.talkswithtanha.twt.core.model.SignalFollow
 import com.talkswithtanha.twt.core.model.TradingStats
 import com.talkswithtanha.twt.core.notifications.FollowedSignalNotifier
+import com.talkswithtanha.twt.core.widget.WidgetPublisher
 import com.talkswithtanha.twt.core.session.SessionRepository
 import com.talkswithtanha.twt.core.storage.appPreferences
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -60,6 +61,7 @@ class FollowedSignalTracker @Inject constructor(
     private val signalRepository: SignalRepository,
     private val notifier: FollowedSignalNotifier,
     private val session: SessionRepository,
+    private val widgets: WidgetPublisher,
     private val scope: CoroutineScope
 ) {
 
@@ -126,10 +128,25 @@ class FollowedSignalTracker @Inject constructor(
                     if (uid == null) flowOf(null) else signalRepository.observeSignals()
                 }
 
-            combine(follows, signalsForUser) { follows, signals -> follows to signals }
-                .collect { (follows, signals) ->
-                    if (signals is Snapshot.Data) reconcile(follows, signals.value)
-                }
+            combine(session.currentUser, follows, signalsForUser) { user, follows, signals ->
+                Triple(user, follows, signals)
+            }.collect { (user, follows, signals) ->
+                if (signals is Snapshot.Data) reconcile(follows, signals.value)
+
+                // The home-screen widgets, from the same three things: a widget
+                // cannot listen to Firestore, so it is handed a finished picture
+                // whenever one of them moves. The publisher redraws only on a
+                // real difference.
+                widgets.publish(
+                    user = user,
+                    // Trades only. A widget is four rows of entry, stop and
+                    // target; analysis has none of those, and on a home screen
+                    // it would draw as a call with every number blank.
+                    signals = (signals as? Snapshot.Data)?.value.orEmpty()
+                        .filterNot { it.isAnalysis },
+                    follows = follows
+                )
+            }
         }
     }
 
@@ -185,9 +202,10 @@ class FollowedSignalTracker @Inject constructor(
         scope.launch { writeLastKnown(emptyMap()) }
     }
 
-    suspend fun follow(signal: Signal) {
-        val userId = watchedUserId ?: return
-        runCatching { followRepository.follow(signal, userId) }
+    /** True when the follow was saved. */
+    suspend fun follow(signal: Signal): Boolean {
+        val userId = watchedUserId ?: return false
+        return runCatching { followRepository.follow(signal, userId) }
             .onSuccess {
                 // Recorded *without* announcing. The member is looking at the
                 // signal right now; they do not need to be told what it already
@@ -199,8 +217,28 @@ class FollowedSignalTracker @Inject constructor(
                 // moment it does, which is a single code path rather than two
                 // that can disagree.
                 putLastKnown(signal.id, signal.status.stored)
+                // Put the "Following …" card up now, so the tap is answered in
+                // the notification shade straight away. `reconcile` re-asserts
+                // the same card (same id) once the follow document syncs.
+                if (signal.status.isOngoing) {
+                    notifier.show(
+                        signal,
+                        com.talkswithtanha.twt.core.model.SignalFollow(
+                            id = com.talkswithtanha.twt.core.model.SignalFollow.makeId(userId, signal.id),
+                            userId = userId,
+                            signalId = signal.id,
+                            pair = signal.pair,
+                            type = signal.type,
+                            entryPrice = signal.entryPrice,
+                            stopLoss = signal.stopLoss,
+                            followedAt = java.util.Date(),
+                            isActive = true
+                        )
+                    )
+                }
             }
             .onFailure { Log.w(TAG, "Could not follow ${signal.id}", it) }
+            .isSuccess
     }
 
     suspend fun unfollow(signalId: String) {

@@ -51,6 +51,29 @@ object FirestorePaths {
          * [SignalFollowField.SIGNAL_ID] and [SignalFollowField.IS_ACTIVE].
          */
         const val SIGNAL_FOLLOWS = "signalFollows"
+
+        /**
+         * Support tickets — a problem with a state and an end, as opposed to the
+         * open-ended `chatRooms/support_{uid}` conversation. Replies live in a
+         * `messages` subcollection under each ticket. Mirrors iOS and the admin
+         * panel's `/tickets` queue.
+         */
+        const val SUPPORT_TICKETS = "supportTickets"
+
+        /** The home-screen carousel, managed from the panel and the admin area. */
+        const val BANNERS = "banners"
+
+        /**
+         * Tanha's feed. He posts; everybody else reads, reacts and replies —
+         * see firestore.rules, which is where that asymmetry is enforced.
+         * Replies live in `comments`, one member's reaction in `reactions/{uid}`.
+         */
+        const val FEED_POSTS = "feedPosts"
+        const val COMMENTS = "comments"
+        const val REACTIONS = "reactions"
+
+        /** One document per member who saved a post, keyed by their uid. */
+        const val SAVES = "saves"
     }
 
     object Document {
@@ -92,6 +115,106 @@ object FirestorePaths {
         fun support(uid: String): String = SUPPORT_PREFIX + uid
     }
 
+    /**
+     * Fields on a `supportTickets/{id}` document and its messages. Mirrored in
+     * `TicketField` in Twt/Features/Support/Services/SupportTicketRepository.swift
+     * and in twt-admin/lib/firestore-paths.ts.
+     */
+    object TicketField {
+        const val SUBJECT = "subject"
+        const val CATEGORY = "category"
+        const val STATUS = "status"
+        const val PRIORITY = "priority"
+        const val MEMBER_ID = "memberId"
+        const val MEMBER_NAME = "memberName"
+        const val MEMBER_EMAIL = "memberEmail"
+
+        /** True when staff raised it on the member's behalf. */
+        const val OPENED_BY_STAFF = "openedByStaff"
+        const val CREATED_AT = "createdAt"
+        const val UPDATED_AT = "updatedAt"
+        const val LAST_MESSAGE = "lastMessage"
+        const val LAST_MESSAGE_AT = "lastMessageAt"
+        const val LAST_MESSAGE_FROM_STAFF = "lastMessageFromStaff"
+
+        /** The member spoke last — what orders the queue. */
+        const val NEEDS_REPLY = "needsReply"
+
+        /** Staff replied and the member has not opened it since. */
+        const val UNREAD_FOR_MEMBER = "unreadForMember"
+        const val MESSAGE_COUNT = "messageCount"
+        const val ASSIGNED_TO_NAME = "assignedToName"
+        const val RESOLVED_AT = "resolvedAt"
+        const val FOLLOW_UP_COUNT = "followUpCount"
+    }
+
+    object TicketMessageField {
+        const val TEXT = "text"
+        const val SENDER_ID = "senderId"
+        const val SENDER_NAME = "senderName"
+
+        /**
+         * Drawn as the team's side of the thread. The security rules require a
+         * member's own message to carry `false`, so a member cannot post a reply
+         * the app would show as coming from Tanha.
+         */
+        const val IS_STAFF = "isStaff"
+        const val TIMESTAMP = "timestamp"
+    }
+
+    /** Fields on a `feedPosts/{id}` document and the two collections under it. */
+    object FeedField {
+        const val AUTHOR_ID = "authorId"
+        const val AUTHOR_NAME = "authorName"
+        const val AUTHOR_PHOTO = "authorPhoto"
+        const val TEXT = "text"
+
+        /** Image URLs, in the order they were attached. */
+        const val IMAGES = "images"
+
+        /** A YouTube or direct video link, shown as a player card. */
+        const val VIDEO_URL = "videoUrl"
+
+        /** The instrument the post is about, when there is one. */
+        const val PAIR = "pair"
+
+        /** The signal this post carries, for a trade shared into the feed. */
+        const val SIGNAL_ID = "signalId"
+
+        /** A recorded voice note, its subject line, and how long it runs. */
+        const val AUDIO_URL = "audioUrl"
+        const val AUDIO_TITLE = "audioTitle"
+        const val AUDIO_DURATION = "audioDurationSec"
+        const val CREATED_AT = "createdAt"
+        const val UPDATED_AT = "updatedAt"
+        const val EDITED_AT = "editedAt"
+
+        /** Totals kept on the post. Members may move them by one; see the rules. */
+        const val REACTION_COUNT = "reactionCount"
+        const val REACTION_COUNTS = "reactionCounts"
+        const val COMMENT_COUNT = "commentCount"
+
+        /** Held at the top of the feed until it is unpinned. */
+        const val IS_PINNED = "isPinned"
+    }
+
+    object FeedCommentField {
+        const val AUTHOR_ID = "authorId"
+        const val AUTHOR_NAME = "authorName"
+        const val AUTHOR_PHOTO = "authorPhoto"
+        const val TEXT = "text"
+        const val CREATED_AT = "createdAt"
+
+        /** Null for a top-level reply; the comment id for a reply to a reply. */
+        const val PARENT_ID = "parentId"
+        const val REPLY_COUNT = "replyCount"
+    }
+
+    object FeedReactionField {
+        const val KIND = "kind"
+        const val CREATED_AT = "createdAt"
+    }
+
     object SignalField {
         const val PAIR = "pair"
         const val ASSET = "asset"
@@ -118,6 +241,14 @@ object FirestorePaths {
          */
         const val SCREENSHOTS = "screenshots"
         const val IS_EDITED = "isEdited"
+
+        /**
+         * A chart and a read with no trade on it — posted from the panel's
+         * Analysis page. The app shows these only in the Analysis tab: there
+         * is no entry, stop or target to act on, and a ticket drawn with
+         * empty levels is a number somebody could take for a real one.
+         */
+        const val IS_ANALYSIS = "isAnalysis"
 
         object TakeProfit {
             const val LABEL = "label"
@@ -328,6 +459,16 @@ object FirestorePaths {
             const val SENDER_NAME = "senderName"
             const val TEXT = "text"
         }
+
+        /** Keys inside [NOTE_ATTACHMENT]. Identical to iOS's `ChatRepository`,
+         *  so a note shared on either phone renders on both. */
+        object Note {
+            const val NOTE_ID = "noteId"
+            const val VIDEO_ID = "videoId"
+            const val VIDEO_TITLE = "videoTitle"
+            const val TIMESTAMP = "timestamp"
+            const val NOTE_TEXT = "noteText"
+        }
     }
 
     /**
@@ -432,6 +573,14 @@ object FirestorePaths {
         const val ACCESS_GRANTED_AT = "accessGrantedAt"
         const val ROLE = "role"
 
+        /**
+         * Which areas of the business a staff account may work in — see
+         * [com.talkswithtanha.twt.core.model.StaffArea]. Written only by the
+         * owner, from the admin panel's Team page. Absent means the account
+         * predates the field and the rules still give it everything.
+         */
+        const val STAFF_ACCESS = "staffAccess"
+
         /** Can still read, cannot post. */
         const val IS_BLOCKED = "isBlocked"
         const val REFERRAL_CODE = "referralCode"
@@ -449,6 +598,20 @@ object FirestorePaths {
         const val CREATED_AT = "createdAt"
         const val UPDATED_AT = "updatedAt"
 
+        /** Map of the profile-setup answers. See `TradingProfile`. Self-writable,
+         *  shape-checked by the rules. */
+        const val TRADING_PROFILE = "tradingProfile"
+        const val PROFILE_SETUP_AT = "profileSetupAt"
+
+        /** Keys inside [TRADING_PROFILE]. */
+        object Trading {
+            const val BROKER_STATUS = "brokerStatus"
+            const val BROKER = "broker"
+            const val IB_STATUS = "ibStatus"
+            const val EXPERIENCE = "experience"
+            const val TRADING_DURATION = "tradingDuration"
+        }
+
         /**
          * Exactly the keys a member is allowed to change on their own document.
          *
@@ -463,7 +626,8 @@ object FirestorePaths {
         val SELF_WRITABLE: Set<String> = setOf(
             FULL_NAME, PHONE, BIO, PROFILE_PHOTO, COUNTRY, EMAIL, FCM_TOKENS,
             CURRENT_SESSION_ID, LAST_ACTIVE_DEVICE_ID, LAST_ACTIVE_DEVICE_MODEL,
-            LAST_ACTIVE_PLATFORM, LAST_LOGIN_AT, UPDATED_AT
+            LAST_ACTIVE_PLATFORM, LAST_LOGIN_AT, UPDATED_AT,
+            TRADING_PROFILE, PROFILE_SETUP_AT
         )
 
         /**

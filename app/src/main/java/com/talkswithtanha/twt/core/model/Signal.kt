@@ -39,7 +39,11 @@ data class Signal(
     val screenshots: List<String> = emptyList(),
     /** The client chose "yes, and show members it was edited" over silent edits.
      *  Someone who acted on the original numbers is entitled to know they moved. */
-    val isEdited: Boolean = false
+    val isEdited: Boolean = false,
+    /** Posted from the panel's Analysis page: a chart and the read behind it,
+     *  with no levels. Belongs in the Analysis tab and nowhere else — and it is
+     *  kept out of the win rate, because there was no trade to win. */
+    val isAnalysis: Boolean = false
 ) {
     /**
      * The chart and the screenshots as one list, chart first — what the detail
@@ -47,6 +51,27 @@ data class Signal(
      */
     val teamImages: List<String>
         get() = listOfNotNull(chartImageUrl) + screenshots
+
+    /**
+     * Which market this trade belongs to, for the filter on the Signals tab.
+     *
+     * The pair wins over the stored [asset] when it names the market outright.
+     * The two disagree in the live database — a XAU/USD call saved while the
+     * asset dropdown still said Forex — and the card already draws gold's own
+     * badge from the pair, so a Gold filter that skipped that card would look
+     * broken rather than strict. The stored value still decides everything the
+     * pair cannot say, which is most of forex and the indices.
+     */
+    val market: SignalAsset
+        get() {
+            val base = pair.uppercase().takeWhile { it.isLetterOrDigit() }
+            return when {
+                base.startsWith("XAU") || base.startsWith("GOLD") -> SignalAsset.GOLD
+                base.startsWith("BTC") || base.startsWith("ETH") ||
+                    base.startsWith("SOL") || base.startsWith("XRP") -> SignalAsset.CRYPTO
+                else -> asset
+            }
+        }
 
     data class TakeProfit(
         val label: String,

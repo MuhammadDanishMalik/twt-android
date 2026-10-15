@@ -120,7 +120,8 @@ class FirebaseSignalRepository @Inject constructor(
             screenshots = (document.get(F.SCREENSHOTS) as? List<*>)
                 .orEmpty()
                 .mapNotNull { it.asNonBlankString() },
-            isEdited = document.getBoolean(F.IS_EDITED) ?: false
+            isEdited = document.getBoolean(F.IS_EDITED) ?: false,
+            isAnalysis = document.getBoolean(F.IS_ANALYSIS) ?: false
         )
     }
 

@@ -4,8 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.talkswithtanha.twt.core.session.ApiResult
 import com.talkswithtanha.twt.core.session.AuthApi
+import com.talkswithtanha.twt.core.session.AuthError
+import com.talkswithtanha.twt.core.session.AuthException
 import com.talkswithtanha.twt.core.session.AuthService
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,7 +23,24 @@ const val CODE_LENGTH = 6
 /** How long a member waits before they may ask for another code. */
 private const val RESEND_SECONDS = 60
 
+/**
+ * The wait between Firebase verification links. Matches iOS; Firebase throttles
+ * repeated sends on its own, so a longer wait here only slows honest members.
+ */
+private const val LINK_RESEND_SECONDS = 30
+
+/**
+ * How an address gets confirmed in this build.
+ *
+ * [CODE] needs the admin app deployed with a Resend key, and its URL compiled
+ * in as `adminApiBase`. Without that every send fails, and a new member is held
+ * at the verification gate with no way through. [LINK] is Firebase's own
+ * verification email, the same one iOS sends, and needs no server of ours.
+ */
+enum class VerifyMethod { CODE, LINK }
+
 data class EmailCodeUiState(
+    val method: VerifyMethod = VerifyMethod.CODE,
     val code: String = "",
     val isSubmitting: Boolean = false,
     val isSending: Boolean = false,
@@ -29,17 +49,18 @@ data class EmailCodeUiState(
     val secondsUntilResend: Int = 0,
     val isDone: Boolean = false
 ) {
-    val canSubmit: Boolean get() = code.length == CODE_LENGTH && !isSubmitting
+    val canSubmit: Boolean
+        get() = !isSubmitting && (method == VerifyMethod.LINK || code.length == CODE_LENGTH)
     val canResend: Boolean get() = secondsUntilResend == 0 && !isSending && !isSubmitting
 }
 
 /**
- * Confirming an email address with a six-digit code.
+ * Confirming an email address, by code or by link.
  *
  * The account already exists by the time this screen appears — it was created
  * on the phone, so Firebase Auth holds the password and the server never sees
  * it. All that is settled here is whether the member can read the inbox they
- * signed up with.
+ * signed up with. See [VerifyMethod] for which way that happens.
  */
 @HiltViewModel
 class VerifyEmailViewModel @Inject constructor(
@@ -47,16 +68,20 @@ class VerifyEmailViewModel @Inject constructor(
     private val auth: AuthService
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(EmailCodeUiState())
+    private val method = if (api.isConfigured) VerifyMethod.CODE else VerifyMethod.LINK
+
+    private val _state = MutableStateFlow(EmailCodeUiState(method = method))
     val state: StateFlow<EmailCodeUiState> = _state.asStateFlow()
 
-    /** The address the code went to, for the "we sent it to…" line. */
+    /** The address the email went to, for the "we sent it to…" line. */
     val email: String? get() = auth.currentEmail
+
+    private var countdown: Job? = null
 
     init {
         // Sent on arrival rather than behind a button: the member has just
         // finished a sign-up form and is already waiting for this.
-        send()
+        send(onArrival = true)
     }
 
     fun onCodeChange(value: String) {
@@ -67,30 +92,75 @@ class VerifyEmailViewModel @Inject constructor(
         if (digits.length == CODE_LENGTH) submit()
     }
 
-    fun send() {
+    fun send() = send(onArrival = false)
+
+    private fun send(onArrival: Boolean) {
         if (_state.value.isSending) return
         _state.update { it.copy(isSending = true, error = null) }
 
         viewModelScope.launch {
-            val token = auth.idToken()
-            if (token == null) {
-                _state.update { it.copy(isSending = false, error = "Sign in again.") }
-                return@launch
+            when (method) {
+                VerifyMethod.CODE -> sendCode()
+                VerifyMethod.LINK -> sendLink(onArrival)
             }
-            when (val result = api.sendVerificationCode(token)) {
-                is ApiResult.Ok -> {
-                    _state.update {
-                        it.copy(isSending = false, notice = "Code sent. Check your inbox.")
-                    }
-                    startResendCountdown(RESEND_SECONDS)
+        }
+    }
+
+    private suspend fun sendCode() {
+        val token = auth.idToken()
+        if (token == null) {
+            _state.update { it.copy(isSending = false, error = "Sign in again.") }
+            return
+        }
+        when (val result = api.sendVerificationCode(token)) {
+            is ApiResult.Ok -> {
+                // The server answers OK without mailing anything when the
+                // address is already confirmed (on the website, say). Then
+                // there is nothing to type: walk straight in.
+                if (auth.reload()) {
+                    _state.update { it.copy(isSending = false, isDone = true) }
+                    return
                 }
-                is ApiResult.Failed -> {
-                    _state.update { it.copy(isSending = false, error = result.message) }
-                    // The server knows how long is left better than the phone
-                    // does, so its number wins when it gives one.
-                    result.retryAfterSeconds?.let { startResendCountdown(it) }
+                _state.update {
+                    it.copy(
+                        isSending = false,
+                        notice = "Code sent to ${auth.currentEmail ?: "your inbox"}. Check Spam if it isn't there in a minute."
+                    )
                 }
+                startResendCountdown(RESEND_SECONDS)
             }
+            is ApiResult.Failed -> {
+                _state.update { it.copy(isSending = false, error = result.message) }
+                // The server knows how long is left better than the phone
+                // does, so its number wins when it gives one.
+                result.retryAfterSeconds?.let { startResendCountdown(it) }
+            }
+        }
+    }
+
+    private suspend fun sendLink(onArrival: Boolean) {
+        // A member reopening the app after tapping the link should walk
+        // straight in, not be mailed a second link they no longer need.
+        if (onArrival && auth.reload()) {
+            _state.update { it.copy(isSending = false, isDone = true) }
+            return
+        }
+        try {
+            auth.sendEmailVerification()
+            _state.update { it.copy(isSending = false, notice = "Link sent. Check your inbox.") }
+            startResendCountdown(LINK_RESEND_SECONDS)
+        } catch (e: AuthException) {
+            // Throttled on arrival means a link went out moments ago — at
+            // sign-up, or on the last visit to this screen. That link still
+            // works, so the member is told nothing and simply waits to resend.
+            val throttled = e.reason == AuthError.TooManyRequests
+            _state.update {
+                it.copy(
+                    isSending = false,
+                    error = if (throttled && onArrival) null else e.reason.message
+                )
+            }
+            if (throttled) startResendCountdown(RESEND_SECONDS)
         }
     }
 
@@ -100,24 +170,57 @@ class VerifyEmailViewModel @Inject constructor(
         _state.update { it.copy(isSubmitting = true, error = null) }
 
         viewModelScope.launch {
-            val token = auth.idToken()
-            if (token == null) {
-                _state.update { it.copy(isSubmitting = false, error = "Sign in again.") }
-                return@launch
-            }
-            when (val result = api.verifyEmail(token, current.code)) {
-                is ApiResult.Ok -> {
-                    // The Admin SDK set the flag; this phone's cached user has
-                    // no idea until it asks again.
-                    auth.reload()
-                    _state.update { it.copy(isSubmitting = false, isDone = true) }
-                }
-                is ApiResult.Failed -> _state.update {
-                    // Cleared, because a rejected code is never worth resending
-                    // and leaving it there invites exactly that.
-                    it.copy(isSubmitting = false, error = result.message, code = "")
+            when (method) {
+                VerifyMethod.CODE -> submitCode(current.code)
+                VerifyMethod.LINK -> {
+                    val verified = auth.reload()
+                    _state.update {
+                        it.copy(
+                            isSubmitting = false,
+                            isDone = verified,
+                            error = if (verified) null
+                            else "Not verified yet. Tap the link in your email, then try again."
+                        )
+                    }
                 }
             }
+        }
+    }
+
+    private suspend fun submitCode(code: String) {
+        val token = auth.idToken()
+        if (token == null) {
+            _state.update { it.copy(isSubmitting = false, error = "Sign in again.") }
+            return
+        }
+        when (val result = api.verifyEmail(token, code)) {
+            is ApiResult.Ok -> {
+                // The Admin SDK set the flag; this phone's cached user has
+                // no idea until it asks again.
+                auth.reload()
+                _state.update { it.copy(isSubmitting = false, isDone = true) }
+            }
+            is ApiResult.Failed -> _state.update {
+                // Cleared, because a rejected code is never worth resending
+                // and leaving it there invites exactly that.
+                it.copy(isSubmitting = false, error = result.message, code = "")
+            }
+        }
+    }
+
+    /**
+     * A silent check, for when the member comes back to the app.
+     *
+     * With a link, the natural path is: open the mail app, tap, switch back.
+     * Making them also press "I've verified" after that is a step for the app's
+     * benefit. Quiet on failure — they may simply not have tapped it yet.
+     */
+    fun recheckQuietly() {
+        if (method != VerifyMethod.LINK) return
+        val current = _state.value
+        if (current.isSubmitting || current.isSending || current.isDone) return
+        viewModelScope.launch {
+            if (auth.reload()) _state.update { it.copy(isDone = true, error = null) }
         }
     }
 
@@ -133,7 +236,10 @@ class VerifyEmailViewModel @Inject constructor(
     fun abandon() = auth.signOut()
 
     private fun startResendCountdown(seconds: Int) {
-        viewModelScope.launch {
+        // One countdown at a time. Two running together fight over the number
+        // and the member watches it jump.
+        countdown?.cancel()
+        countdown = viewModelScope.launch {
             for (remaining in seconds downTo 0) {
                 _state.update { it.copy(secondsUntilResend = remaining) }
                 if (remaining > 0) delay(1000)
@@ -142,8 +248,13 @@ class VerifyEmailViewModel @Inject constructor(
     }
 }
 
-/** Which step of the reset a member is on. */
-enum class ResetStage { EMAIL, CODE, PASSWORD, DONE }
+/**
+ * Which step of the reset a member is on.
+ *
+ * [LINK_SENT] is the whole flow when email codes are not configured: Firebase
+ * mails a reset link and the new password is chosen in the browser, as on iOS.
+ */
+enum class ResetStage { EMAIL, CODE, PASSWORD, DONE, LINK_SENT }
 
 data class ResetUiState(
     val stage: ResetStage = ResetStage.EMAIL,
@@ -160,7 +271,9 @@ data class ResetUiState(
     val canSubmitCode: Boolean get() = code.length == CODE_LENGTH && !isSubmitting
     val passwordsMatch: Boolean get() = password == confirmPassword
     val canSetPassword: Boolean
-        get() = password.length >= 6 && passwordsMatch && !isSubmitting
+        // The same minimum as a new account. The server accepts six, so this
+        // is stricter, never looser.
+        get() = password.length >= MIN_NEW_PASSWORD_LENGTH && passwordsMatch && !isSubmitting
     val canResend: Boolean get() = secondsUntilResend == 0 && !isSubmitting
 }
 
@@ -175,8 +288,14 @@ data class ResetUiState(
  */
 @HiltViewModel
 class ResetPasswordViewModel @Inject constructor(
-    private val api: AuthApi
+    private val api: AuthApi,
+    private val auth: AuthService
 ) : ViewModel() {
+
+    private var countdown: Job? = null
+
+    /** True when email codes are not configured and Firebase's link is used. */
+    val usesLink: Boolean get() = !api.isConfigured
 
     private val _state = MutableStateFlow(ResetUiState())
     val state: StateFlow<ResetUiState> = _state.asStateFlow()
@@ -198,6 +317,7 @@ class ResetPasswordViewModel @Inject constructor(
         when (it.stage) {
             ResetStage.CODE -> it.copy(stage = ResetStage.EMAIL, code = "", error = null)
             ResetStage.PASSWORD -> it.copy(stage = ResetStage.CODE, error = null)
+            ResetStage.LINK_SENT -> it.copy(stage = ResetStage.EMAIL, error = null)
             else -> it
         }
     }
@@ -206,6 +326,11 @@ class ResetPasswordViewModel @Inject constructor(
         val current = _state.value
         if (!current.canSendCode) return
         _state.update { it.copy(isSubmitting = true, error = null) }
+
+        if (usesLink) {
+            sendLink(current.email)
+            return
+        }
 
         viewModelScope.launch {
             when (val result = api.sendResetCode(current.email)) {
@@ -227,6 +352,27 @@ class ResetPasswordViewModel @Inject constructor(
                     result.retryAfterSeconds?.let { startResendCountdown(it) }
                 }
             }
+        }
+    }
+
+    private fun sendLink(email: String) {
+        viewModelScope.launch {
+            val error = try {
+                auth.sendPasswordReset(email)
+                null
+            } catch (e: AuthException) {
+                when (e.reason) {
+                    // No such account. Answered exactly as though there were
+                    // one, for the same reason the code route does.
+                    AuthError.InvalidCredentials -> null
+                    else -> e.reason.message
+                }
+            }
+            _state.update {
+                if (error == null) it.copy(isSubmitting = false, stage = ResetStage.LINK_SENT)
+                else it.copy(isSubmitting = false, error = error)
+            }
+            if (error == null) startResendCountdown(RESEND_SECONDS)
         }
     }
 
@@ -265,7 +411,8 @@ class ResetPasswordViewModel @Inject constructor(
     fun dismissNotice() = _state.update { it.copy(notice = null, error = null) }
 
     private fun startResendCountdown(seconds: Int) {
-        viewModelScope.launch {
+        countdown?.cancel()
+        countdown = viewModelScope.launch {
             for (remaining in seconds downTo 0) {
                 _state.update { it.copy(secondsUntilResend = remaining) }
                 if (remaining > 0) delay(1000)

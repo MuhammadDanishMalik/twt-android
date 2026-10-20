@@ -41,11 +41,13 @@ interface ChatRepository {
         text: String,
         senderId: String,
         senderName: String,
-        replyTo: ChatMessage.ReplyReference? = null
+        replyTo: ChatMessage.ReplyReference? = null,
+        note: ChatMessage.NoteAttachment? = null
     )
 
     suspend fun edit(roomId: String, messageId: String, text: String)
-    suspend fun toggleReaction(roomId: String, messageId: String, emoji: String, add: Boolean)
+    /** Reacts with [emoji]; the same emoji again removes it, another one swaps. */
+    suspend fun react(roomId: String, messageId: String, uid: String, emoji: String)
     suspend fun markSeen(roomId: String, messageId: String, uid: String)
 
     /**
@@ -123,7 +125,8 @@ class FirebaseChatRepository @Inject constructor(
         text: String,
         senderId: String,
         senderName: String,
-        replyTo: ChatMessage.ReplyReference?
+        replyTo: ChatMessage.ReplyReference?,
+        note: ChatMessage.NoteAttachment?
     ) {
         val payload = mutableMapOf<String, Any>(
             M.TEXT to text,
@@ -143,6 +146,15 @@ class FirebaseChatRepository @Inject constructor(
                 M.Reply.TEXT to it.text
             )
         }
+        note?.let {
+            payload[M.NOTE_ATTACHMENT] = mapOf(
+                M.Note.NOTE_ID to it.noteId,
+                M.Note.VIDEO_ID to it.videoId,
+                M.Note.VIDEO_TITLE to it.videoTitle,
+                M.Note.TIMESTAMP to it.timestamp,
+                M.Note.NOTE_TEXT to it.noteText
+            )
+        }
         messages(roomId).add(payload).await()
     }
 
@@ -154,17 +166,32 @@ class FirebaseChatRepository @Inject constructor(
             .await()
     }
 
-    override suspend fun toggleReaction(
-        roomId: String,
-        messageId: String,
-        emoji: String,
-        add: Boolean
-    ) {
-        // Increment rather than write a total. Two people reacting at once would
-        // otherwise each write "1" and one of them would vanish.
-        messages(roomId).document(messageId)
-            .update("${M.REACTIONS}.$emoji", FieldValue.increment(if (add) 1L else -1L))
-            .await()
+    override suspend fun react(roomId: String, messageId: String, uid: String, emoji: String) {
+        // One reaction per member, as in WhatsApp. reactedBy says who chose what;
+        // the reactions totals stay in step in the same transaction, and use
+        // increments so two people reacting at once both count.
+        val ref = messages(roomId).document(messageId)
+        db.runTransaction { tx ->
+            val snap = tx.get(ref)
+            if (!snap.exists()) return@runTransaction
+            @Suppress("UNCHECKED_CAST")
+            val totals = snap.get(M.REACTIONS) as? Map<String, Any?> ?: emptyMap()
+            val previous = (snap.get(M.REACTED_BY) as? Map<*, *>)?.get(uid) as? String
+            val updates = mutableMapOf<String, Any>()
+            fun decrement(e: String) {
+                val count = (totals[e] as? Number)?.toLong() ?: 0L
+                updates["${M.REACTIONS}.$e"] = if (count <= 1L) FieldValue.delete() else FieldValue.increment(-1L)
+            }
+            if (previous == emoji) {
+                decrement(emoji)
+                updates["${M.REACTED_BY}.$uid"] = FieldValue.delete()
+            } else {
+                previous?.let(::decrement)
+                updates["${M.REACTIONS}.$emoji"] = FieldValue.increment(1L)
+                updates["${M.REACTED_BY}.$uid"] = emoji
+            }
+            tx.update(ref, updates)
+        }.await()
     }
 
     override suspend fun markSeen(roomId: String, messageId: String, uid: String) {
@@ -239,9 +266,20 @@ class FirebaseChatRepository @Inject constructor(
             isCurrentUser = senderId.isNotEmpty() && senderId == currentUserId,
             timestamp = serverTimestamp?.toDate() ?: Date(),
             replyTo = reply,
+            noteAttachment = (document.get(M.NOTE_ATTACHMENT) as? Map<*, *>)?.let { raw ->
+                ChatMessage.NoteAttachment(
+                    noteId = raw[M.Note.NOTE_ID] as? String ?: "",
+                    videoId = raw[M.Note.VIDEO_ID] as? String ?: "",
+                    videoTitle = raw[M.Note.VIDEO_TITLE] as? String ?: "",
+                    // iOS writes a Double; a whole number can come back as Long.
+                    timestamp = (raw[M.Note.TIMESTAMP] as? Number)?.toDouble() ?: 0.0,
+                    noteText = raw[M.Note.NOTE_TEXT] as? String ?: ""
+                )
+            },
             reactions = reactions,
             isEdited = document.getBoolean(M.IS_EDITED) ?: false,
             seenBy = seenBy,
+            myReaction = (document.get(M.REACTED_BY) as? Map<*, *>)?.get(currentUserId) as? String,
             // Per document, not per query. `QuerySnapshot.metadata` is true
             // while *any* write in the query is in flight, so reading it there
             // marks every message in the room as "sending" whenever one of them

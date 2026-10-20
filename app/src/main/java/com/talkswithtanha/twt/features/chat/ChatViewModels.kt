@@ -309,10 +309,8 @@ class ChatRoomViewModel @Inject constructor(
     fun block(message: ChatMessage) = blockedUsers.block(message.senderId, message.senderName)
 
     fun toggleReaction(message: ChatMessage, emoji: String) = viewModelScope.launch {
-        val alreadyReacted = (message.reactions[emoji] ?: 0) > 0
-        runCatching {
-            chatRepository.toggleReaction(roomId, message.id, emoji, !alreadyReacted)
-        }
+        val uid = session.currentUser.value?.id ?: return@launch
+        runCatching { chatRepository.react(roomId, message.id, uid, emoji) }
     }
 
     fun dismissError() { _error.value = null }

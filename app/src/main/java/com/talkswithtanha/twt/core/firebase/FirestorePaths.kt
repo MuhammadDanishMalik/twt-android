@@ -454,6 +454,8 @@ object FirestorePaths {
         const val REPLY_TO = "replyTo"
         const val NOTE_ATTACHMENT = "noteAttachment"
         const val SEEN_BY = "seenBy"
+        /** uid → the one emoji that member reacted with. */
+        const val REACTED_BY = "reactedBy"
 
         object Reply {
             const val SENDER_NAME = "senderName"

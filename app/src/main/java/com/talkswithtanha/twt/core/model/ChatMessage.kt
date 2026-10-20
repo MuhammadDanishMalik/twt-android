@@ -19,13 +19,33 @@ data class ChatMessage(
     val isCurrentUser: Boolean,
     val timestamp: Date,
     val replyTo: ReplyReference? = null,
+    /** A lesson note shared into the chat. */
+    val noteAttachment: NoteAttachment? = null,
     val reactions: Map<String, Int> = emptyMap(),
     val isEdited: Boolean = false,
     val seenBy: List<String> = emptyList(),
+    /** The emoji this member reacted with, if any. One per member per message. */
+    val myReaction: String? = null,
     /** True between hitting send and the server echoing the write back. */
     val isPending: Boolean = false
 ) {
     data class ReplyReference(val senderName: String, val text: String)
+
+    /**
+     * A copy of a saved lesson note, taken at the moment it was shared. A copy
+     * rather than a reference because notes live only on the sender's phone.
+     */
+    data class NoteAttachment(
+        val noteId: String,
+        /** The YouTube id of the lesson. */
+        val videoId: String,
+        val videoTitle: String,
+        /** Seconds into the video. */
+        val timestamp: Double,
+        val noteText: String
+    ) {
+        val formattedTimestamp: String get() = formatVideoTime(timestamp)
+    }
 
     /** Whether this message can still be edited (within five minutes). */
     val canEdit: Boolean
@@ -53,4 +73,10 @@ sealed class ChatRoom(val id: String, val displayName: String) {
 
     val isSupport: Boolean get() = id.startsWith(FirestorePaths.ChatRoom.SUPPORT_PREFIX)
     val isPremium: Boolean get() = id == FirestorePaths.ChatRoom.PREMIUM
+}
+
+/** 125.4 → "02:05", the way both apps print a moment in a video. */
+fun formatVideoTime(seconds: Double): String {
+    val total = seconds.toInt().coerceAtLeast(0)
+    return "%02d:%02d".format(total / 60, total % 60)
 }

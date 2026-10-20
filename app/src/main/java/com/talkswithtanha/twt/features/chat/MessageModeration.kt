@@ -2,6 +2,10 @@ package com.talkswithtanha.twt.features.chat
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -47,10 +51,13 @@ import com.talkswithtanha.twt.core.moderation.ReportReason
  * or block its author. Google Play requires both of any app with user
  * conversations; they sit behind a long-press, where people look for them.
  */
+private val QUICK_REACTIONS = listOf("👍", "❤️", "😂", "😮", "😢", "🙏")
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MessageActionsSheet(
     message: ChatMessage,
+    onReact: (String) -> Unit,
     onReport: (ReportReason) -> Unit,
     onBlock: () -> Unit,
     onDismiss: () -> Unit
@@ -84,11 +91,36 @@ fun MessageActionsSheet(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(14.dp))
+
+            // WhatsApp's six. One per member: the ringed one is theirs, and
+            // tapping it again takes it back.
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                QUICK_REACTIONS.forEach { emoji ->
+                    val mine = message.myReaction == emoji
+                    Box(
+                        Modifier
+                            .size(46.dp)
+                            .clip(CircleShape)
+                            .background(if (mine) IosColors.Accent.copy(alpha = 0.28f) else Color(0xFF2C2C2E))
+                            .clickable {
+                                Haptics.success(haptics)
+                                onReact(emoji)
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(emoji, fontSize = 24.sp)
+                    }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
 
             AnimatedContent(targetState = choosingReason, label = "moderation") { reasons ->
                 Column {
-                    if (!reasons) {
+                    if (!reasons && !message.isCurrentUser) {
                         ActionRow(Icons.Outlined.Flag, "Report message", "The team reviews every report") {
                             Haptics.tap(haptics)
                             choosingReason = true
@@ -102,7 +134,7 @@ fun MessageActionsSheet(
                             Haptics.toggleOn(haptics)
                             onBlock()
                         }
-                    } else {
+                    } else if (reasons) {
                         Row(
                             Modifier
                                 .fillMaxWidth()

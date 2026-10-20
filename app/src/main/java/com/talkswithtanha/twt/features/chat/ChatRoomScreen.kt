@@ -1,6 +1,13 @@
 package com.talkswithtanha.twt.features.chat
 
 import androidx.compose.foundation.combinedClickable
+import com.talkswithtanha.twt.core.designsystem.components.ImageViewer
+import com.talkswithtanha.twt.core.images.Cloudinary
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeOut
@@ -91,6 +98,8 @@ fun ChatRoomScreen(
     val savedNotes by viewModel.savedNotes.collectAsStateWithLifecycle()
     var pickingNote by remember { mutableStateOf(false) }
     var actionsFor by remember { mutableStateOf<ChatMessage?>(null) }
+    // A chat photo open full screen: every image in that message, and which one.
+    var viewing by remember { mutableStateOf<Pair<List<String>, Int>?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
     fun toast(text: String) =
         android.widget.Toast.makeText(context, text, android.widget.Toast.LENGTH_SHORT).show()
@@ -148,7 +157,12 @@ fun ChatRoomScreen(
                 contentPadding = PaddingValues(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                itemsWithDateDividers(state.messages, openNote, onLongPress = { actionsFor = it })
+                itemsWithDateDividers(
+                    state.messages,
+                    openNote,
+                    onLongPress = { actionsFor = it },
+                    onOpenImage = { images, index -> viewing = images to index }
+                )
             }
         }
 
@@ -182,6 +196,10 @@ fun ChatRoomScreen(
     actionsFor?.let { message ->
         MessageActionsSheet(
             message = message,
+            onReact = { emoji ->
+                actionsFor = null
+                viewModel.toggleReaction(message, emoji)
+            },
             onReport = { reason ->
                 actionsFor = null
                 viewModel.report(message, reason) { sent ->
@@ -195,6 +213,10 @@ fun ChatRoomScreen(
             },
             onDismiss = { actionsFor = null }
         )
+    }
+
+    viewing?.let { (images, index) ->
+        ImageViewer(images = images, startIndex = index, onDismiss = { viewing = null })
     }
 
     if (pickingNote) {
@@ -219,7 +241,8 @@ fun ChatRoomScreen(
 private fun androidx.compose.foundation.lazy.LazyListScope.itemsWithDateDividers(
     messages: List<ChatMessage>,
     onOpenNote: (ChatMessage.NoteAttachment) -> Unit,
-    onLongPress: (ChatMessage) -> Unit
+    onLongPress: (ChatMessage) -> Unit,
+    onOpenImage: (List<String>, Int) -> Unit
 ) {
     messages.forEachIndexed { index, message ->
         val previous = messages.getOrNull(index - 1)
@@ -228,7 +251,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsWithDateDividers
                 ChatDateDivider(chatDateLabel(message.timestamp))
             }
         }
-        item(key = message.id) { ChatBubble(message, onOpenNote, onLongPress) }
+        item(key = message.id) { ChatBubble(message, onOpenNote, onLongPress, onOpenImage) }
     }
 }
 
@@ -236,8 +259,15 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsWithDateDividers
 private fun ChatBubble(
     message: ChatMessage,
     onOpenNote: (ChatMessage.NoteAttachment) -> Unit,
-    onLongPress: (ChatMessage) -> Unit
+    onLongPress: (ChatMessage) -> Unit,
+    onOpenImage: (List<String>, Int) -> Unit
 ) {
+    // Photos Tanha sends from the admin arrive as image links in the text;
+    // they show as pictures, and the link itself is hidden.
+    val images = remember(message.text) { imageUrlsIn(message.text) }
+    val bodyText = remember(message.text, images) {
+        images.fold(message.text) { t, url -> t.replace(url, "") }.trim()
+    }
     val haptics = LocalHapticFeedback.current
     var appeared by remember(message.id) { mutableStateOf(false) }
     LaunchedEffect(message.id) { appeared = true }
@@ -284,16 +314,14 @@ private fun ChatBubble(
                         if (message.isCurrentUser) IosColors.Accent else Color(0xFF2C2C2E)
                     )
                     .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(20.dp))
-                    // Someone else's message: hold to report it or block them.
-                    .then(
-                        if (message.isCurrentUser) Modifier
-                        else Modifier.combinedClickable(
-                            onClick = {},
-                            onLongClick = {
-                                Haptics.sheetOpen(haptics)
-                                onLongPress(message)
-                            }
-                        )
+                    // Hold any message to react; someone else's also to
+                    // report it or block them.
+                    .combinedClickable(
+                        onClick = {},
+                        onLongClick = {
+                            Haptics.sheetOpen(haptics)
+                            onLongPress(message)
+                        }
                     )
                     .padding(horizontal = 14.dp, vertical = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -334,8 +362,54 @@ private fun ChatBubble(
                     NoteAttachmentCard(note, isMine = message.isCurrentUser, onOpen = { onOpenNote(note) })
                 }
 
-                if (message.text.isNotEmpty()) {
-                    Text(text = message.text, color = Color.White, fontSize = 16.sp)
+                images.take(4).forEachIndexed { index, url ->
+                    AsyncImage(
+                        model = Cloudinary.transformed(url, "c_limit,w_900,f_auto,q_auto") ?: url,
+                        contentDescription = "Photo",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 260.dp)
+                            .aspectRatio(4f / 3f)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color.White.copy(alpha = 0.06f))
+                            .clickable { onOpenImage(images, index) }
+                    )
+                }
+
+                if (bodyText.isNotEmpty()) {
+                    Text(text = bodyText, color = Color.White, fontSize = 16.sp)
+                }
+            }
+
+            // Reactions, WhatsApp-style: one pill tucked under the bubble,
+            // most-used first. Ringed when one of them is this member's.
+            val reactions = message.reactions.entries.sortedByDescending { it.value }
+            if (reactions.isNotEmpty()) {
+                val total = reactions.sumOf { it.value }
+                Row(
+                    Modifier
+                        .padding(horizontal = 8.dp)
+                        .offset(y = (-6).dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF2C2C2E))
+                        .border(
+                            1.dp,
+                            if (message.myReaction != null) IosColors.Accent else Color.White.copy(alpha = 0.12f),
+                            RoundedCornerShape(12.dp)
+                        )
+                        .clickable {
+                            Haptics.tap(haptics)
+                            onLongPress(message)
+                        }
+                        .padding(horizontal = 7.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    reactions.take(3).forEach { Text(it.key, fontSize = 14.sp) }
+                    if (total > 1) {
+                        Spacer(Modifier.width(4.dp))
+                        Text("$total", color = IosColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
 
@@ -830,6 +904,14 @@ private fun ChatInputBar(
         }
     }
 }
+
+private val IMAGE_URL = Regex(
+    """https?://[^\s)]+?\.(?:png|jpe?g|gif|webp)(?:\?[^\s)]*)?|https?://res\.cloudinary\.com/[^\s)]+""",
+    RegexOption.IGNORE_CASE
+)
+
+/** Image links in a message, in order, each once. */
+private fun imageUrlsIn(text: String): List<String> = IMAGE_URL.findAll(text).map { it.value }.distinct().toList()
 
 private fun timeFormat() = SimpleDateFormat("h:mm a", Locale.getDefault())
 

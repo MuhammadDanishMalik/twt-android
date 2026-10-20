@@ -199,23 +199,21 @@ class ChatRoomViewModel @Inject constructor(
     // arrives again does not write again.
     private val markedSeen = mutableSetOf<String>()
 
-    init {
-        // Opening a room counts as seeing what is in it: the newest messages from
-        // other people get this member's uid in `seenBy`, which the admin panel
-        // shows as the view count. Only the latest few, so a first visit to a
-        // long room is not a burst of writes.
-        viewModelScope.launch {
-            kotlinx.coroutines.flow.combine(messages, session.currentUser) { snap, user -> snap to user }
-                .collect { (snap, user) ->
-                    val list = (snap as? Snapshot.Data)?.value ?: return@collect
-                    val uid = user?.id ?: return@collect
-                    list.takeLast(SEEN_WINDOW)
-                        .filter { it.senderId != uid && uid !in it.seenBy && markedSeen.add(it.id) }
-                        .forEach { message ->
-                            launch { runCatching { chatRepository.markSeen(roomId, message.id, uid) } }
-                        }
-                }
-        }
+    /**
+     * Records that this member has seen the newest messages from other people.
+     * Called by the screen while it is actually showing them — not from a
+     * background collector, which would keep marking messages "seen" while the
+     * room sat behind another screen. Only the latest few, so a first visit to
+     * a long room is not a burst of writes.
+     */
+    fun markVisibleSeen() {
+        val uid = session.currentUser.value?.id ?: return
+        state.value.messages
+            .takeLast(SEEN_WINDOW)
+            .filter { it.senderId != uid && uid !in it.seenBy && !it.isPending && markedSeen.add(it.id) }
+            .forEach { message ->
+                viewModelScope.launch { runCatching { chatRepository.markSeen(roomId, message.id, uid) } }
+            }
     }
 
     fun onDraftChange(value: String) { _draft.value = value }

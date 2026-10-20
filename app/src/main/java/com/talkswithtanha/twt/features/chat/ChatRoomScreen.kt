@@ -1,5 +1,11 @@
 package com.talkswithtanha.twt.features.chat
 
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -77,9 +83,20 @@ import kotlin.math.abs
 @Composable
 fun ChatRoomScreen(
     onBack: () -> Unit,
+    /** Opens a shared note's lesson at the moment it was taken. */
+    onOpenLesson: (videoId: String, title: String, startSeconds: Int) -> Unit = { _, _, _ -> },
     viewModel: ChatRoomViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val savedNotes by viewModel.savedNotes.collectAsStateWithLifecycle()
+    var pickingNote by remember { mutableStateOf(false) }
+    var actionsFor by remember { mutableStateOf<ChatMessage?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    fun toast(text: String) =
+        android.widget.Toast.makeText(context, text, android.widget.Toast.LENGTH_SHORT).show()
+    val openNote: (ChatMessage.NoteAttachment) -> Unit = {
+        if (it.videoId.isNotBlank()) onOpenLesson(it.videoId, it.videoTitle, it.timestamp.toInt())
+    }
     val listState = rememberLazyListState()
 
     // Stick to the newest message. Keyed on the count rather than the list, so
@@ -88,6 +105,8 @@ fun ChatRoomScreen(
     LaunchedEffect(state.messages.size) {
         if (state.messages.isNotEmpty()) {
             listState.animateScrollToItem(state.messages.lastIndex)
+            // On screen and scrolled to the newest: these count as seen.
+            viewModel.markVisibleSeen()
         }
     }
 
@@ -129,7 +148,7 @@ fun ChatRoomScreen(
                 contentPadding = PaddingValues(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                itemsWithDateDividers(state.messages)
+                itemsWithDateDividers(state.messages, openNote, onLongPress = { actionsFor = it })
             }
         }
 
@@ -142,11 +161,50 @@ fun ChatRoomScreen(
             )
         }
 
+        AnimatedVisibility(
+            visible = state.pendingNote != null,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            state.pendingNote?.let { PendingNoteBanner(it, onCancel = { viewModel.setPendingNote(null) }) }
+        }
+
         ChatInputBar(
             draft = state.draft,
             enabled = state.canPost,
+            hasAttachment = state.pendingNote != null,
             onDraftChange = viewModel::onDraftChange,
+            onAttach = { pickingNote = true },
             onSend = viewModel::send
+        )
+    }
+
+    actionsFor?.let { message ->
+        MessageActionsSheet(
+            message = message,
+            onReport = { reason ->
+                actionsFor = null
+                viewModel.report(message, reason) { sent ->
+                    toast(if (sent) "Reported. Thanks — the team will review it." else "The report did not send. Try again.")
+                }
+            },
+            onBlock = {
+                actionsFor = null
+                viewModel.block(message)
+                toast("${message.senderName} is blocked. Unblock in Settings.")
+            },
+            onDismiss = { actionsFor = null }
+        )
+    }
+
+    if (pickingNote) {
+        NotePickerSheet(
+            notes = savedNotes,
+            onPick = {
+                viewModel.setPendingNote(it)
+                pickingNote = false
+            },
+            onDismiss = { pickingNote = false }
         )
     }
 }
@@ -159,7 +217,9 @@ fun ChatRoomScreen(
  * its own header cannot be reordered or removed without leaving one behind.
  */
 private fun androidx.compose.foundation.lazy.LazyListScope.itemsWithDateDividers(
-    messages: List<ChatMessage>
+    messages: List<ChatMessage>,
+    onOpenNote: (ChatMessage.NoteAttachment) -> Unit,
+    onLongPress: (ChatMessage) -> Unit
 ) {
     messages.forEachIndexed { index, message ->
         val previous = messages.getOrNull(index - 1)
@@ -168,12 +228,17 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsWithDateDividers
                 ChatDateDivider(chatDateLabel(message.timestamp))
             }
         }
-        item(key = message.id) { ChatBubble(message) }
+        item(key = message.id) { ChatBubble(message, onOpenNote, onLongPress) }
     }
 }
 
 @Composable
-private fun ChatBubble(message: ChatMessage) {
+private fun ChatBubble(
+    message: ChatMessage,
+    onOpenNote: (ChatMessage.NoteAttachment) -> Unit,
+    onLongPress: (ChatMessage) -> Unit
+) {
+    val haptics = LocalHapticFeedback.current
     var appeared by remember(message.id) { mutableStateOf(false) }
     LaunchedEffect(message.id) { appeared = true }
     val scale by animateFloatAsState(
@@ -219,6 +284,17 @@ private fun ChatBubble(message: ChatMessage) {
                         if (message.isCurrentUser) IosColors.Accent else Color(0xFF2C2C2E)
                     )
                     .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(20.dp))
+                    // Someone else's message: hold to report it or block them.
+                    .then(
+                        if (message.isCurrentUser) Modifier
+                        else Modifier.combinedClickable(
+                            onClick = {},
+                            onLongClick = {
+                                Haptics.sheetOpen(haptics)
+                                onLongPress(message)
+                            }
+                        )
+                    )
                     .padding(horizontal = 14.dp, vertical = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
@@ -252,6 +328,10 @@ private fun ChatBubble(message: ChatMessage) {
                             )
                         }
                     }
+                }
+
+                message.noteAttachment?.let { note ->
+                    NoteAttachmentCard(note, isMine = message.isCurrentUser, onOpen = { onOpenNote(note) })
                 }
 
                 if (message.text.isNotEmpty()) {
@@ -665,11 +745,14 @@ private fun EmptyRoom() {
 private fun ChatInputBar(
     draft: String,
     enabled: Boolean,
+    hasAttachment: Boolean,
     onDraftChange: (String) -> Unit,
+    onAttach: () -> Unit,
     onSend: () -> Unit
 ) {
     val haptics = LocalHapticFeedback.current
-    val canSend = enabled && draft.isNotBlank()
+    // A note can be sent on its own, without any text.
+    val canSend = enabled && (draft.isNotBlank() || hasAttachment)
 
     Row(
         Modifier
@@ -684,13 +767,17 @@ private fun ChatInputBar(
             Modifier
                 .size(36.dp)
                 .clip(CircleShape)
-                .background(Color(0xFF2C2C2E)),
+                .background(if (hasAttachment) IosColors.Accent.copy(alpha = 0.2f) else Color(0xFF2C2C2E))
+                .clickable(enabled = enabled) {
+                    Haptics.sheetOpen(haptics)
+                    onAttach()
+                },
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 Icons.Filled.AttachFile,
-                contentDescription = "Attach",
-                tint = IosColors.TextSecondary,
+                contentDescription = "Share a lesson note",
+                tint = if (hasAttachment) IosColors.Accent else IosColors.TextSecondary,
                 modifier = Modifier.size(18.dp)
             )
         }

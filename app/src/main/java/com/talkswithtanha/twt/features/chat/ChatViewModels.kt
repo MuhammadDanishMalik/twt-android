@@ -1,5 +1,10 @@
 package com.talkswithtanha.twt.features.chat
 
+import com.talkswithtanha.twt.core.moderation.ReportReason
+import com.talkswithtanha.twt.core.moderation.ReportRepository
+import com.talkswithtanha.twt.core.moderation.BlockedUsersStore
+import com.talkswithtanha.twt.core.notes.VideoNotesStore
+import com.talkswithtanha.twt.core.notes.VideoNote
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -87,6 +92,8 @@ data class ChatRoomUiState(
     val messages: List<ChatMessage> = emptyList(),
     val draft: String = "",
     val replyTo: ChatMessage? = null,
+    /** A lesson note waiting to go out with the next message. */
+    val pendingNote: ChatMessage.NoteAttachment? = null,
     val isLoading: Boolean = true,
     val error: String? = null,
     val canPost: Boolean = false,
@@ -95,13 +102,21 @@ data class ChatRoomUiState(
 )
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+private const val SEEN_WINDOW = 50
+
 @HiltViewModel
 class ChatRoomViewModel @Inject constructor(
     private val chatRepository: ChatRepository,
     private val session: SessionRepository,
     exchangeRates: com.talkswithtanha.twt.core.data.ExchangeRateRepository,
+    notesStore: VideoNotesStore,
+    private val blockedUsers: BlockedUsersStore,
+    private val reports: ReportRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
+
+    /** The member's saved lesson notes, for the paperclip's share sheet. */
+    val savedNotes: StateFlow<List<VideoNote>> = notesStore.notes
 
     private val rate = exchangeRates.observeRate()
         .map { it?.let { r -> com.talkswithtanha.twt.core.model.ExchangeRate.formatPaisa(r.buyPaisa) } }
@@ -123,6 +138,7 @@ class ChatRoomViewModel @Inject constructor(
 
     private val _draft = MutableStateFlow("")
     private val _replyTo = MutableStateFlow<ChatMessage?>(null)
+    private val _pendingNote = MutableStateFlow<ChatMessage.NoteAttachment?>(null)
     private val _error = MutableStateFlow<String?>(null)
 
     private val messages: StateFlow<Snapshot<List<ChatMessage>>?> = session.currentUser
@@ -138,7 +154,9 @@ class ChatRoomViewModel @Inject constructor(
         _replyTo,
         _error,
         session.currentUser,
-        rate
+        rate,
+        _pendingNote,
+        blockedUsers.blocked
     ) { values ->
         @Suppress("UNCHECKED_CAST")
         val snapshot = values[0] as Snapshot<List<ChatMessage>>?
@@ -147,10 +165,16 @@ class ChatRoomViewModel @Inject constructor(
         val error = values[3] as String?
         val user = values[4] as com.talkswithtanha.twt.core.model.User?
         val liveRate = values[5] as String?
+        val pendingNote = values[6] as ChatMessage.NoteAttachment?
+        @Suppress("UNCHECKED_CAST")
+        val blocked = values[7] as Map<String, String>
         ChatRoomUiState(
-            messages = (snapshot as? Snapshot.Data)?.value.orEmpty(),
+            // A blocked member's messages are simply not shown to the blocker.
+            messages = (snapshot as? Snapshot.Data)?.value.orEmpty()
+                .filterNot { !it.isCurrentUser && it.senderId in blocked },
             draft = draft,
             replyTo = replyTo,
+            pendingNote = pendingNote,
             isLoading = snapshot == null,
             error = error ?: (snapshot as? Snapshot.Failed)?.let {
                 // The premium room is gated on *reading*. A member whose code
@@ -171,6 +195,29 @@ class ChatRoomViewModel @Inject constructor(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChatRoomUiState())
 
+    // Messages this session has already recorded a view on, so a snapshot that
+    // arrives again does not write again.
+    private val markedSeen = mutableSetOf<String>()
+
+    init {
+        // Opening a room counts as seeing what is in it: the newest messages from
+        // other people get this member's uid in `seenBy`, which the admin panel
+        // shows as the view count. Only the latest few, so a first visit to a
+        // long room is not a burst of writes.
+        viewModelScope.launch {
+            kotlinx.coroutines.flow.combine(messages, session.currentUser) { snap, user -> snap to user }
+                .collect { (snap, user) ->
+                    val list = (snap as? Snapshot.Data)?.value ?: return@collect
+                    val uid = user?.id ?: return@collect
+                    list.takeLast(SEEN_WINDOW)
+                        .filter { it.senderId != uid && uid !in it.seenBy && markedSeen.add(it.id) }
+                        .forEach { message ->
+                            launch { runCatching { chatRepository.markSeen(roomId, message.id, uid) } }
+                        }
+                }
+        }
+    }
+
     fun onDraftChange(value: String) { _draft.value = value }
 
     /** A quick reply fills the box rather than sending: the member nearly
@@ -179,10 +226,26 @@ class ChatRoomViewModel @Inject constructor(
 
     fun setReplyTo(message: ChatMessage?) { _replyTo.value = message }
 
+    /** Attaches a saved note to the next message — a copy, since notes live
+     *  only on this phone. Null clears it. */
+    fun setPendingNote(note: VideoNote?) {
+        _pendingNote.value = note?.let {
+            ChatMessage.NoteAttachment(
+                noteId = it.id,
+                videoId = it.videoId,
+                videoTitle = it.videoTitle,
+                timestamp = it.timestamp,
+                noteText = it.text
+            )
+        }
+    }
+
     fun send() {
         val user = session.currentUser.value ?: return
         val text = _draft.value.trim()
-        if (text.isEmpty()) return
+        val note = _pendingNote.value
+        // A shared note can go out on its own, as on iOS.
+        if (text.isEmpty() && note == null) return
 
         // Cleared immediately rather than on success. Firestore's offline queue
         // will deliver this, and leaving the text in the box makes a member on a
@@ -190,6 +253,7 @@ class ChatRoomViewModel @Inject constructor(
         _draft.value = ""
         val reply = _replyTo.value
         _replyTo.value = null
+        _pendingNote.value = null
 
         viewModelScope.launch {
             runCatching {
@@ -201,7 +265,7 @@ class ChatRoomViewModel @Inject constructor(
                         uid = user.id,
                         userName = user.fullName,
                         userEmail = user.email,
-                        lastMessage = text
+                        lastMessage = text.ifEmpty { "Shared a lesson note" }
                     )
                 }
                 chatRepository.send(
@@ -211,14 +275,38 @@ class ChatRoomViewModel @Inject constructor(
                     senderName = user.fullName,
                     replyTo = reply?.let {
                         ChatMessage.ReplyReference(it.senderName, it.text)
-                    }
+                    },
+                    note = note
                 )
             }.onFailure {
                 _error.value = "That message did not send."
                 _draft.value = text
+                _pendingNote.value = note
             }
         }
     }
+
+    /** Files a report for the team to review. [onDone] gets whether it went through. */
+    fun report(message: ChatMessage, reason: ReportReason, onDone: (Boolean) -> Unit) {
+        val user = session.currentUser.value ?: return onDone(false)
+        viewModelScope.launch {
+            val sent = runCatching {
+                reports.reportMessage(
+                    reporterId = user.id,
+                    roomId = roomId,
+                    messageId = message.id,
+                    reportedUserId = message.senderId,
+                    reportedUserName = message.senderName,
+                    messageText = message.text.ifEmpty { message.noteAttachment?.noteText.orEmpty() },
+                    reason = reason
+                )
+            }.isSuccess
+            onDone(sent)
+        }
+    }
+
+    /** Hides everything [message]'s author posts, on this phone. */
+    fun block(message: ChatMessage) = blockedUsers.block(message.senderId, message.senderName)
 
     fun toggleReaction(message: ChatMessage, emoji: String) = viewModelScope.launch {
         val alreadyReacted = (message.reactions[emoji] ?: 0) > 0

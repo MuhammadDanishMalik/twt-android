@@ -120,51 +120,60 @@ class FirebaseDealRepository @Inject constructor(
         "accountNumber" to account.accountNumber
     )
 
-    private fun map(document: DocumentSnapshot): Deal? {
-        val userId = document.get(F.USER_ID).asNonBlankString() ?: return null
+    private fun map(document: DocumentSnapshot): Deal? = dealFrom(document)
+}
 
-        val cents = document.get(F.AMOUNT_USD_CENTS).asLongOrNull()
-            ?: document.get(F.AMOUNT_USD).asDoubleOrNull()?.let { Math.round(it * 100) }
-            ?: return null
-        val ratePaisa = document.get(F.LOCKED_RATE_PAISA).asLongOrNull()
-            ?: document.get(F.LOCKED_RATE).asDoubleOrNull()?.let { Math.round(it * 100) }
-            ?: 0L
+// ─── Shared mapping ─────────────────────────────────────────────────────────
+//
+// Top-level and internal rather than private to the repository, because the
+// admin area reads the same documents through `AdminRepository` — and two copies
+// of this mapping is how the member's screen and the staff screen end up
+// disagreeing about what a deal says.
 
-        return Deal(
-            id = document.id,
-            userId = userId,
-            userName = document.get(F.USER_NAME).asNonBlankString().orEmpty(),
-            reference = document.get(F.REFERENCE).asNonBlankString() ?: document.id.take(6).uppercase(),
-            side = DealSide.from(document.getString(F.SIDE)),
-            amountUsdCents = cents,
-            lockedRatePaisa = ratePaisa,
-            status = DealStatus.from(document.getString(F.STATUS)),
-            sellerAccount = account(document.get(F.SELLER_ACCOUNT)),
-            receivingAccount = account(document.get(F.RECEIVING_ACCOUNT)),
-            paymentReference = document.get(F.PAYMENT_REFERENCE).asNonBlankString(),
-            events = (document.get(F.EVENTS) as? List<*>)
-                .orEmpty()
-                .filterIsInstance<Map<*, *>>()
-                .mapNotNull { raw ->
-                    DealEvent(
-                        id = raw["id"].asNonBlankString() ?: return@mapNotNull null,
-                        status = DealStatus.from(raw["status"] as? String),
-                        note = raw["note"].asNonBlankString().orEmpty(),
-                        timestamp = (raw["timestamp"] as? Timestamp)?.toDate() ?: Date()
-                    )
-                }
-                .sortedBy { it.timestamp },
-            createdAt = document.getTimestamp(F.CREATED_AT)?.toDate() ?: Date()
-        )
-    }
+internal fun dealFrom(document: DocumentSnapshot): Deal? {
+    val userId = document.get(F.USER_ID).asNonBlankString() ?: return null
 
-    private fun account(raw: Any?): PaymentAccount? {
-        val map = raw as? Map<*, *> ?: return null
-        val number = map["accountNumber"].asNonBlankString() ?: return null
-        return PaymentAccount(
-            method = map["method"].asNonBlankString().orEmpty(),
-            accountTitle = map["accountTitle"].asNonBlankString().orEmpty(),
-            accountNumber = number
-        )
-    }
+    val cents = document.get(F.AMOUNT_USD_CENTS).asLongOrNull()
+        ?: document.get(F.AMOUNT_USD).asDoubleOrNull()?.let { Math.round(it * 100) }
+        ?: return null
+    val ratePaisa = document.get(F.LOCKED_RATE_PAISA).asLongOrNull()
+        ?: document.get(F.LOCKED_RATE).asDoubleOrNull()?.let { Math.round(it * 100) }
+        ?: 0L
+
+    return Deal(
+        id = document.id,
+        userId = userId,
+        userName = document.get(F.USER_NAME).asNonBlankString().orEmpty(),
+        reference = document.get(F.REFERENCE).asNonBlankString() ?: document.id.take(6).uppercase(),
+        side = DealSide.from(document.getString(F.SIDE)),
+        amountUsdCents = cents,
+        lockedRatePaisa = ratePaisa,
+        status = DealStatus.from(document.getString(F.STATUS)),
+        sellerAccount = account(document.get(F.SELLER_ACCOUNT)),
+        receivingAccount = account(document.get(F.RECEIVING_ACCOUNT)),
+        paymentReference = document.get(F.PAYMENT_REFERENCE).asNonBlankString(),
+        events = (document.get(F.EVENTS) as? List<*>)
+            .orEmpty()
+            .filterIsInstance<Map<*, *>>()
+            .mapNotNull { raw ->
+                DealEvent(
+                    id = raw["id"].asNonBlankString() ?: return@mapNotNull null,
+                    status = DealStatus.from(raw["status"] as? String),
+                    note = raw["note"].asNonBlankString().orEmpty(),
+                    timestamp = (raw["timestamp"] as? Timestamp)?.toDate() ?: Date()
+                )
+            }
+            .sortedBy { it.timestamp },
+        createdAt = document.getTimestamp(F.CREATED_AT)?.toDate() ?: Date()
+    )
+}
+
+private fun account(raw: Any?): PaymentAccount? {
+    val map = raw as? Map<*, *> ?: return null
+    val number = map["accountNumber"].asNonBlankString() ?: return null
+    return PaymentAccount(
+        method = map["method"].asNonBlankString().orEmpty(),
+        accountTitle = map["accountTitle"].asNonBlankString().orEmpty(),
+        accountNumber = number
+    )
 }

@@ -24,8 +24,14 @@ data class AuthUiState(
     val canSignIn: Boolean
         get() = email.isNotBlank() && password.length >= 6 && !isSubmitting
 
+    /**
+     * Stricter than sign-in on length: new passwords need
+     * [MIN_NEW_PASSWORD_LENGTH], as on iOS. Sign-in keeps six so accounts made
+     * before the rule changed can still get in.
+     */
     val canSignUp: Boolean
-        get() = canSignIn && fullName.isNotBlank()
+        get() = canSignIn && fullName.isNotBlank() &&
+            password.length >= MIN_NEW_PASSWORD_LENGTH
 }
 
 @HiltViewModel

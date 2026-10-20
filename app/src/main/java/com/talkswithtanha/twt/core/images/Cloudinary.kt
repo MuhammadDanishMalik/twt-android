@@ -38,7 +38,29 @@ object Cloudinary {
     /** The unsigned preset that governs member avatar uploads. */
     const val AVATAR_PRESET = "twt_avatars"
 
+    /**
+     * The unsigned preset for voice notes on the feed.
+     *
+     * Create it once, as **unsigned**, with:
+     *
+     *  - Folder: `twt/voice`
+     *  - Resource type: `video` (Cloudinary files audio under video)
+     *  - Allowed formats: `m4a, mp4, aac, mp3`
+     *  - Max file size: 25 MB
+     *
+     * Until it exists Cloudinary answers "Upload preset not found", which the
+     * composer shows as-is rather than inventing a friendlier lie.
+     */
+    const val VOICE_PRESET = "twt_voice"
+
     const val UPLOAD_ENDPOINT = "https://api.cloudinary.com/v1_1/$CLOUD_NAME/image/upload"
+
+    /**
+     * Audio uploads and delivery go through `video`, not `audio`. Cloudinary
+     * has no audio resource type — an m4a is a video with no pictures as far as
+     * the API is concerned, and posting one to the image endpoint is rejected.
+     */
+    const val VIDEO_UPLOAD_ENDPOINT = "https://api.cloudinary.com/v1_1/$CLOUD_NAME/video/upload"
 
     private const val DELIVERY_MARKER = "/image/upload/"
 

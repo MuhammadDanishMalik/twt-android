@@ -49,19 +49,42 @@ class FollowedSignalNotifier @Inject constructor(
     fun show(signal: Signal, follow: SignalFollow) {
         if (!canPost()) return
 
-        val notification = NotificationCompat.Builder(context, NotificationChannels.FOLLOWED_SIGNAL)
+        val progress = TradeProgress.of(signal)
+        val ongoing = signal.status.isOngoing
+        val builder = NotificationCompat.Builder(context, NotificationChannels.FOLLOWED_SIGNAL)
             .setSmallIcon(R.drawable.ic_stat_signal)
-            .setContentTitle("${signal.pair} · ${signal.type.stored}")
-            .setContentText(summary(signal))
-            .setStyle(NotificationCompat.BigTextStyle().bigText(detail(signal, follow)))
-            .setOngoing(signal.status.isOngoing)
+            .setContentTitle(
+                if (ongoing) "Following ${signal.pair} · ${signal.type.stored}"
+                else "${signal.pair} · ${signal.type.stored} · ${signal.status.stored}"
+            )
+            .setContentText(progress.headline(signal))
+            .setSubText(progress.stepLabel)
+            .setOngoing(ongoing)
             .setOnlyAlertOnce(true)
             .setSilent(true)
-            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .setColor(progress.color)
             .setContentIntent(openSignal(signal.id))
-            .build()
 
-        post(notificationId(signal.id), notification)
+        if (android.os.Build.VERSION.SDK_INT >= 36) {
+            // Android 16 Live Update: a segmented track with a stop at Entry and
+            // at every target, filled as targets are hit — the Android answer to
+            // the iPhone's Live Activity. The short chip sits in the status bar.
+            val style = NotificationCompat.ProgressStyle()
+                .setStyledByProgress(false)
+                .setProgress(progress.value)
+            progress.segments.forEach { style.addProgressSegment(it) }
+            progress.points.forEach { style.addProgressPoint(it) }
+            builder.setStyle(style)
+                .setRequestPromotedOngoing(ongoing)
+                .setShortCriticalText(progress.chip(signal))
+        } else {
+            builder
+                .setStyle(NotificationCompat.BigTextStyle().bigText(detail(signal, follow)))
+                .setProgress(progress.max, progress.value, false)
+        }
+
+        post(notificationId(signal.id), builder.build())
     }
 
     /**
@@ -192,3 +215,75 @@ class FollowedSignalNotifier @Inject constructor(
         private const val TAG = "FollowedSignalNotifier"
     }
 }
+
+/**
+ * Where a followed trade is on its way from entry to its last target, for the
+ * progress track: one step per take-profit, filled as each is hit, full and
+ * red when the stop is hit.
+ */
+internal class TradeProgress private constructor(
+    val max: Int,
+    val value: Int,
+    val color: Int,
+    val stepLabel: String,
+    val segments: List<NotificationCompat.ProgressStyle.Segment>,
+    val points: List<NotificationCompat.ProgressStyle.Point>
+) {
+    fun headline(signal: Signal): String {
+        val next = signal.takeProfits.firstOrNull { !it.isHit }
+        return when {
+            signal.status == SignalStatus.LOST -> "Stop loss hit at ${signal.stopLoss}"
+            signal.status == SignalStatus.WON ->
+                "Closed in profit" + (signal.pipsGained?.let { " · ${it.toInt()} pips" } ?: "")
+            next != null -> "Next: ${next.label} ${next.price} · Stop ${signal.stopLoss}"
+            else -> "Entry ${signal.entryPrice} · Stop ${signal.stopLoss}"
+        }
+    }
+
+    /** Status-bar chip on Android 16: "TP1", "TP2", "WIN", "SL", "LIVE". */
+    fun chip(signal: Signal): String = when (signal.status) {
+        SignalStatus.TP1_HIT -> "TP1"
+        SignalStatus.TP2_HIT -> "TP2"
+        SignalStatus.WON -> "WIN"
+        SignalStatus.LOST -> "SL"
+        SignalStatus.PENDING -> "WAIT"
+        SignalStatus.ACTIVE -> "LIVE"
+    }
+
+    companion object {
+        private const val STEP = 100
+        private const val GREEN = 0xFF33C759.toInt()
+        private const val RED = 0xFFF04D4D.toInt()
+        private const val TRACK = 0xFF5A5A5A.toInt()
+
+        fun of(signal: Signal): TradeProgress {
+            val tps = signal.takeProfits
+            val steps = tps.size.coerceAtLeast(1)
+            val max = steps * STEP
+            val hit = tps.count { it.isHit }
+            val (value, color) = when (signal.status) {
+                SignalStatus.LOST -> max to RED
+                SignalStatus.WON -> max to GREEN
+                // Hit targets fill their step; a live trade shows a sliver so
+                // the track reads as started rather than empty.
+                else -> (hit * STEP).coerceAtLeast(STEP / 8) to GREEN
+            }
+            val label = when (signal.status) {
+                SignalStatus.LOST -> "Stopped out"
+                SignalStatus.WON -> "Closed ✓"
+                else -> if (tps.isEmpty()) "Running" else "$hit of ${tps.size} targets"
+            }
+            val segments = List(steps) {
+                NotificationCompat.ProgressStyle.Segment(STEP)
+                    .setColor(if (signal.status == SignalStatus.LOST) RED else if (it < hit) GREEN else TRACK)
+            }
+            // A marker at each target, green once reached.
+            val points = tps.mapIndexed { i, tp ->
+                NotificationCompat.ProgressStyle.Point((i + 1) * STEP)
+                    .setColor(if (tp.isHit) GREEN else TRACK)
+            }
+            return TradeProgress(max, value.coerceAtMost(max), color, label, segments, points)
+        }
+    }
+}
+

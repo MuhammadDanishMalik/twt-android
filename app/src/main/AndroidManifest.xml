@@ -4,6 +4,11 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Voice notes on the feed. Asked for at the moment Tanha taps record,
+         never at launch: a trading app requesting the microphone on first run
+         looks like something else entirely. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <!-- Optional, so a device without a camera can still install and use the
          gallery half of the avatar picker. No CAMERA permission is declared:
          ACTION_IMAGE_CAPTURE hands the work to the camera app, and declaring
@@ -15,6 +20,9 @@
       to say yes, having just asked to be told what happens to it.
     -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Android 16: lets a followed trade's progress card show as a Live Update
+         (status-bar chip, lock screen). Granted at install; no prompt. -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
 
     <!--
       Opening WhatsApp, the access page and YouTube. Package visibility on
@@ -55,6 +63,38 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+          Home-screen widgets, drawn with Glance.
+
+          Both read the snapshot the app leaves in DataStore (see WidgetStore) —
+          a widget cannot open a Firestore listener, so the app hands it a
+          finished picture and asks for a redraw when it changes. updatePeriod
+          in the XML is only the fallback for a phone whose app has not run.
+        -->
+        <receiver
+            android:name=".core.widget.SignalsWidgetReceiver"
+            android:exported="false"
+            android:label="TWT Signals">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/signals_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".core.widget.AccessCardWidgetReceiver"
+            android:exported="false"
+            android:label="TWT Access Card">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/access_widget_info" />
+        </receiver>
 
         <service
             android:name=".core.notifications.TwtMessagingService"

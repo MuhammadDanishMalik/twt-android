@@ -17,7 +17,13 @@ import com.talkswithtanha.twt.core.data.FirebaseDealRepository
 import com.talkswithtanha.twt.core.data.FirebaseMarketplaceConfigRepository
 import com.talkswithtanha.twt.core.data.MarketplaceConfigRepository
 import com.talkswithtanha.twt.core.data.ExchangeRateRepository
+import com.talkswithtanha.twt.core.data.AdminRepository
 import com.talkswithtanha.twt.core.data.FirebaseAcademyRepository
+import com.talkswithtanha.twt.core.data.FeedRepository
+import com.talkswithtanha.twt.core.data.FirebaseAdminRepository
+import com.talkswithtanha.twt.core.data.FirebaseFeedRepository
+import com.talkswithtanha.twt.core.data.FirebaseSupportTicketRepository
+import com.talkswithtanha.twt.core.data.SupportTicketRepository
 import com.talkswithtanha.twt.core.data.FirebaseAccessTokenRepository
 import com.talkswithtanha.twt.core.data.FirebaseChatRepository
 import com.talkswithtanha.twt.core.data.FirebaseExchangeRateRepository
@@ -123,4 +129,20 @@ abstract class RepositoryModule {
     abstract fun marketplaceConfigRepository(
         impl: FirebaseMarketplaceConfigRepository
     ): MarketplaceConfigRepository
+
+    @Binds
+    @Singleton
+    abstract fun supportTicketRepository(
+        impl: FirebaseSupportTicketRepository
+    ): SupportTicketRepository
+
+    /** Staff writes: signals, deals and the app's banners. Gated by area in
+     *  firestore.rules, not here. */
+    @Binds
+    @Singleton
+    abstract fun adminRepository(impl: FirebaseAdminRepository): AdminRepository
+
+    @Binds
+    @Singleton
+    abstract fun feedRepository(impl: FirebaseFeedRepository): FeedRepository
 }

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug builds only. Lets the app reach twt-admin running on this computer over
+  plain http (adminApiBase=http://10.0.2.2:3000 from the emulator, or the Mac's
+  LAN address from a phone). Release builds keep Android's default: https only.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:usesCleartextTraffic="true" />
+</manifest>

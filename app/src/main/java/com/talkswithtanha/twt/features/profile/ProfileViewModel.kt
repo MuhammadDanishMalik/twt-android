@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.profile
 
+import com.talkswithtanha.twt.core.moderation.BlockedUsersStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.talkswithtanha.twt.core.data.SupportConfigRepository
@@ -25,10 +26,16 @@ import javax.inject.Inject
 class ProfileViewModel @Inject constructor(
     private val session: SessionRepository,
     supportConfig: SupportConfigRepository,
-    tracker: FollowedSignalTracker
+    tracker: FollowedSignalTracker,
+    private val blockedUsers: BlockedUsersStore
 ) : ViewModel() {
 
     val user: StateFlow<User?> = session.currentUser
+
+    /** Members blocked on this phone, uid → name. */
+    val blocked: StateFlow<Map<String, String>> = blockedUsers.blocked
+
+    fun unblock(uid: String) = blockedUsers.unblock(uid)
 
     /** Shown as "2 open" beside My Signals, the way iOS does. */
     val openFollowCount: StateFlow<Int> = tracker.openFollows
@@ -40,8 +47,13 @@ class ProfileViewModel @Inject constructor(
 
     fun signOut() = session.signOut()
 
+    /** Why the last delete failed, for the profile screen to show. */
+    val deleteError = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+
     fun deleteAccount(onDone: () -> Unit) = viewModelScope.launch {
-        runCatching { session.deleteAccount() }.onSuccess { onDone() }
+        runCatching { session.deleteAccount() }
+            .onSuccess { onDone() }
+            .onFailure { deleteError.value = it.message ?: "Could not delete the account. Try again." }
     }
 }
 

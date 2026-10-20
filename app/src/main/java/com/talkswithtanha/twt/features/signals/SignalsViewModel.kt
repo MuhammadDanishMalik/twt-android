@@ -115,12 +115,22 @@ class SignalDetailViewModel @Inject constructor(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SignalDetailUiState())
 
+    /** One-off messages for the screen to show: "Following …" or an error. */
+    val followMessages = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 1)
+
     fun toggleFollow() {
         val current = state.value
         val signal = current.signal ?: return
         viewModelScope.launch {
-            if (current.isFollowing) tracker.unfollow(signal.id)
-            else tracker.follow(signal)
+            if (current.isFollowing) {
+                tracker.unfollow(signal.id)
+            } else {
+                val ok = tracker.follow(signal)
+                followMessages.tryEmit(
+                    if (ok) "Following ${signal.pair}. You'll get every update, and it's pinned in your notifications."
+                    else "Couldn't follow this signal. Check your connection and try again."
+                )
+            }
         }
     }
 

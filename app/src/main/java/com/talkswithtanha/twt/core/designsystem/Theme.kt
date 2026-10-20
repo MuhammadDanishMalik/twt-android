@@ -1,7 +1,6 @@
 package com.talkswithtanha.twt.core.designsystem
 
 import android.app.Activity
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -53,7 +52,12 @@ private val LightColors = lightColorScheme(
  */
 @Composable
 fun TwtTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    // Always dark, whatever the phone is set to. Every screen draws fixed dark
+    // surfaces and near-white text, and light mode is not drawn yet (the
+    // Appearance screen says so). Following the system theme only flipped the
+    // few pieces that read the colour scheme — cards went white under white
+    // titles on any phone set to light mode.
+    darkTheme: Boolean = true,
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current

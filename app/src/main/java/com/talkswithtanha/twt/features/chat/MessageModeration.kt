@@ -1,0 +1,167 @@
+package com.talkswithtanha.twt.features.chat
+
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.talkswithtanha.twt.core.designsystem.Haptics
+import com.talkswithtanha.twt.core.designsystem.IosColors
+import com.talkswithtanha.twt.core.model.ChatMessage
+import com.talkswithtanha.twt.core.moderation.ReportReason
+
+/**
+ * What a member can do about someone else's message: report it to the team,
+ * or block its author. Google Play requires both of any app with user
+ * conversations; they sit behind a long-press, where people look for them.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MessageActionsSheet(
+    message: ChatMessage,
+    onReport: (ReportReason) -> Unit,
+    onBlock: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val haptics = LocalHapticFeedback.current
+    var choosingReason by remember { mutableStateOf(false) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheet,
+        containerColor = Color(0xFF1C1C1E),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    ) {
+        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 12.dp)) {
+            // The message being acted on, so there is no doubt which one.
+            Column(
+                Modifier
+                    .padding(horizontal = 20.dp)
+                    .fillMaxWidth()
+                    .background(Color(0xFF2C2C2E), RoundedCornerShape(14.dp))
+                    .padding(12.dp)
+            ) {
+                Text(message.senderName, color = IosColors.Accent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    message.text.ifEmpty { message.noteAttachment?.noteText.orEmpty() },
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+
+            AnimatedContent(targetState = choosingReason, label = "moderation") { reasons ->
+                Column {
+                    if (!reasons) {
+                        ActionRow(Icons.Outlined.Flag, "Report message", "The team reviews every report") {
+                            Haptics.tap(haptics)
+                            choosingReason = true
+                        }
+                        ActionRow(
+                            Icons.Outlined.Block,
+                            "Block ${message.senderName}",
+                            "Hide their messages. They are not told.",
+                            destructive = true
+                        ) {
+                            Haptics.toggleOn(haptics)
+                            onBlock()
+                        }
+                    } else {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { choosingReason = false }
+                                .padding(horizontal = 20.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = IosColors.TextSecondary, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(10.dp))
+                            Text("Why are you reporting this?", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                        ReportReason.entries.forEach { reason ->
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        Haptics.success(haptics)
+                                        onReport(reason)
+                                    }
+                                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(reason.title, color = Color.White, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                                Icon(
+                                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    null,
+                                    tint = IosColors.TextSecondary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActionRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    destructive: Boolean = false,
+    onClick: () -> Unit
+) {
+    val tint = if (destructive) IosColors.SellRed else Color.White
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(16.dp))
+        Column {
+            Text(title, color = tint, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+            Text(subtitle, color = IosColors.TextSecondary, fontSize = 13.sp)
+        }
+    }
+}

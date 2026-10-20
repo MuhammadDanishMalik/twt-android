@@ -3,8 +3,10 @@ package com.talkswithtanha.twt.core.designsystem.brand
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
@@ -80,6 +82,33 @@ object TabIcons {
         }
         val shape = Path().apply { op(bubble, tail, PathOperation.Union) }
         shape to smile(Offset(13.5f, 11.2f), 4.2f)
+    }
+
+    /**
+     * The feed: a card with writing on it.
+     *
+     * It had the chat bubble, which was the glyph the chats used before the feed
+     * took their tab — two different places behind one drawing, with the bubble
+     * still in the feed's own top right corner pointing at the chats. Three
+     * knocked-out lines of falling length read as a post at 24dp, where
+     * anything more literal turns to mush.
+     */
+    @Composable
+    fun Feed(modifier: Modifier = Modifier, tint: Color) = Glyph(modifier, tint) {
+        val card = Path().apply {
+            addRoundRect(
+                RoundRect(
+                    Rect(Offset(2.2f, 3f), Size(21.6f, 20f)),
+                    CornerRadius(5.2f, 5.2f)
+                )
+            )
+        }
+        val lines = Path().apply {
+            moveTo(7f, 9.6f); lineTo(19f, 9.6f)
+            moveTo(7f, 13.6f); lineTo(19f, 13.6f)
+            moveTo(7f, 17.6f); lineTo(14f, 17.6f)
+        }
+        card to lines
     }
 
     /**

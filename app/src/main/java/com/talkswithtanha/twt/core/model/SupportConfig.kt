@@ -37,10 +37,14 @@ data class SupportConfig(
         "mailto:$supportEmail?subject=" + java.net.URLEncoder.encode(subject, "UTF-8")
 
     companion object {
-        const val DEFAULT_ACCESS_PAGE = "https://twt-admin.vercel.app/get-access"
+        // The live site. The old twt-admin.vercel.app address returns 404.
+        const val DEFAULT_ACCESS_PAGE = "https://tradewithtanha.io/get-access"
         const val DEFAULT_WHATSAPP = "923000000000"
         const val DEFAULT_EMAIL = "support@talkswithtanha.com"
-        const val DEFAULT_TERMS = "https://twt-admin.vercel.app/terms"
-        const val DEFAULT_PRIVACY = "https://twt-admin.vercel.app/privacy"
+        // Served by twt-admin on the live site (app/terms, app/privacy).
+        const val DEFAULT_TERMS = "https://tradewithtanha.io/terms"
+        const val DEFAULT_PRIVACY = "https://tradewithtanha.io/privacy"
+        /** Google Play requires a web page for deletion requests too. */
+        const val DEFAULT_DELETE_ACCOUNT = "https://tradewithtanha.io/delete-account"
     }
 }

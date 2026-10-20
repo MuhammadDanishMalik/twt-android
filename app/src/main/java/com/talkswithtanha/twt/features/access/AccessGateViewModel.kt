@@ -46,10 +46,10 @@ class AccessGateViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SupportConfig())
 
     fun onCodeChange(value: String) {
-        // Typed freely, normalised at the edge. Somebody pasting
-        // "TWT-4H2K-9XQP" out of WhatsApp should not have to strip the dashes,
-        // and somebody typing lowercase should not be told they are wrong.
-        _state.update { it.copy(code = value.uppercase(), error = null) }
+        // Formatted as they type: the TWT prefix and both dashes appear by
+        // themselves. Pasting "TWT-4H2K-9XQP" out of WhatsApp still works — the
+        // formatter strips what is there before laying it out again.
+        _state.update { it.copy(code = AccessCode.formatWhileTyping(value), error = null) }
     }
 
     fun redeem() {

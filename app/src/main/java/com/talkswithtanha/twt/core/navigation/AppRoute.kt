@@ -22,12 +22,26 @@ sealed class AppRoute(val route: String) {
     data object ResetPassword : AppRoute("resetPassword")
 
     /** The gate the whole app turns on. Signed in, no live access code. */
+    data object ProfileSetup : AppRoute("profileSetup")
     data object AccessGate : AppRoute("accessGate")
 
     // ── Bottom bar ───────────────────────────────────────────────────────
     data object Home : AppRoute("home")
     data object Signals : AppRoute("signals")
     data object ChatList : AppRoute("chatList")
+
+    /**
+     * Tanha's feed. It takes the third tab; the chats it replaced are one tap
+     * away behind the icon in its top right corner.
+     */
+    data object Feed : AppRoute("feed")
+
+    data object FeedPost : AppRoute("feed/{postId}") {
+        const val ARG = "postId"
+        fun of(postId: String) = "feed/$postId"
+    }
+
+    data object NewFeedPost : AppRoute("feed/new")
 
     // ── Pushed ───────────────────────────────────────────────────────────
     data object SignalDetail : AppRoute("signal/{signalId}") {
@@ -57,6 +71,16 @@ sealed class AppRoute(val route: String) {
 
     data object Academy : AppRoute("academy")
 
+    /** A lesson played in-app, with the member's notes for it. [START_ARG]
+     *  opens it at a moment — used when a shared note is tapped. */
+    data object Lesson : AppRoute("lesson/{videoId}?title={title}&start={start}") {
+        const val ARG = "videoId"
+        const val TITLE_ARG = "title"
+        const val START_ARG = "start"
+        fun of(videoId: String, title: String, startSeconds: Int = 0) =
+            "lesson/$videoId?title=${android.net.Uri.encode(title)}&start=$startSeconds"
+    }
+
     /** Tanha's YouTube channel, which the home screen's Watch button opens. */
     data object MediaHub : AppRoute("mediaHub")
     data object Marketplace : AppRoute("marketplace")
@@ -74,13 +98,34 @@ sealed class AppRoute(val route: String) {
         const val ARG = "dealId"
         fun of(dealId: String) = "deal/$dealId"
     }
+    // ── Support tickets ──────────────────────────────────────────────────
+    /** The member's tickets — and, for staff holding the area, the queue. */
+    data object SupportTickets : AppRoute("supportTickets")
+    data object NewTicket : AppRoute("newTicket")
+
+    data object SupportTicket : AppRoute("ticket/{ticketId}") {
+        const val ARG = "ticketId"
+        fun of(ticketId: String) = "ticket/$ticketId"
+    }
+
+    // ── Admin, for staff only ────────────────────────────────────────────
+    //
+    // Hidden from everybody else, and refused by the security rules regardless
+    // of what the UI shows. Which of these a staff account may actually use
+    // depends on the areas Tanha has given them — see `StaffArea`.
+    data object AdminHome : AppRoute("admin")
+    data object AdminPostSignal : AppRoute("admin/postSignal")
+    data object AdminSignals : AppRoute("admin/signals")
+    data object AdminDeals : AppRoute("admin/deals")
+    data object AdminBanners : AppRoute("admin/banners")
+
     data object Appearance : AppRoute("appearance")
     data object ContactSupport : AppRoute("contactSupport")
 
     companion object {
         /** The three the bottom bar shows. Anything else hides it. */
         val bottomBarRoutes: Set<String> by lazy {
-            setOf(Home.route, Signals.route, ChatList.route)
+            setOf(Home.route, Signals.route, Feed.route)
         }
     }
 }

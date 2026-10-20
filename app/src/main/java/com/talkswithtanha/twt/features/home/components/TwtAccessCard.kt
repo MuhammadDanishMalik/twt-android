@@ -78,7 +78,13 @@ fun TwtAccessCard(
     grantedAt: Date?,
     accessCode: String?,
     onContactSupport: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /**
+     * The lean-away tilt. Off inside the home carousel: it is a drag gesture,
+     * and a card that eats horizontal drags inside a pager means the member
+     * cannot swipe past it to the banner behind.
+     */
+    tiltEnabled: Boolean = true
 ) {
     // Recomputed each minute so "3 hours left" does not sit on screen saying
     // three hours for the rest of the afternoon.
@@ -161,22 +167,24 @@ fun TwtAccessCard(
                     }
                 }
             }
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragEnd = {
-                        scope.launch { tiltX.animateTo(0f, spring()) }
-                        scope.launch { tiltY.animateTo(0f, spring()) }
-                    }
-                ) { change, drag ->
-                    change.consume()
-                    scope.launch {
-                        tiltX.snapTo((tiltX.value + drag.x / size.width * 2f).coerceIn(-1f, 1f))
-                    }
-                    scope.launch {
-                        tiltY.snapTo((tiltY.value + drag.y / size.height * 2f).coerceIn(-1f, 1f))
+            .then(
+                if (!tiltEnabled) Modifier else Modifier.pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragEnd = {
+                            scope.launch { tiltX.animateTo(0f, spring()) }
+                            scope.launch { tiltY.animateTo(0f, spring()) }
+                        }
+                    ) { change, drag ->
+                        change.consume()
+                        scope.launch {
+                            tiltX.snapTo((tiltX.value + drag.x / size.width * 2f).coerceIn(-1f, 1f))
+                        }
+                        scope.launch {
+                            tiltY.snapTo((tiltY.value + drag.y / size.height * 2f).coerceIn(-1f, 1f))
+                        }
                     }
                 }
-            }
+            )
             .padding(16.dp)
     ) {
         Column(Modifier.fillMaxSize()) {

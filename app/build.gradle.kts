@@ -36,8 +36,8 @@ android {
         applicationId = "com.orixto.twt"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 3
+        versionName = "1.0.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -66,7 +66,22 @@ android {
     }
 
     buildTypes {
+        // The Marketplace (buy/sell USD with Tanha) is peer-to-peer currency
+        // exchange, which Google Play only allows from licensed money-service
+        // businesses. It is compiled out of the Play build and kept in debug
+        // builds, where it is still developed. -PenableMarketplace=true|false
+        // overrides either way.
+        val marketplaceOverride = project.findProperty("enableMarketplace")?.toString()
+        debug {
+            buildConfigField("boolean", "MARKETPLACE_ENABLED", marketplaceOverride ?: "true")
+        }
         release {
+            buildConfigField("boolean", "MARKETPLACE_ENABLED", marketplaceOverride ?: "false")
+            // The deployed twt-admin, unless a URL was passed explicitly. The
+            // emulator address in gradle.properties means nothing on a phone.
+            val releaseApi = project.findProperty("releaseAdminApiBase")?.toString()
+                ?: "https://tradewithtanha.io"
+            buildConfigField("String", "ADMIN_API_BASE", "\"$releaseApi\"")
             signingConfig = signingConfigs.findByName("release")
             // R8 on. It strips the unused half of Firebase and Compose, which
             // is most of the download size, and it obfuscates — the rules in

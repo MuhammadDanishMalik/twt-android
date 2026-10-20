@@ -36,8 +36,15 @@ class HomeViewModel @Inject constructor(
     session: SessionRepository,
     signalRepository: SignalRepository,
     exchangeRates: ExchangeRateRepository,
-    private val tracker: FollowedSignalTracker
+    private val tracker: FollowedSignalTracker,
+    private val banners: com.talkswithtanha.twt.core.data.BannerRepository
 ) : ViewModel() {
+
+    /** Active promotional banners, in the order the admin panel set. */
+    val activeBanners: StateFlow<List<com.talkswithtanha.twt.core.data.Banner>> = banners.observeActive()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun bannerTapped(id: String) = viewModelScope.launch { banners.recordTap(id) }
 
     val user: StateFlow<User?> = session.currentUser
 

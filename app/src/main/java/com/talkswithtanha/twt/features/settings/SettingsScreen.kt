@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.settings
 
+import androidx.compose.material.icons.filled.Block
 import android.content.Intent
 import android.provider.Settings
 import androidx.compose.foundation.background
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.AlertDialog
@@ -75,6 +77,7 @@ fun SettingsScreen(
     onViewProfile: () -> Unit,
     onEditProfile: () -> Unit,
     onMySignals: () -> Unit,
+    onAdmin: () -> Unit,
     onMyDeals: () -> Unit,
     onAppearance: () -> Unit,
     onContactSupport: () -> Unit,
@@ -85,6 +88,8 @@ fun SettingsScreen(
     val openFollows by viewModel.openFollowCount.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var confirmSignOut by remember { mutableStateOf(false) }
+    val blocked by viewModel.blocked.collectAsStateWithLifecycle()
+    var showBlocked by remember { mutableStateOf(false) }
     var notificationsOn by remember { mutableStateOf(NotificationPermission.isGranted(context)) }
     val askForNotifications = rememberNotificationPermissionRequest { granted ->
         notificationsOn = granted
@@ -110,6 +115,41 @@ fun SettingsScreen(
             .statusBarsPadding()
     ) {
         SheetHeader("Settings", onClose)
+
+        if (showBlocked) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showBlocked = false },
+                containerColor = Color(0xFF1C1C1E),
+                title = { Text("Blocked members", color = IosColors.TextPrimary) },
+                text = {
+                    if (blocked.isEmpty()) {
+                        Text(
+                            "Nobody. Hold a message in any chat to block its author.",
+                            color = IosColors.TextSecondary
+                        )
+                    } else {
+                        Column {
+                            blocked.forEach { (uid, name) ->
+                                Row(
+                                    Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(name, color = IosColors.TextPrimary, modifier = Modifier.weight(1f))
+                                    androidx.compose.material3.TextButton(onClick = { viewModel.unblock(uid) }) {
+                                        Text("Unblock", color = IosColors.Accent)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = { showBlocked = false }) {
+                        Text("Done", color = IosColors.Accent)
+                    }
+                }
+            )
+        }
 
         LazyColumn(
             contentPadding = PaddingValues(
@@ -164,6 +204,25 @@ fun SettingsScreen(
                 }
             }
 
+            // Staff only. Sits above everything else because somebody who can
+            // post a signal is here to post a signal, not to change their
+            // notification settings — and a row buried under Preferences is a
+            // row nobody taps on a phone.
+            if (user?.isStaff == true) {
+                item {
+                    Spacer(Modifier.height(12.dp))
+                    SettingsSectionHeader("Running TWT")
+                    SettingsCard {
+                        SettingsRow(
+                            title = "Admin",
+                            icon = Icons.Filled.Tune,
+                            tint = IosColors.SettingsIcon.Account,
+                            onClick = onAdmin
+                        )
+                    }
+                }
+            }
+
             item {
                 Spacer(Modifier.height(12.dp))
                 SettingsCard {
@@ -181,12 +240,28 @@ fun SettingsScreen(
                         value = if (openFollows > 0) "$openFollows open" else null,
                         onClick = onMySignals
                     )
-                    SettingsDivider()
+                    // Not in the Play build — see MARKETPLACE_ENABLED.
+                    if (com.talkswithtanha.twt.BuildConfig.MARKETPLACE_ENABLED) {
+                        SettingsDivider()
+                        SettingsRow(
+                            title = "My Deals",
+                            icon = Icons.Filled.Wallet,
+                            tint = IosColors.SettingsIcon.Deals,
+                            onClick = onMyDeals
+                        )
+                    }
+                }
+            }
+
+            item {
+                SettingsSectionHeader("Privacy & safety")
+                SettingsCard {
                     SettingsRow(
-                        title = "My Deals",
-                        icon = Icons.Filled.Wallet,
-                        tint = IosColors.SettingsIcon.Deals,
-                        onClick = onMyDeals
+                        title = "Blocked members",
+                        icon = Icons.Filled.Block,
+                        tint = IosColors.SettingsIcon.SignOut,
+                        value = if (blocked.isEmpty()) "None" else "${blocked.size}",
+                        onClick = { showBlocked = true }
                     )
                 }
             }

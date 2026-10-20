@@ -1,9 +1,10 @@
 package com.talkswithtanha.twt.features.signals
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.animateContentSize
+import com.talkswithtanha.twt.core.designsystem.Motion
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -41,6 +42,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -68,20 +70,14 @@ import com.talkswithtanha.twt.core.model.SignalType
 @Composable
 fun AnalysisFeed(
     signals: List<Signal>,
-    followedIds: Set<String>,
     onOpenSignal: (String) -> Unit,
-    onFollow: (Signal) -> Unit,
-    onUnfollow: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier.fillMaxWidth()) {
+    Column(modifier.fillMaxWidth().animateContentSize(Motion.gentle())) {
         signals.forEachIndexed { index, signal ->
             AnalysisCard(
                 signal = signal,
-                isFollowing = signal.id in followedIds,
                 onOpen = { onOpenSignal(signal.id) },
-                onFollow = { onFollow(signal) },
-                onUnfollow = { onUnfollow(signal.id) },
                 modifier = Modifier
                     .padding(horizontal = 16.dp)
                     .staggeredAppear(index)
@@ -94,10 +90,7 @@ fun AnalysisFeed(
 @Composable
 private fun AnalysisCard(
     signal: Signal,
-    isFollowing: Boolean,
     onOpen: () -> Unit,
-    onFollow: () -> Unit,
-    onUnfollow: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalHapticFeedback.current
@@ -215,113 +208,71 @@ private fun AnalysisCard(
                 Spacer(Modifier.height(12.dp))
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Level("ENTRY", signal.entryPrice, Modifier.weight(1f))
-                Level("TARGET", signal.takeProfits.lastOrNull()?.price ?: "—", Modifier.weight(1f))
-                Level("STOP", signal.stopLoss, Modifier.weight(1f))
-            }
-
-            Spacer(Modifier.height(14.dp))
-
-            FollowButton(
-                isFollowing = isFollowing,
-                enabled = signal.status.isOngoing,
-                onClick = {
-                    Haptics.toggle(haptics, on = !isFollowing)
-                    if (isFollowing) onUnfollow() else onFollow()
-                }
+            // When the analysis was posted, and on what timeframe.
+            //
+            // The chart carries TradingView's own timestamp burned into the
+            // image, which is when the *screenshot* was taken — not when Tanha
+            // called it, and the two can be hours apart. UTC for the same
+            // reason the ticket uses it: forex runs on it, and a time in the
+            // reader's own zone is ambiguous the moment the card is forwarded
+            // to somebody in another one.
+            //
+            // The rule above it is what makes this read as a caption rather
+            // than as two labels left over from something that used to be
+            // here — which, since the levels came off, is exactly what it
+            // would otherwise look like.
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(0.5.dp)
+                    .background(Color.White.copy(alpha = 0.07f))
             )
-        }
-    }
-}
+            Spacer(Modifier.height(11.dp))
 
-@Composable
-private fun Level(label: String, value: String, modifier: Modifier = Modifier) {
-    Column(modifier) {
-        Text(
-            text = label,
-            color = Color.White.copy(alpha = 0.38f),
-            fontSize = 9.sp,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 0.7.sp
-        )
-        Spacer(Modifier.height(3.dp))
-        Text(
-            text = value,
-            color = Color.White,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1
-        )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = utcPosted(signal.timestamp.time),
+                    color = Color.White.copy(alpha = 0.5f),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    // Tabular digits, so a column of these cards lines its
+                    // times up instead of wobbling at every 1.
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = (-0.2).sp,
+                    maxLines = 1
+                )
+                Spacer(Modifier.weight(1f))
+                // A chip, like the status pill on the ticket. The timeframe is
+                // a value, and a bare word at the end of a row reads as a
+                // caption that ran out rather than as the answer to "on what?".
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(Color.White.copy(alpha = 0.07f))
+                        .padding(horizontal = 9.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = signal.timeframe,
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
     }
 }
 
 /**
- * Follow, from the feed.
- *
- * The whole reason this tab exists as more than a gallery: a member who is
- * convinced by the chart should not have to go and find the ticket to act on
- * it. Closed trades show the state and refuse the tap — there is nothing left
- * to be told about.
+ * `19:33 UTC 29 September, 2026` — the same format and the same clock as the
+ * ticket card, so a member comparing the two is not asked to reconcile them.
  */
-@Composable
-private fun FollowButton(isFollowing: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    val background = when {
-        !enabled -> Color.White.copy(alpha = 0.05f)
-        isFollowing -> IosColors.BuyGreen.copy(alpha = 0.15f)
-        else -> IosColors.Accent
-    }
-    val content = when {
-        !enabled -> Color.White.copy(alpha = 0.35f)
-        isFollowing -> IosColors.BuyGreen
-        else -> Color.White
-    }
-
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(background)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                enabled = enabled,
-                onClick = onClick
-            )
-            .padding(vertical = 12.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        AnimatedContent(
-            targetState = when {
-                !enabled -> "Closed"
-                isFollowing -> "Following"
-                else -> "Follow this trade"
-            },
-            transitionSpec = { fadeIn() togetherWith fadeOut() },
-            label = "follow"
-        ) { label ->
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                if (enabled) {
-                    Icon(
-                        if (isFollowing) Icons.Filled.Check else Icons.Filled.Notifications,
-                        contentDescription = null,
-                        tint = content,
-                        modifier = Modifier.size(15.dp)
-                    )
-                }
-                Text(
-                    text = label,
-                    color = content,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
-    }
-}
+private fun utcPosted(epochMillis: Long): String =
+    SimpleDateFormat("HH:mm 'UTC' d MMMM, yyyy", Locale.US)
+        .apply { timeZone = TimeZone.getTimeZone("UTC") }
+        .format(java.util.Date(epochMillis))
 
 @Composable
 private fun PageDots(count: Int, current: Int, modifier: Modifier = Modifier) {

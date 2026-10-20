@@ -1,5 +1,7 @@
 package com.talkswithtanha.twt.features.signals
 
+import androidx.compose.foundation.lazy.itemsIndexed
+import com.talkswithtanha.twt.core.designsystem.components.ImageViewer
 import android.content.Intent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -100,6 +102,12 @@ fun SignalDetailScreen(
     // at which they have an obvious reason to say yes, having just asked to be
     // told what happens to it.
     val askForNotifications = rememberNotificationPermissionRequest()
+    val followContext = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(Unit) {
+        viewModel.followMessages.collect {
+            android.widget.Toast.makeText(followContext, it, android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
 
     val signal = state.signal
 
@@ -200,6 +208,10 @@ fun SignalDetailScreen(
             Reveal(1) { SignalMilestoneTrack(signal) }
 
             val teamImages = signal.teamImages
+            var viewing by remember { mutableStateOf<Int?>(null) }
+            viewing?.let { start ->
+                ImageViewer(images = teamImages, startIndex = start, onDismiss = { viewing = null })
+            }
             if (teamImages.isNotEmpty()) {
                 Reveal(2) {
                     DetailCard(
@@ -218,7 +230,7 @@ fun SignalDetailScreen(
                         // and stacking those full-width pushes the details off
                         // the screen.
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            items(teamImages) { url ->
+                            itemsIndexed(teamImages) { index, url ->
                                 AsyncImage(
                                     model = url,
                                     contentDescription = "Chart for ${signal.pair}",
@@ -233,6 +245,11 @@ fun SignalDetailScreen(
                                             Color.White.copy(alpha = 0.10f),
                                             RoundedCornerShape(14.dp)
                                         )
+                                        // Tap to open it full screen.
+                                        .clickable {
+                                            Haptics.tap(haptics)
+                                            viewing = index
+                                        }
                                 )
                             }
                         }

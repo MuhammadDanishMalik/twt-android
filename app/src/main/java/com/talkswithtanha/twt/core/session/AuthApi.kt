@@ -75,6 +75,13 @@ class AuthApi @Inject constructor() {
             JSONObject().put("email", email).put("code", code).put("password", password)
         )
 
+    /**
+     * Deletes the account and the data tied to it — profile, activity, follows,
+     * messages — server-side, then the login. See the route for what is kept.
+     */
+    suspend fun deleteAccount(idToken: String): ApiResult =
+        post("/api/account/delete", JSONObject().put("idToken", idToken))
+
     private suspend fun post(path: String, body: JSONObject): ApiResult =
         withContext(Dispatchers.IO) {
             if (!isConfigured) {

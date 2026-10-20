@@ -1,5 +1,18 @@
 package com.talkswithtanha.twt.features.auth
 
+import androidx.compose.ui.text.withLink
+import com.talkswithtanha.twt.core.model.SupportConfig
+import com.talkswithtanha.twt.core.designsystem.readableWidth
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.foundation.layout.width
+import com.talkswithtanha.twt.R
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import com.talkswithtanha.twt.core.designsystem.WebType
+import com.talkswithtanha.twt.core.designsystem.WebColors
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -36,7 +49,6 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.talkswithtanha.twt.core.designsystem.IosColors
-import com.talkswithtanha.twt.core.designsystem.brand.TwtWordmark
 import java.util.Locale
 
 enum class AuthMode { SignIn, SignUp }
@@ -62,7 +74,6 @@ fun AuthScreen(
     viewModel: AuthViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    var passwordVisible by remember { mutableStateOf(false) }
 
     // Best guess at the member's country, used only as the initial value on a
     // new account. It decides which marketplace receiving accounts they are
@@ -72,7 +83,8 @@ fun AuthScreen(
     Column(
         Modifier
             .fillMaxSize()
-            .background(IosColors.Background)
+            .background(WebColors.Ink)
+            .readableWidth()
             .safeDrawingPadding()
             .imePadding()
             .verticalScroll(rememberScrollState())
@@ -80,52 +92,63 @@ fun AuthScreen(
     ) {
         Spacer(Modifier.height(36.dp))
 
-        TwtWordmark(Modifier.height(26.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Image(
+                painterResource(R.drawable.twt_logo),
+                contentDescription = "TWT",
+                modifier = Modifier.size(40.dp).clip(CircleShape)
+            )
+            Spacer(Modifier.width(10.dp))
+            Text("TWT Global", style = WebType.h3.copy(fontSize = 18.sp))
+        }
 
         Spacer(Modifier.height(32.dp))
 
+        // Two voices, like every heading on the website: the plain half in
+        // Bricolage, the emphasised half in green serif italic.
         Text(
-            text = when (mode) {
-                AuthMode.SignIn -> "Log in or sign up"
-                AuthMode.SignUp -> "Create your account"
+            text = buildAnnotatedString {
+                val (plain, accent) = when (mode) {
+                    AuthMode.SignIn -> "Log in" to "or sign up."
+                    AuthMode.SignUp -> "Create your" to "account."
+                }
+                append("$plain ")
+                withStyle(WebType.accent(34.sp).toSpanStyle()) { append(accent) }
             },
-            color = Color.White,
-            fontSize = 26.sp,
-            fontWeight = FontWeight.Bold
+            style = WebType.h1(34.sp)
         )
 
         Spacer(Modifier.height(22.dp))
 
-        // One box, hairlines inside. Separate boxes make each field look like
-        // an independent decision; this says fill them both.
-        GroupedFields {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (mode == AuthMode.SignUp) {
-                GroupedField(
+                AuthTextField(
                     value = state.fullName,
                     onValueChange = viewModel::onFullNameChange,
                     label = "Full name",
+                    capitalization = KeyboardCapitalization.Words,
                     enabled = !state.isSubmitting
                 )
-                GroupedDivider()
             }
-            GroupedField(
+            AuthTextField(
                 value = state.email,
                 onValueChange = viewModel::onEmailChange,
                 label = "Email",
                 keyboardType = KeyboardType.Email,
                 enabled = !state.isSubmitting
             )
-            GroupedDivider()
-            GroupedField(
+            AuthTextField(
                 value = state.password,
                 onValueChange = viewModel::onPasswordChange,
                 label = "Password",
-                keyboardType = KeyboardType.Password,
                 isPassword = true,
-                passwordVisible = passwordVisible,
-                enabled = !state.isSubmitting,
-                onTogglePasswordVisibility = { passwordVisible = !passwordVisible }
+                imeAction = ImeAction.Done,
+                enabled = !state.isSubmitting
             )
+        }
+
+        if (mode == AuthMode.SignUp) {
+            PasswordStrengthMeter(state.password)
         }
 
         Spacer(Modifier.height(10.dp))
@@ -159,6 +182,35 @@ fun AuthScreen(
             }
         )
 
+        if (mode == AuthMode.SignUp) {
+            Spacer(Modifier.height(14.dp))
+            // Accepting the terms — community rules included — is part of
+            // creating the account, as Google Play requires of apps where
+            // members talk to each other.
+            val linkStyle = androidx.compose.ui.text.TextLinkStyles(
+                style = androidx.compose.ui.text.SpanStyle(
+                    color = WebColors.Text,
+                    textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline
+                )
+            )
+            Text(
+                text = buildAnnotatedString {
+                    append("By continuing you agree to the ")
+                    withLink(androidx.compose.ui.text.LinkAnnotation.Url(SupportConfig.DEFAULT_TERMS, linkStyle)) {
+                        append("Terms of Use")
+                    }
+                    append(", including the community rules, and the ")
+                    withLink(androidx.compose.ui.text.LinkAnnotation.Url(SupportConfig.DEFAULT_PRIVACY, linkStyle)) {
+                        append("Privacy Policy")
+                    }
+                    append(".")
+                },
+                color = Color.White.copy(alpha = 0.42f),
+                fontSize = 12.sp,
+                lineHeight = 17.sp
+            )
+        }
+
         Spacer(Modifier.height(22.dp))
 
         OrDivider()
@@ -185,8 +237,8 @@ fun AuthScreen(
                     .background(
                         Brush.horizontalGradient(
                             listOf(
-                                IosColors.Gold.copy(alpha = 0.09f),
-                                IosColors.Gold.copy(alpha = 0.03f)
+                                WebColors.Brand.copy(alpha = 0.09f),
+                                WebColors.Brand.copy(alpha = 0.03f)
                             )
                         )
                     )
@@ -198,12 +250,12 @@ fun AuthScreen(
                             Modifier
                                 .size(6.dp)
                                 .clip(CircleShape)
-                                .background(IosColors.Gold)
+                                .background(WebColors.Brand)
                         )
                         Spacer(Modifier.size(8.dp))
                         Text(
                             text = "Invite only",
-                            color = IosColors.Gold,
+                            color = WebColors.Brand,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold
                         )

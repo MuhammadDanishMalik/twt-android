@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Signals widget as the launcher's picker sees it.
+
+  minWidth/minHeight are the 2x2 floor (a Glance widget that cannot fit its
+  content is refused by some launchers rather than clipped), and targetCell*
+  is what modern launchers actually use. resizeMode allows both axes so one
+  widget covers what iOS splits across small, medium and large — the layout
+  reads LocalSize and draws accordingly.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="140dp"
+    android:minHeight="140dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
+    android:description="@string/widget_signals_description"
+    android:previewLayout="@layout/widget_preview_signals"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen" />

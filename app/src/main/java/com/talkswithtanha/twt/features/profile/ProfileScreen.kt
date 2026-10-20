@@ -70,6 +70,14 @@ fun ProfileScreen(
     val support by viewModel.support.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var confirmDelete by remember { mutableStateOf(false) }
+    val deleteError by viewModel.deleteError.collectAsStateWithLifecycle()
+    val profileContext = androidx.compose.ui.platform.LocalContext.current
+    androidx.compose.runtime.LaunchedEffect(deleteError) {
+        deleteError?.let {
+            android.widget.Toast.makeText(profileContext, it, android.widget.Toast.LENGTH_LONG).show()
+            viewModel.deleteError.value = null
+        }
+    }
 
     fun open(url: String) {
         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) }
@@ -241,8 +249,9 @@ fun ProfileScreen(
                     // deletes an account expecting their code back will be in
                     // touch otherwise. Releasing a code is Tanha's decision from
                     // the admin panel, not something deleting an account does.
-                    text = "This signs you out permanently and removes your login. " +
-                        "Your access code stays used — contact Tanha if you need it released.",
+                    text = "This permanently deletes your login, profile, messages and " +
+                        "signal history. It cannot be undone. Your access code stays used — " +
+                        "contact support if you need it released.",
                     color = TwtColors.TextSecondary
                 )
             },

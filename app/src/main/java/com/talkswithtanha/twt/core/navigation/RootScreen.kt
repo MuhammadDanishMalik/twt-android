@@ -34,8 +34,11 @@ private val bottomBarItems = listOf(
     BottomBarItem("Signals", AppRoute.Signals.route) { tint, modifier ->
         TabIcons.Signals(modifier, tint)
     },
-    BottomBarItem("Chat", AppRoute.ChatList.route) { tint, modifier ->
-        TabIcons.Chat(modifier, tint)
+    // The feed took this tab from the chats, which now sit behind the icon in
+    // its top right corner. It is what people open the app for; the
+    // conversations are one tap away.
+    BottomBarItem("Feed", AppRoute.Feed.route) { tint, modifier ->
+        TabIcons.Feed(modifier, tint)
     }
 )
 
@@ -73,7 +76,16 @@ fun RootScreen(
             RootViewModel.Gate.Undecided -> null
             RootViewModel.Gate.SignedOut -> AppRoute.Onboarding.route
             RootViewModel.Gate.NeedsEmailVerification -> AppRoute.VerifyEmail.route
+            RootViewModel.Gate.NeedsProfileSetup -> AppRoute.ProfileSetup.route
             RootViewModel.Gate.NeedsAccessCode -> AppRoute.AccessGate.route
+            // Signed out first, then sent to the front door with a reason.
+            RootViewModel.Gate.AccessExpired -> {
+                viewModel.signOutForExpiredAccess()
+                snackbars.showSnackbar(
+                    "Your access code has expired, so you have been signed out. Sign in again with a new code."
+                )
+                AppRoute.Onboarding.route
+            }
             RootViewModel.Gate.Allowed -> AppRoute.Home.route
         } ?: return@LaunchedEffect
 
@@ -82,6 +94,13 @@ fun RootScreen(
         navController.navigate(destination) {
             popUpTo(navController.graph.id) { inclusive = true }
             launchSingleTop = true
+        }
+
+        // Leaving the verify screen signs the member out, but they are not new
+        // here: they just made an account. Sign In is where they want to be,
+        // with onboarding underneath so back still behaves.
+        if (gate == RootViewModel.Gate.SignedOut && currentRoute == AppRoute.VerifyEmail.route) {
+            navController.navigate(AppRoute.SignIn.route) { launchSingleTop = true }
         }
     }
 

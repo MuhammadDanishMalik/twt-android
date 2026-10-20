@@ -1,3 +1,7 @@
 <resources>
-    <string name="app_name">TWT</string>
+    <string name="app_name">TWT Global</string>
+
+    <!-- Shown in the launcher's widget picker, under each preview. -->
+    <string name="widget_signals_description">Your followed trades and the latest calls from Tanha.</string>
+    <string name="widget_access_description">Your TWT Access Card and how long your access has left.</string>
 </resources>

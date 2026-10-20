@@ -38,7 +38,10 @@ fun MemberAvatar(
     name: String?,
     size: Dp,
     modifier: Modifier = Modifier,
-    fallbackInitial: String = "T"
+    fallbackInitial: String = "T",
+    /** The placeholder behind the initial, when there is no photo. */
+    gradient: List<Color> = IosColors.AvatarGradient,
+    initialColor: Color = Color.White
 ) {
     val initial = name?.trim()?.takeIf { it.isNotEmpty() }
         ?.take(1)?.uppercase()
@@ -55,7 +58,7 @@ fun MemberAvatar(
         modifier
             .size(size)
             .clip(CircleShape)
-            .background(Brush.linearGradient(IosColors.AvatarGradient)),
+            .background(Brush.linearGradient(gradient)),
         contentAlignment = Alignment.Center
     ) {
         if (rendered != null) {
@@ -68,7 +71,7 @@ fun MemberAvatar(
         } else {
             Text(
                 text = initial,
-                color = Color.White,
+                color = initialColor,
                 // Proportional to the circle, so one component serves a 22dp
                 // chat bubble and a 76dp profile header without a size table.
                 fontSize = (size.value * 0.40f).sp,

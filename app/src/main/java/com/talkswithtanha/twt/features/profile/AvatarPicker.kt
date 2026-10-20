@@ -80,7 +80,13 @@ fun AvatarEditor(
     onCropped: (Bitmap) -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
-    size: androidx.compose.ui.unit.Dp = 96.dp
+    size: androidx.compose.ui.unit.Dp = 96.dp,
+    /** The badge and placeholder colours. Defaults are the in-app look;
+     *  the sign-up flow passes the website's green. */
+    accent: Color = IosColors.Accent,
+    onAccent: Color = Color.White,
+    placeholderGradient: List<Color> = IosColors.AvatarGradient,
+    initialColor: Color = Color.White
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -130,7 +136,13 @@ fun AvatarEditor(
                 },
             contentAlignment = Alignment.Center
         ) {
-            MemberAvatar(photoUrl = photoUrl, name = initial, size = size)
+            MemberAvatar(
+                photoUrl = photoUrl,
+                name = initial,
+                size = size,
+                gradient = placeholderGradient,
+                initialColor = initialColor
+            )
 
             if (isUploading) {
                 Box(
@@ -152,7 +164,7 @@ fun AvatarEditor(
                 .align(Alignment.BottomEnd)
                 .size(30.dp)
                 .clip(CircleShape)
-                .background(IosColors.Accent)
+                .background(accent)
                 .clickable(enabled = !isUploading) {
                     Haptics.sheetOpen(haptics)
                     showSheet = true
@@ -162,7 +174,7 @@ fun AvatarEditor(
             Icon(
                 Icons.Filled.PhotoCamera,
                 contentDescription = "Change profile photo",
-                tint = Color.White,
+                tint = onAccent,
                 modifier = Modifier.size(16.dp)
             )
         }

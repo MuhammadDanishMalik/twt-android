@@ -1,5 +1,7 @@
 package com.talkswithtanha.twt.core.session
 
+import com.google.firebase.FirebaseNetworkException
+import com.google.firebase.FirebaseTooManyRequestsException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
@@ -44,6 +46,10 @@ sealed class AuthError(val message: String) {
     )
     data object MalformedEmail : AuthError("That does not look like an email address.")
     data object Offline : AuthError("No connection. Check your internet and try again.")
+    data object TooManyRequests : AuthError(
+        "Too many emails sent. Wait a minute, then try again."
+    )
+    data object NotSignedIn : AuthError("Sign in again.")
     data object Cancelled : AuthError("Sign-in cancelled.")
     class Unknown(detail: String) : AuthError(detail)
 }
@@ -115,14 +121,26 @@ class AuthService @Inject constructor(
     }
 
     /**
+     * Emails Firebase's own verification link to the signed-in member.
+     *
+     * The fallback for builds without [AuthApi] configured, and the same thing
+     * iOS does. The link flips `emailVerified` when opened, and [reload] is
+     * what lets this phone notice.
+     */
+    suspend fun sendEmailVerification() = wrap {
+        val user = auth.currentUser ?: throw AuthException(AuthError.NotSignedIn)
+        user.sendEmailVerification().await()
+    }
+
+    /**
      * A fresh Firebase ID token for the signed-in member.
      *
      * The admin routes verify this rather than trusting anything in the request
      * body, so it is what proves a caller is who they say they are. Null when
      * nobody is signed in.
      */
-    suspend fun idToken(): String? = auth.currentUser?.let { user ->
-        runCatching { user.getIdToken(false).await().token }.getOrNull()
+    suspend fun idToken(forceRefresh: Boolean = false): String? = auth.currentUser?.let { user ->
+        runCatching { user.getIdToken(forceRefresh).await().token }.getOrNull()
     }
 
     /**
@@ -187,6 +205,10 @@ class AuthService @Inject constructor(
             if (e.errorCode == "ERROR_INVALID_EMAIL") AuthError.MalformedEmail
             else AuthError.InvalidCredentials
         )
+    } catch (e: FirebaseTooManyRequestsException) {
+        throw AuthException(AuthError.TooManyRequests)
+    } catch (e: FirebaseNetworkException) {
+        throw AuthException(AuthError.Offline)
     } catch (e: java.io.IOException) {
         throw AuthException(AuthError.Offline)
     } catch (e: AuthException) {

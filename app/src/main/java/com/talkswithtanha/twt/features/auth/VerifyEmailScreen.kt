@@ -1,5 +1,8 @@
 package com.talkswithtanha.twt.features.auth
 
+import com.talkswithtanha.twt.core.designsystem.readableWidth
+import com.talkswithtanha.twt.core.designsystem.WebColors
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -31,18 +34,23 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.platform.LocalHapticFeedback
 import com.talkswithtanha.twt.core.designsystem.Haptics
 import com.talkswithtanha.twt.core.designsystem.IosColors
 
 /**
- * Confirming the address, with the code that was just emailed.
+ * Confirming the address, with the code or link that was just emailed.
  *
  * The account already exists — it was created on the previous screen, and
  * Firebase Auth holds the password. What is missing is proof that the member
  * can read the inbox they typed, which is the only thing standing between a
  * real sign-up and somebody typing a stranger's address.
+ *
+ * Which of the two depends on the build — see [VerifyMethod]. With a link there
+ * is nothing to type: the member taps it in their mail app, and the check runs
+ * again by itself when they switch back here.
  *
  * There is a way out. A member who mistyped their address has to be able to go
  * back and fix it, and a screen with no exit is where sign-ups die.
@@ -66,11 +74,20 @@ fun VerifyEmailScreen(
     LaunchedEffect(state.error) {
         if (state.error != null) Haptics.failure(haptics)
     }
+    // The system back gesture takes the same exit as the arrow, rather than
+    // closing the app with a half-finished, signed-in account behind it.
+    BackHandler { viewModel.abandon() }
+    LifecycleResumeEffect(Unit) {
+        viewModel.recheckQuietly()
+        onPauseOrDispose {}
+    }
+    val isLink = state.method == VerifyMethod.LINK
 
     Column(
         Modifier
             .fillMaxSize()
-            .background(IosColors.Background)
+            .background(WebColors.Ink)
+            .readableWidth()
             .safeDrawingPadding()
             .imePadding()
             .verticalScroll(rememberScrollState())
@@ -99,41 +116,45 @@ fun VerifyEmailScreen(
             Modifier
                 .size(56.dp)
                 .clip(CircleShape)
-                .background(IosColors.Accent.copy(alpha = 0.13f)),
+                .background(WebColors.Brand.copy(alpha = 0.13f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 Icons.Filled.MarkEmailRead,
                 contentDescription = null,
-                tint = IosColors.Accent,
+                tint = WebColors.Brand,
                 modifier = Modifier.size(26.dp)
             )
         }
 
         Spacer(Modifier.height(20.dp))
 
+        val sentWhat = if (isLink) "a verification link" else "a six-digit code"
         AuthHeading(
             title = "Check your email",
-            subtitle = viewModel.email?.let { "We sent a six-digit code to $it." }
-                ?: "We sent a six-digit code to your email."
+            subtitle = (viewModel.email?.let { "We sent $sentWhat to $it." }
+                ?: "We sent $sentWhat to your email.") +
+                if (isLink) " Tap it, then come back here." else ""
         )
 
         Spacer(Modifier.height(28.dp))
 
-        CodeInput(
-            code = state.code,
-            length = CODE_LENGTH,
-            enabled = !state.isSubmitting,
-            onCodeChange = viewModel::onCodeChange,
-            modifier = Modifier.fillMaxWidth()
-        )
+        if (!isLink) {
+            CodeInput(
+                code = state.code,
+                length = CODE_LENGTH,
+                enabled = !state.isSubmitting,
+                onCodeChange = viewModel::onCodeChange,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
 
         AuthError(state.error)
 
         Spacer(Modifier.height(24.dp))
 
         AuthPrimaryButton(
-            text = "Verify and continue",
+            text = if (isLink) "I've verified — continue" else "Verify and continue",
             enabled = state.canSubmit,
             loading = state.isSubmitting,
             onClick = viewModel::submit
@@ -150,8 +171,8 @@ fun VerifyEmailScreen(
         Spacer(Modifier.height(24.dp))
 
         Text(
-            text = "The code expires in 10 minutes. Check your spam folder if it " +
-                "has not arrived after a minute.",
+            text = (if (isLink) "" else "The code expires in 10 minutes. ") +
+                "Check your spam folder if it has not arrived after a minute.",
             color = Color.White.copy(alpha = 0.3f),
             fontSize = 12.sp,
             lineHeight = 17.sp,

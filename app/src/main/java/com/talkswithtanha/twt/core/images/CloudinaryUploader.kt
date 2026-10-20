@@ -7,9 +7,11 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
+import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -79,6 +81,51 @@ class CloudinaryUploader @Inject constructor() {
                 val url = json?.optString("secure_url").orEmpty()
                 val publicId = json?.optString("public_id").orEmpty()
                 if (url.isBlank()) UploadResult.Failed("Cloudinary returned no image URL")
+                else UploadResult.Success(url, publicId)
+            }
+        }.getOrElse { error ->
+            UploadResult.Failed(error.message ?: "Could not reach Cloudinary")
+        }
+    }
+
+    /**
+     * Uploads a recorded voice note and returns its delivery URL.
+     *
+     * Sent as a stream from the file rather than read into memory: a long note
+     * is a few megabytes, and there is no reason for all of it to sit on the
+     * heap of a phone that is also holding a feed of images.
+     */
+    suspend fun uploadVoiceNote(file: File): UploadResult = withContext(Dispatchers.IO) {
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart(
+                name = "file",
+                filename = file.name,
+                body = file.asRequestBody("audio/mp4".toMediaType())
+            )
+            .addFormDataPart("upload_preset", Cloudinary.VOICE_PRESET)
+            .build()
+
+        val request = Request.Builder()
+            .url(Cloudinary.VIDEO_UPLOAD_ENDPOINT)
+            .post(body)
+            .build()
+
+        runCatching {
+            client.newCall(request).execute().use { response ->
+                val text = response.body?.string().orEmpty()
+                val json = runCatching { JSONObject(text) }.getOrNull()
+
+                if (!response.isSuccessful) {
+                    val detail = json?.optJSONObject("error")?.optString("message")
+                    return@use UploadResult.Failed(
+                        detail?.takeIf { it.isNotBlank() } ?: "Upload failed (${response.code})"
+                    )
+                }
+
+                val url = json?.optString("secure_url").orEmpty()
+                val publicId = json?.optString("public_id").orEmpty()
+                if (url.isBlank()) UploadResult.Failed("Cloudinary returned no audio URL")
                 else UploadResult.Success(url, publicId)
             }
         }.getOrElse { error ->

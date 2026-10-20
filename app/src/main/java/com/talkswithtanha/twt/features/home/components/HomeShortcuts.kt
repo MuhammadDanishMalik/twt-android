@@ -1,5 +1,7 @@
 package com.talkswithtanha.twt.features.home.components
 
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -80,8 +82,9 @@ enum class HomeShortcutsLayout(val title: String, val subtitle: String) {
     companion object {
         const val STORAGE_KEY = "home.shortcutsLayout"
 
+        /** The deck unless the member chose the list in Appearance. */
         fun from(value: String?): HomeShortcutsLayout =
-            entries.firstOrNull { it.name == value } ?: LIST
+            entries.firstOrNull { it.name == value } ?: STACK
     }
 }
 
@@ -94,7 +97,10 @@ fun HomeShortcuts(
     exchangeSubtitle: String,
     modifier: Modifier = Modifier
 ) {
-    val cards: List<@Composable () -> Unit> = listOf(
+    // The exchange card only exists where the Marketplace does — it is left
+    // out of the Play build (see MARKETPLACE_ENABLED), and the deck and list
+    // both work with the two that remain.
+    val cards: List<@Composable () -> Unit> = listOfNotNull(
         {
             HomeEntryCard(
                 icon = Icons.Filled.PlayArrow,
@@ -106,16 +112,18 @@ fun HomeShortcuts(
                 onClick = onWatchLive
             )
         },
-        {
-            HomeEntryCard(
-                icon = Icons.Filled.SwapHoriz,
-                eyebrow = "EXCHANGE",
-                title = exchangeSubtitle,
-                subtitle = "Buy and sell dollars with Tanha",
-                actionTitle = "Open",
-                onClick = onOpenMarketplace
-            )
-        },
+        if (com.talkswithtanha.twt.BuildConfig.MARKETPLACE_ENABLED) {
+            {
+                HomeEntryCard(
+                    icon = Icons.Filled.SwapHoriz,
+                    eyebrow = "EXCHANGE",
+                    title = exchangeSubtitle,
+                    subtitle = "Buy and sell dollars with Tanha",
+                    actionTitle = "Open",
+                    onClick = onOpenMarketplace
+                )
+            }
+        } else null,
         {
             HomeEntryCard(
                 icon = Icons.Outlined.School,
@@ -198,6 +206,14 @@ private fun ShortcutDeck(
     val peek = 11.dp
 
     /**
+     * The front card's height, lent to the cards behind. Their content is not
+     * composed (see below), so without this they would be empty boxes of zero
+     * height — and a deck whose back cards have no size has no edges to peek.
+     */
+    var cardHeightPx by remember { mutableIntStateOf(0) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+
+    /**
      * Whether the deck is allowed to move on its own.
      *
      * A member who has turned animations off at the system level is asking
@@ -223,14 +239,29 @@ private fun ShortcutDeck(
         front = ((front + step) % count + count) % count
     }
 
+    /** 0→1 over the wait before the deck moves on, drawn in the active dot. */
+    val timer = remember { Animatable(0f) }
+    var timedCard by remember { mutableIntStateOf(front) }
     LaunchedEffect(front, isTouching, animationsOn) {
-        if (isTouching || !animationsOn) return@LaunchedEffect
-        delay(4500)
+        // A new front card, however it got there, starts its own countdown;
+        // a touch on the same card only pauses it where it is.
+        if (front != timedCard) {
+            timedCard = front
+            timer.snapTo(0f)
+        }
+        if (!animationsOn || isTouching) return@LaunchedEffect
+        val remaining = ((1f - timer.value) * AUTO_ADVANCE_MS).toInt()
+        timer.animateTo(1f, tween(remaining, easing = LinearEasing))
+        timer.snapTo(0f)
         // Silently. The iOS deck fires a selection haptic on its timer, which
         // means a phone sitting on a desk buzzes every four and a half seconds;
         // a haptic should confirm something the member did.
         advance(step = 1, withHaptic = false)
     }
+
+    /** How far through a throw the finger is, 0 to 1, for the card behind. */
+    val throwPx = with(androidx.compose.ui.platform.LocalDensity.current) { 70.dp.toPx() }
+    val pull = (abs(cardOffset) / throwPx).coerceIn(0f, 1f)
 
     Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
@@ -306,16 +337,27 @@ private fun ShortcutDeck(
                     animationSpec = spring(dampingRatio = 0.9f, stiffness = 300f),
                     label = "dim"
                 )
+                // The card directly behind rises to meet the swipe: as the front
+                // card is pulled away, the next one grows, lifts and brightens
+                // toward its place, so the pile moves as one thing.
+                val rise = if (depth == 1) pull else 0f
 
                 Box(
                     Modifier
                         .fillMaxWidth()
+                        .then(
+                            if (depth == 0) {
+                                Modifier.onSizeChanged { cardHeightPx = it.height }
+                            } else {
+                                Modifier.height(with(density) { cardHeightPx.toDp() })
+                            }
+                        )
                         .zIndex((count - depth).toFloat())
                         .graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
+                            scaleX = scale + 0.05f * rise
+                            scaleY = scale + 0.05f * rise
                             transformOrigin = TransformOrigin(0.5f, 1f)
-                            translationY = lift * peek.toPx()
+                            translationY = (lift - rise) * peek.toPx()
                             if (depth == 0) {
                                 translationX = cardOffset
                                 // Pivoting from the bottom edge, so the card
@@ -346,14 +388,37 @@ private fun ShortcutDeck(
                     // content.
                     if (depth == 0) {
                         card()
+                    } else if (depth == 1 && rise > 0.05f) {
+                        // While it rises to meet a swipe, the next card's face
+                        // fades up with it, so the member sees what is coming
+                        // before letting go. Drawing only — the front card is
+                        // still on top, and this one takes no taps yet.
+                        Box(Modifier.graphicsLayer { alpha = rise }) { card() }
                     }
-                    if (dim > 0f) {
+                    val shade = dim * (1f - rise)
+                    if (shade > 0f) {
                         // Dimmed with a solid shade rather than transparency, so
                         // a card behind can never be seen through.
                         Box(
                             Modifier
                                 .matchParentSize()
-                                .background(Color.Black.copy(alpha = dim))
+                                .background(Color.Black.copy(alpha = shade))
+                        )
+                    }
+                    if (depth > 0) {
+                        // The edge peeking out is a target: tap it and that card
+                        // comes to the front. Only the strip below the front
+                        // card is reachable — the front card covers the rest.
+                        Box(
+                            Modifier
+                                .matchParentSize()
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null
+                                ) {
+                                    Haptics.tick(haptics)
+                                    front = index
+                                }
                         )
                     }
                 }
@@ -366,17 +431,38 @@ private fun ShortcutDeck(
             repeat(count) { index ->
                 val selected = index == front
                 val width by animateFloatAsState(
-                    targetValue = if (selected) 16f else 6f,
+                    targetValue = if (selected) 22f else 6f,
                     animationSpec = spring(dampingRatio = 0.75f),
                     label = "dot"
                 )
+                // The active dot is a track that fills while the deck waits to
+                // move on — so the change is expected, not a surprise.
                 Box(
                     Modifier
                         .width(width.dp)
                         .height(6.dp)
                         .clip(CircleShape)
-                        .background(if (selected) Color.White else Color.White.copy(alpha = 0.25f))
-                )
+                        .background(Color.White.copy(alpha = if (selected) 0.3f else 0.22f))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {
+                            if (!selected) {
+                                Haptics.tick(haptics)
+                                front = index
+                            }
+                        }
+                ) {
+                    if (selected) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth(if (animationsOn) timer.value.coerceIn(0.08f, 1f) else 1f)
+                                .height(6.dp)
+                                .clip(CircleShape)
+                                .background(Color.White)
+                        )
+                    }
+                }
             }
         }
     }
@@ -513,3 +599,6 @@ fun HomeEntryCard(
         }
     }
 }
+
+/** How long the deck rests on a card before moving on by itself. */
+private const val AUTO_ADVANCE_MS = 4500

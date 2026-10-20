@@ -32,7 +32,17 @@ class RootViewModel @Inject constructor(
      * the gate wipes the back stack on every change, so anything the sign-up
      * screen navigated to would be thrown away a frame later.
      */
-    enum class Gate { Undecided, SignedOut, NeedsEmailVerification, NeedsAccessCode, Allowed }
+    enum class Gate {
+        Undecided,
+        SignedOut,
+        NeedsEmailVerification,
+        NeedsProfileSetup,
+        NeedsAccessCode,
+
+        /** Had a code, and it ran out. This device is signed out — see RootScreen. */
+        AccessExpired,
+        Allowed
+    }
 
     val gate: StateFlow<Gate> = combine(
         session.state,
@@ -63,6 +73,19 @@ class RootViewModel @Inject constructor(
                 // reading the field directly keeps a lapsed member in forever,
                 // because nothing rewrites it when the date passes.
                 user?.hasAppAccess == true -> Gate.Allowed
+
+                // A few questions about their trading before the code screen,
+                // once. Members who already have access never see it — it is
+                // for getting to know new people, not a toll on existing ones.
+                user?.profileSetupAt == null -> Gate.NeedsProfileSetup
+
+                // A code that has run out signs this device out; a member who
+                // has simply not redeemed one yet goes to the gate. Both have
+                // `hasAppAccess == false`, so testing that alone would throw
+                // every new member off the app in the seconds between signing
+                // up and redeeming.
+                user?.accessExpired == true -> Gate.AccessExpired
+
                 else -> Gate.NeedsAccessCode
             }
         }
@@ -81,6 +104,15 @@ class RootViewModel @Inject constructor(
     }
 
     fun acknowledgeKickedOut() = session.acknowledgeKickedOut()
+
+    /**
+     * Ends the session on this device when the member's access has expired.
+     *
+     * The client asked for this: access ending should end the session, not leave
+     * the app sitting on the gate with a live login behind it. The account is
+     * untouched — a new code signs them straight back in.
+     */
+    fun signOutForExpiredAccess() = session.signOut()
 }
 
 /**

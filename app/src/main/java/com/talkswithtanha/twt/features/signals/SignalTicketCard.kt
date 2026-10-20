@@ -23,7 +23,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.filled.NorthEast
@@ -43,9 +42,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -97,16 +94,7 @@ fun SignalTicketCard(
     onRequestUnfollow: () -> Unit = {}
 ) {
     val haptics = LocalHapticFeedback.current
-    val clipboard = LocalClipboardManager.current
     val interaction = remember { MutableInteractionSource() }
-    var copied by remember { mutableStateOf(false) }
-
-    LaunchedEffect(copied) {
-        if (copied) {
-            kotlinx.coroutines.delay(1600)
-            copied = false
-        }
-    }
 
     val tint = signalTint(signal)
 
@@ -159,15 +147,6 @@ fun SignalTicketCard(
                 maxLines = 1,
                 modifier = Modifier.weight(1f)
             )
-
-            TicketIconButton(
-                icon = if (copied) Icons.Filled.Check else Icons.Filled.ContentCopy,
-                contentDescription = "Copy signal"
-            ) {
-                clipboard.setText(AnnotatedString(signal.shareText()))
-                Haptics.success(haptics)
-                copied = true
-            }
 
             // Following only makes sense while the trade can still move.
             if (showsFollowButton && signal.status.isOngoing) {
@@ -367,16 +346,6 @@ private fun utcTimestamp(epochMillis: Long): String =
     SimpleDateFormat("HH:mm 'UTC' d MMMM, yyyy", Locale.US)
         .apply { timeZone = TimeZone.getTimeZone("UTC") }
         .format(java.util.Date(epochMillis))
-
-/** Plain-text form of the signal, for copy and share. */
-fun Signal.shareText(): String = buildList {
-    add("$pair — ${type.stored}")
-    add("Status: ${status.stored}")
-    add("Entry: $entryPrice")
-    add("Stop loss: $stopLoss")
-    takeProfits.forEach { add("${it.label}: ${it.price}${if (it.isHit) " ✓" else ""}") }
-    add("via Trade with Tanha")
-}.joinToString("\n")
 
 /** `https://www.tradingview.com/chart/?symbol=EURUSD`. */
 fun Signal.tradingViewUrl(): String? {

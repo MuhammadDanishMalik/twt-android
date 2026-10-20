@@ -1,5 +1,8 @@
 package com.talkswithtanha.twt.features.auth
 
+import com.talkswithtanha.twt.core.designsystem.readableWidth
+import androidx.compose.ui.text.input.ImeAction
+import com.talkswithtanha.twt.core.designsystem.WebColors
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.fadeIn
@@ -67,7 +70,8 @@ fun ResetPasswordScreen(
     Column(
         Modifier
             .fillMaxSize()
-            .background(IosColors.Background)
+            .background(WebColors.Ink)
+            .readableWidth()
             .safeDrawingPadding()
             .imePadding()
             .verticalScroll(rememberScrollState())
@@ -98,13 +102,13 @@ fun ResetPasswordScreen(
             Modifier
                 .size(56.dp)
                 .clip(CircleShape)
-                .background(IosColors.Accent.copy(alpha = 0.13f)),
+                .background(WebColors.Brand.copy(alpha = 0.13f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 Icons.Filled.LockReset,
                 contentDescription = null,
-                tint = IosColors.Accent,
+                tint = WebColors.Brand,
                 modifier = Modifier.size(26.dp)
             )
         }
@@ -132,6 +136,7 @@ fun ResetPasswordScreen(
                 ResetStage.CODE -> CodeStep(state, viewModel)
                 ResetStage.PASSWORD -> PasswordStep(state, viewModel)
                 ResetStage.DONE -> DoneStep(onDone)
+                ResetStage.LINK_SENT -> LinkSentStep(state, viewModel, onDone)
             }
         }
 
@@ -144,7 +149,8 @@ private fun EmailStep(state: ResetUiState, viewModel: ResetPasswordViewModel) {
     Column {
         AuthHeading(
             title = "Reset your password",
-            subtitle = "Enter the email you signed up with and we'll send you a code."
+            subtitle = "Enter the email you signed up with and we'll send you " +
+                if (viewModel.usesLink) "a reset link." else "a code."
         )
         Spacer(Modifier.height(24.dp))
         AuthTextField(
@@ -156,7 +162,7 @@ private fun EmailStep(state: ResetUiState, viewModel: ResetPasswordViewModel) {
         AuthError(state.error)
         Spacer(Modifier.height(24.dp))
         AuthPrimaryButton(
-            text = "Send code",
+            text = if (viewModel.usesLink) "Send link" else "Send code",
             enabled = state.canSendCode,
             loading = state.isSubmitting,
             onClick = viewModel::sendCode
@@ -198,40 +204,38 @@ private fun CodeStep(state: ResetUiState, viewModel: ResetPasswordViewModel) {
 
 @Composable
 private fun PasswordStep(state: ResetUiState, viewModel: ResetPasswordViewModel) {
-    var visible by remember { mutableStateOf(false) }
+    // Only once they have typed enough to have made the mistake.
+    val mismatch = state.confirmPassword.isNotEmpty() && !state.passwordsMatch
 
     Column {
         AuthHeading(
             title = "Choose a new password",
-            subtitle = "At least six characters. You'll be signed out everywhere else."
+            subtitle = "At least $MIN_NEW_PASSWORD_LENGTH characters. You'll be signed out everywhere else."
         )
         Spacer(Modifier.height(24.dp))
         AuthTextField(
             value = state.password,
             onValueChange = viewModel::onPasswordChange,
             label = "New password",
-            keyboardType = KeyboardType.Password,
-            isPassword = true,
-            passwordVisible = visible,
-            onTogglePasswordVisibility = { visible = !visible }
+            isPassword = true
         )
-        Spacer(Modifier.height(12.dp))
+        PasswordStrengthMeter(state.password)
+        Spacer(Modifier.height(16.dp))
         AuthTextField(
             value = state.confirmPassword,
             onValueChange = viewModel::onConfirmPasswordChange,
             label = "Confirm password",
-            keyboardType = KeyboardType.Password,
             isPassword = true,
-            passwordVisible = visible,
-            onTogglePasswordVisibility = { visible = !visible }
+            imeAction = ImeAction.Done,
+            isError = mismatch,
+            supportingText = when {
+                mismatch -> "Those passwords do not match."
+                state.confirmPassword.isNotEmpty() -> "Passwords match."
+                else -> null
+            }
         )
 
-        // Only once they have typed enough to have made the mistake.
-        if (state.confirmPassword.isNotEmpty() && !state.passwordsMatch) {
-            AuthError("Those passwords do not match.")
-        } else {
-            AuthError(state.error)
-        }
+        AuthError(state.error)
 
         Spacer(Modifier.height(24.dp))
         AuthPrimaryButton(
@@ -258,6 +262,31 @@ private fun DoneStep(onDone: () -> Unit) {
             color = Color.White.copy(alpha = 0.3f),
             fontSize = 12.sp,
             modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+/** Firebase's reset link is on its way; the new password is set in the browser. */
+@Composable
+private fun LinkSentStep(
+    state: ResetUiState,
+    viewModel: ResetPasswordViewModel,
+    onDone: () -> Unit
+) {
+    Column {
+        AuthHeading(
+            title = "Check your email",
+            subtitle = "If ${state.email} has an account, a reset link is on its way. " +
+                "Open it, choose a new password, then sign in here."
+        )
+        AuthError(state.error)
+        Spacer(Modifier.height(28.dp))
+        AuthPrimaryButton(text = "Back to sign in", enabled = true, onClick = onDone)
+        Spacer(Modifier.height(20.dp))
+        ResendRow(
+            secondsRemaining = state.secondsUntilResend,
+            enabled = state.canResend,
+            onResend = viewModel::sendCode
         )
     }
 }

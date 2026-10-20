@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.outlined.Forum
@@ -72,10 +73,13 @@ import java.util.Locale
 fun ChatListScreen(
     onOpenRoom: (String) -> Unit,
     onOpenSellerChat: (String) -> Unit,
-    viewModel: ChatListViewModel = hiltViewModel()
+    onOpenTickets: () -> Unit,
+    viewModel: ChatListViewModel = hiltViewModel(),
+    ticketsViewModel: com.talkswithtanha.twt.features.support.SupportTicketsViewModel = hiltViewModel()
 ) {
     val rooms by viewModel.rooms.collectAsStateWithLifecycle()
     val user by viewModel.user.collectAsStateWithLifecycle()
+    val tickets by ticketsViewModel.state.collectAsStateWithLifecycle()
 
     Column(
         Modifier
@@ -119,9 +123,40 @@ fun ChatListScreen(
                 }
             }
 
-            item { ChatSectionHeader("From the Marketplace") }
+            // Tickets are their own section rather than a fourth row under
+            // Community, because they are not a room: a problem with a state
+            // does not belong in a list of places to talk.
+            item { ChatSectionHeader("Help") }
 
             item {
+                SettingsCard {
+                    // Staff holding the tickets area see the queue's count;
+                    // everybody else sees how many of their own have been
+                    // answered since they last looked.
+                    val waiting =
+                        if (tickets.canWorkQueue) tickets.queueNeedingReply else tickets.unreadForMember
+                    ChatRoomRow(
+                        title = "Support tickets",
+                        subtitle = when {
+                            tickets.canWorkQueue && waiting > 0 ->
+                                "$waiting member${if (waiting == 1) "" else "s"} waiting on a reply"
+                            tickets.canWorkQueue -> "Members' problems, worked as a queue"
+                            else -> "Report a problem and follow it to the end"
+                        },
+                        initials = "",
+                        icon = Icons.Filled.SupportAgent,
+                        locked = false,
+                        crowned = false,
+                        onClick = onOpenTickets
+                    )
+                }
+            }
+
+            // The Marketplace thread — left out of the Play build, like the
+            // rest of the Marketplace (see MARKETPLACE_ENABLED).
+            if (com.talkswithtanha.twt.BuildConfig.MARKETPLACE_ENABLED) item { ChatSectionHeader("From the Marketplace") }
+
+            if (com.talkswithtanha.twt.BuildConfig.MARKETPLACE_ENABLED) item {
                 SettingsCard {
                     val supportRoom = rooms.lastOrNull()?.roomId
                     ChatRoomRow(

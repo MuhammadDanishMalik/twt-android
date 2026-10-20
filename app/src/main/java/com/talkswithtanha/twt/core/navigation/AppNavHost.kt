@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.core.navigation
 
+import com.talkswithtanha.twt.features.academy.LessonPlayerScreen
 import android.content.Intent
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -30,6 +31,7 @@ import androidx.navigation.navArgument
 import com.talkswithtanha.twt.core.firebase.FirestorePaths
 import com.talkswithtanha.twt.features.academy.AcademyScreen
 import com.talkswithtanha.twt.features.access.AccessGateScreen
+import com.talkswithtanha.twt.features.setup.ProfileSetupScreen
 import com.talkswithtanha.twt.features.auth.AuthMode
 import com.talkswithtanha.twt.features.auth.AuthScreen
 import com.talkswithtanha.twt.features.auth.ResetPasswordScreen
@@ -50,7 +52,18 @@ import com.talkswithtanha.twt.features.settings.AppearanceScreen
 import com.talkswithtanha.twt.features.settings.ContactSupportScreen
 import com.talkswithtanha.twt.features.settings.MySignalsScreen
 import com.talkswithtanha.twt.features.settings.RecordResultScreen
+import com.talkswithtanha.twt.features.admin.AdminBannersScreen
+import com.talkswithtanha.twt.features.admin.AdminDealsScreen
+import com.talkswithtanha.twt.features.admin.AdminHomeScreen
+import com.talkswithtanha.twt.features.admin.AdminSignalsScreen
+import com.talkswithtanha.twt.features.admin.PostSignalScreen
+import com.talkswithtanha.twt.features.feed.FeedScreen
+import com.talkswithtanha.twt.features.feed.NewPostScreen
+import com.talkswithtanha.twt.features.feed.PostDetailScreen
 import com.talkswithtanha.twt.features.settings.SettingsScreen
+import com.talkswithtanha.twt.features.support.NewTicketScreen
+import com.talkswithtanha.twt.features.support.SupportTicketsScreen
+import com.talkswithtanha.twt.features.support.TicketThreadScreen
 import com.talkswithtanha.twt.features.signals.SignalDetailScreen
 import com.talkswithtanha.twt.features.signals.SignalsScreen
 import com.talkswithtanha.twt.features.signals.MySignalsViewModel
@@ -136,6 +149,10 @@ fun AppNavHost(
             )
         }
 
+            // No navigation out of here either: saving sets profileSetupAt,
+            // and the gate moves the stack on to the access-code screen.
+            screen(sharedScope, AppRoute.ProfileSetup.route) { ProfileSetupScreen() }
+
             screen(sharedScope, AppRoute.AccessGate.route) { AccessGateScreen() }
 
         // ── Bottom bar ───────────────────────────────────────────────────
@@ -147,7 +164,8 @@ fun AppNavHost(
                 onOpenAcademy = { navController.navigate(AppRoute.Academy.route) },
                 onOpenMarketplace = { navController.navigate(AppRoute.Marketplace.route) },
                 onOpenSettings = { navController.navigate(AppRoute.Settings.route) },
-                onOpenSupport = { openSupportThread() }
+                onOpenSupport = { openSupportThread() },
+                onOpenChat = { navController.navigateToTab(AppRoute.ChatList.route) }
             )
         }
 
@@ -157,6 +175,7 @@ fun AppNavHost(
 
             screen(sharedScope, AppRoute.ChatList.route) {
             ChatListScreen(
+                onOpenTickets = { navController.navigate(AppRoute.SupportTickets.route) },
                 onOpenRoom = { navController.navigate(AppRoute.ChatRoom.of(it)) },
                 // The marketplace row opens the same private thread in its
                 // seller presentation, rather than the rate screen.
@@ -185,12 +204,32 @@ fun AppNavHost(
                 }
             )
         ) {
-            ChatRoomScreen(onBack = { navController.popBackStack() })
+            ChatRoomScreen(
+                onBack = { navController.popBackStack() },
+                onOpenLesson = { videoId, title, start ->
+                    navController.navigate(AppRoute.Lesson.of(videoId, title, start))
+                }
+            )
         }
 
             screen(sharedScope, AppRoute.Academy.route) {
-            AcademyScreen(onBack = { navController.popBackStack() })
+            AcademyScreen(
+                onBack = { navController.popBackStack() },
+                onOpenVideo = { videoId, title -> navController.navigate(AppRoute.Lesson.of(videoId, title)) }
+            )
         }
+
+            screen(
+                sharedScope,
+                AppRoute.Lesson.route,
+                arguments = listOf(
+                    navArgument(AppRoute.Lesson.ARG) { type = NavType.StringType },
+                    navArgument(AppRoute.Lesson.TITLE_ARG) { type = NavType.StringType; defaultValue = "" },
+                    navArgument(AppRoute.Lesson.START_ARG) { type = NavType.StringType; defaultValue = "0" }
+                )
+            ) {
+                LessonPlayerScreen(onBack = { navController.popBackStack() })
+            }
 
             screen(sharedScope, AppRoute.MediaHub.route) {
             MediaHubScreen(onBack = { navController.popBackStack() })
@@ -221,10 +260,92 @@ fun AppNavHost(
                 onViewProfile = { navController.navigate(AppRoute.AccountDetails.route) },
                 onEditProfile = { navController.navigate(AppRoute.EditProfile.route) },
                 onMySignals = { navController.navigate(AppRoute.MySignals.route) },
+                onAdmin = { navController.navigate(AppRoute.AdminHome.route) },
                 onMyDeals = { navController.navigate(AppRoute.MyDeals.route) },
                 onAppearance = { navController.navigate(AppRoute.Appearance.route) },
                 onContactSupport = { navController.navigate(AppRoute.ContactSupport.route) }
             )
+        }
+
+            // ── Support tickets ──────────────────────────────────────────
+            // ── The feed ─────────────────────────────────────────────────
+            screen(sharedScope, AppRoute.Feed.route) {
+                FeedScreen(
+                    onOpenPost = { navController.navigate(AppRoute.FeedPost.of(it)) },
+                    onOpenSignal = { navController.navigate(AppRoute.SignalDetail.of(it)) },
+                    onOpenChats = { navController.navigate(AppRoute.ChatList.route) },
+                    onCompose = { navController.navigate(AppRoute.NewFeedPost.route) }
+                )
+            }
+
+            sheetRoute(
+            sharedScope,
+            route = AppRoute.FeedPost.route,
+            arguments = listOf(navArgument(AppRoute.FeedPost.ARG) { type = NavType.StringType })
+        ) {
+            PostDetailScreen(onBack = { navController.popBackStack() })
+        }
+
+            sheetRoute(sharedScope, AppRoute.NewFeedPost.route) {
+            NewPostScreen(onClose = { navController.popBackStack() })
+        }
+
+            sheetRoute(sharedScope, AppRoute.SupportTickets.route) {
+            SupportTicketsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenTicket = { navController.navigate(AppRoute.SupportTicket.of(it)) },
+                onCompose = { navController.navigate(AppRoute.NewTicket.route) }
+            )
+        }
+
+            sheetRoute(sharedScope, AppRoute.NewTicket.route) {
+            NewTicketScreen(
+                onClose = { navController.popBackStack() },
+                onCreated = { ticketId ->
+                    // Straight into the ticket, leaving the form behind: backing
+                    // out of the thread must not land on a filled-in form that
+                    // would raise a second ticket for the same problem.
+                    navController.popBackStack()
+                    navController.navigate(AppRoute.SupportTicket.of(ticketId))
+                }
+            )
+        }
+
+            sheetRoute(
+            sharedScope,
+            route = AppRoute.SupportTicket.route,
+            arguments = listOf(navArgument(AppRoute.SupportTicket.ARG) { type = NavType.StringType })
+        ) {
+            TicketThreadScreen(onBack = { navController.popBackStack() })
+        }
+
+            // ── Admin ────────────────────────────────────────────────────
+            sheetRoute(sharedScope, AppRoute.AdminHome.route) {
+            AdminHomeScreen(
+                onBack = { navController.popBackStack() },
+                onPostSignal = { navController.navigate(AppRoute.AdminPostSignal.route) },
+                onTickets = { navController.navigate(AppRoute.SupportTickets.route) },
+                onChats = { navController.navigateToTab(AppRoute.ChatList.route) },
+                onSignals = { navController.navigate(AppRoute.AdminSignals.route) },
+                onDeals = { navController.navigate(AppRoute.AdminDeals.route) },
+                onBanners = { navController.navigate(AppRoute.AdminBanners.route) }
+            )
+        }
+
+            sheetRoute(sharedScope, AppRoute.AdminPostSignal.route) {
+            PostSignalScreen(onClose = { navController.popBackStack() })
+        }
+
+            sheetRoute(sharedScope, AppRoute.AdminSignals.route) {
+            AdminSignalsScreen(onBack = { navController.popBackStack() })
+        }
+
+            sheetRoute(sharedScope, AppRoute.AdminDeals.route) {
+            AdminDealsScreen(onBack = { navController.popBackStack() })
+        }
+
+            sheetRoute(sharedScope, AppRoute.AdminBanners.route) {
+            AdminBannersScreen(onBack = { navController.popBackStack() })
         }
 
             sheetRoute(sharedScope, AppRoute.AccountDetails.route) {

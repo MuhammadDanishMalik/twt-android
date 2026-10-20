@@ -47,6 +47,43 @@ object AccessCode {
     fun normalise(raw: String): String =
         raw.uppercase().filter { it.isLetter() || it.isDigit() }
 
+    /**
+     * What the field shows while somebody is typing.
+     *
+     * Every code Tanha issues is `TWT` and eight more characters, so the field
+     * writes the prefix and both dashes itself. Members read these off a
+     * WhatsApp message and type them one character at a time; making them key
+     * "T", "W", "T", "-" is four chances to get it wrong before they have
+     * entered anything that matters.
+     *
+     * Typing or pasting the prefix is harmless — it is stripped and re-added, so
+     * a pasted "TWT-4H2K-9XQP" comes back as itself rather than "TWT-TWT4-H2K9".
+     */
+    fun formatWhileTyping(raw: String): String {
+        val all = normalise(raw)
+
+        // Somebody typing the prefix out by hand is left alone until they reach
+        // the body. Without this, the "TWT-" added after their first keystroke
+        // is read back as body on the next one, and "twt4h2k9xqp" typed a
+        // character at a time arrives as "TWT-TWT4-H2K9".
+        //
+        // Only "", "T", "TW" and "TWT" are held back, and each resolves the
+        // moment the next character lands. The one case this gets wrong is a
+        // code whose body genuinely begins "TWT" — one in thirty thousand, and
+        // visible in the field as they type.
+        if (PREFIX.startsWith(all)) return all
+
+        var body = all
+        if (body.startsWith(PREFIX)) body = body.drop(PREFIX.length)
+        body = body.take(8)
+
+        if (body.isEmpty()) return ""
+
+        val first = body.take(4)
+        val second = body.drop(4)
+        return if (second.isEmpty()) "$PREFIX-$first" else "$PREFIX-$first-$second"
+    }
+
     /** `TWT4H2K9XQP` -> `TWT-4H2K-9XQP`, for showing back to the member. */
     fun display(normalised: String): String = when {
         normalised.startsWith(PREFIX) && normalised.length == PREFIX.length + 8 -> {

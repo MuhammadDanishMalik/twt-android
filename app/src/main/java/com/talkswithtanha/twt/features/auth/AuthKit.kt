@@ -1,5 +1,13 @@
 package com.talkswithtanha.twt.features.auth
 
+import com.talkswithtanha.twt.core.designsystem.pressFlood
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import com.talkswithtanha.twt.core.designsystem.components.TwtTextField
+import androidx.compose.animation.core.spring
+import androidx.compose.ui.graphics.graphicsLayer
+import com.talkswithtanha.twt.core.designsystem.WebFonts
+import com.talkswithtanha.twt.core.designsystem.WebColors
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -70,15 +78,15 @@ import com.talkswithtanha.twt.core.designsystem.pressScale
  * able to tell where one screen ends and the next begins.
  */
 
-/** The card fill, matching the Exchange screen. */
-internal val AuthSurface = Color(0xFF1A1A1C)
+/** The field and card fill: the website's `--ink-3`. */
+internal val AuthSurface = WebColors.Ink3
 
-/** The primary action's violet, lit in the middle. Same as the Exchange CTA. */
-internal val AuthGradient = listOf(
-    Color(0xFF6C2BE1),
-    Color(0xFF9151FF),
-    Color(0xFF7E3FEB)
-)
+/**
+ * The primary action: the website's flat green (`.lp-btn-primary`). Flat on
+ * purpose — a lit gradient turns muddy when the button dims to disabled. Text
+ * on it is dark, see [WebColors.OnBrand].
+ */
+internal val AuthGradient = listOf(WebColors.Brand, WebColors.Brand)
 
 /** The full-width violet button every auth screen finishes on. */
 @Composable
@@ -103,10 +111,10 @@ internal fun AuthPrimaryButton(
         modifier
             .fillMaxWidth()
             .pressScale(interaction)
-            .clip(RoundedCornerShape(16.dp))
-            .background(
-                Brush.horizontalGradient(AuthGradient.map { it.copy(alpha = alpha) })
-            )
+            .graphicsLayer { this.alpha = alpha }
+            .clip(CircleShape)
+            .background(Brush.horizontalGradient(AuthGradient))
+            .pressFlood(interaction, Color.White.copy(alpha = 0.38f))
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -121,15 +129,16 @@ internal fun AuthPrimaryButton(
     ) {
         if (loading) {
             CircularProgressIndicator(
-                color = Color.White,
+                color = WebColors.OnBrand,
                 strokeWidth = 2.dp,
                 modifier = Modifier.size(20.dp)
             )
         } else {
             Text(
                 text = text,
-                color = Color.White.copy(alpha = if (enabled) 1f else 0.7f),
+                color = WebColors.OnBrand,
                 fontSize = 16.sp,
+                fontFamily = WebFonts.Body,
                 fontWeight = FontWeight.SemiBold
             )
         }
@@ -256,7 +265,7 @@ private fun CodeCell(character: Char?, isNext: Boolean, modifier: Modifier = Mod
             .background(AuthSurface)
             .border(
                 width = if (isNext) 1.5.dp else 1.dp,
-                color = if (isNext) IosColors.Accent.copy(alpha = borderAlpha)
+                color = if (isNext) WebColors.Brand.copy(alpha = borderAlpha)
                 else Color.White.copy(alpha = borderAlpha),
                 shape = RoundedCornerShape(13.dp)
             ),
@@ -274,7 +283,7 @@ private fun CodeCell(character: Char?, isNext: Boolean, modifier: Modifier = Mod
                 Modifier
                     .size(width = 2.dp, height = 22.dp)
                     .clip(CircleShape)
-                    .background(IosColors.Accent.copy(alpha = 0.7f))
+                    .background(WebColors.Brand.copy(alpha = 0.7f))
             )
         }
     }
@@ -309,7 +318,7 @@ internal fun ResendRow(
         } else {
             Text(
                 text = "Send again",
-                color = IosColors.Accent,
+                color = WebColors.Brand,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier
@@ -328,7 +337,9 @@ internal fun AuthHeading(title: String, subtitle: String, modifier: Modifier = M
         Text(
             text = title,
             color = Color.White,
-            fontSize = 30.sp,
+            fontSize = 32.sp,
+            lineHeight = 34.sp,
+            fontFamily = WebFonts.Display,
             fontWeight = FontWeight.Bold
         )
         Spacer(Modifier.height(8.dp))
@@ -376,170 +387,37 @@ internal fun AuthSuccess(title: String, message: String, modifier: Modifier = Mo
 }
 
 /**
- * A labelled field in the auth family's style.
+ * A form field on the auth screens: the app's Material 3 [TwtTextField].
  *
- * The label lives above the box rather than floating into it. A floating label
- * animates over the value on a screen where the value is often a password the
- * member is squinting at, and the movement is the last thing they need.
+ * Passwords carry their own show/hide toggle, so screens no longer track it.
  */
 @Composable
 internal fun AuthTextField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
-    keyboardType: KeyboardType = KeyboardType.Text,
-    isPassword: Boolean = false,
-    passwordVisible: Boolean = false,
-    enabled: Boolean = true,
-    onTogglePasswordVisibility: (() -> Unit)? = null
-) {
-    Column(Modifier.fillMaxWidth()) {
-        Text(
-            text = label,
-            color = Color.White.copy(alpha = 0.45f),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium
-        )
-        Spacer(Modifier.height(7.dp))
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(AuthSurface)
-                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
-                .padding(horizontal = 14.dp, vertical = 15.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            BasicTextField(
-                value = value,
-                onValueChange = onValueChange,
-                enabled = enabled,
-                singleLine = true,
-                textStyle = androidx.compose.ui.text.TextStyle(
-                    color = Color.White,
-                    fontSize = 16.sp
-                ),
-                cursorBrush = SolidColor(IosColors.Accent),
-                keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-                visualTransformation = if (isPassword && !passwordVisible) {
-                    androidx.compose.ui.text.input.PasswordVisualTransformation()
-                } else {
-                    androidx.compose.ui.text.input.VisualTransformation.None
-                },
-                modifier = Modifier.weight(1f)
-            )
-            if (isPassword && onTogglePasswordVisibility != null) {
-                Icon(
-                    imageVector = if (passwordVisible) Icons.Filled.VisibilityOff
-                    else Icons.Filled.Visibility,
-                    contentDescription = if (passwordVisible) "Hide password" else "Show password",
-                    tint = Color.White.copy(alpha = 0.4f),
-                    modifier = Modifier
-                        .size(20.dp)
-                        .clickable(onClick = onTogglePasswordVisibility)
-                )
-            }
-        }
-    }
-}
-
-/**
- * Fields stacked in one bordered box, divided by hairlines.
- *
- * The Airbnb pattern, and it earns its place: separate boxes make each field
- * look like an independent decision, while one box with rules inside says
- * "these belong together, fill them both". On a two-field login that is the
- * difference between a form and a checklist.
- *
- * The border lifts when anything inside has focus, so the group answers a tap
- * as a unit rather than leaving the member hunting for which box woke up.
- */
-@Composable
-internal fun GroupedFields(
     modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    var focused by remember { mutableStateOf(false) }
-    val border by animateColorAsState(
-        targetValue = if (focused) Color.White.copy(alpha = 0.28f) else Color.White.copy(alpha = 0.10f),
-        animationSpec = Motion.quick(),
-        label = "groupBorder"
-    )
-
-    Column(
-        modifier
-            .fillMaxWidth()
-            .onFocusChanged { focused = it.hasFocus }
-            .clip(RoundedCornerShape(14.dp))
-            .background(AuthSurface)
-            .border(1.dp, border, RoundedCornerShape(14.dp)),
-        content = content
-    )
-}
-
-/** One row inside a [GroupedFields] box: label above, value below. */
-@Composable
-internal fun GroupedField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    label: String,
     keyboardType: KeyboardType = KeyboardType.Text,
     isPassword: Boolean = false,
-    passwordVisible: Boolean = false,
     enabled: Boolean = true,
-    onTogglePasswordVisibility: (() -> Unit)? = null
+    isError: Boolean = false,
+    supportingText: String? = null,
+    capitalization: KeyboardCapitalization = KeyboardCapitalization.None,
+    imeAction: ImeAction = ImeAction.Next
 ) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = label,
-                color = Color.White.copy(alpha = 0.45f),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium
-            )
-            Spacer(Modifier.height(3.dp))
-            BasicTextField(
-                value = value,
-                onValueChange = onValueChange,
-                enabled = enabled,
-                singleLine = true,
-                textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 16.sp),
-                cursorBrush = SolidColor(IosColors.Accent),
-                keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-                visualTransformation = if (isPassword && !passwordVisible) {
-                    androidx.compose.ui.text.input.PasswordVisualTransformation()
-                } else {
-                    androidx.compose.ui.text.input.VisualTransformation.None
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-        if (isPassword && onTogglePasswordVisibility != null) {
-            Icon(
-                imageVector = if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                contentDescription = if (passwordVisible) "Hide password" else "Show password",
-                tint = Color.White.copy(alpha = 0.4f),
-                modifier = Modifier
-                    .size(20.dp)
-                    .clickable(onClick = onTogglePasswordVisibility)
-            )
-        }
-    }
-}
-
-/** The hairline between two grouped fields. */
-@Composable
-internal fun GroupedDivider() {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(1.dp)
-            .background(Color.White.copy(alpha = 0.09f))
+    TwtTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = label,
+        modifier = modifier.fillMaxWidth(),
+        keyboardType = keyboardType,
+        isPassword = isPassword,
+        enabled = enabled,
+        isError = isError,
+        supportingText = supportingText,
+        capitalization = capitalization,
+        autoCorrect = keyboardType != KeyboardType.Email,
+        imeAction = imeAction
     )
 }
 
@@ -566,13 +444,17 @@ internal fun AuthOutlinedButton(
     onClick: () -> Unit
 ) {
     val haptics = LocalHapticFeedback.current
+    val interaction = remember { MutableInteractionSource() }
     Box(
         modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(14.dp))
+            .pressScale(interaction)
+            .clip(CircleShape)
+            .background(Color.White.copy(alpha = 0.03f))
+            .pressFlood(interaction, WebColors.Brand.copy(alpha = 0.16f))
+            .border(1.dp, WebColors.Line2, CircleShape)
             .clickable(
-                interactionSource = remember { MutableInteractionSource() },
+                interactionSource = interaction,
                 indication = null
             ) {
                 Haptics.tap(haptics)
@@ -581,6 +463,151 @@ internal fun AuthOutlinedButton(
             .padding(vertical = 15.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(text = text, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            text = text,
+            color = WebColors.Text,
+            fontSize = 15.sp,
+            fontFamily = WebFonts.Body,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+/**
+ * A live strength meter for a new password: four bars that fill and change
+ * colour, the rating in words, and the checks that make it up. Shown on sign-up
+ * only — on sign-in the password already exists and rating it helps nobody.
+ */
+@Composable
+internal fun PasswordStrengthMeter(password: String, modifier: Modifier = Modifier) {
+    val strength = ratePassword(password)
+    val checks = passwordChecks(password)
+    // A tick each time the rating moves, so it can be felt while typing.
+    val haptics = LocalHapticFeedback.current
+    var lastStrength by remember { mutableStateOf<PasswordStrength?>(null) }
+    LaunchedEffect(strength, password.isEmpty()) {
+        if (password.isNotEmpty() && lastStrength != null && lastStrength != strength) {
+            if (strength == PasswordStrength.Strong) Haptics.success(haptics) else Haptics.tick(haptics)
+        }
+        lastStrength = if (password.isEmpty()) null else strength
+    }
+    val color by animateColorAsState(
+        when (strength) {
+            PasswordStrength.TooShort, PasswordStrength.Weak -> WebColors.Red
+            PasswordStrength.Fair -> WebColors.Amber
+            PasswordStrength.Good -> WebColors.Mint
+            PasswordStrength.Strong -> WebColors.Brand
+        },
+        animationSpec = Motion.quick(),
+        label = "strength"
+    )
+
+    AnimatedVisibility(
+        visible = password.isNotEmpty(),
+        enter = fadeIn(Motion.quick()) + expandVertically(Motion.gentle()),
+        exit = fadeOut(Motion.quick()) + shrinkVertically(Motion.gentle()),
+        modifier = modifier
+    ) {
+        Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    repeat(4) { i ->
+                        val fill by animateFloatAsState(
+                            targetValue = if (i < strength.filledBars) 1f else 0f,
+                            animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
+                            label = "bar$i"
+                        )
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .height(5.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.08f))
+                        ) {
+                            Box(
+                                Modifier
+                                    .fillMaxWidth(fill)
+                                    .height(5.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    text = strength.label,
+                    color = color,
+                    fontSize = 13.sp,
+                    fontFamily = WebFonts.Body,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                PasswordCheck("$MIN_NEW_PASSWORD_LENGTH+ chars", checks.longEnough)
+                PasswordCheck("Aa", checks.mixedCase)
+                PasswordCheck("123", checks.hasNumber)
+                PasswordCheck("#!?", checks.hasSymbol)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PasswordCheck(label: String, met: Boolean) {
+    val tint by animateColorAsState(
+        if (met) WebColors.Brand else Color.White.copy(alpha = 0.35f),
+        animationSpec = Motion.quick(),
+        label = "check"
+    )
+    // The label reads white once met; green is kept for the tick itself, so
+    // the row does not turn into a wall of green text.
+    val labelColor by animateColorAsState(
+        if (met) WebColors.Text else Color.White.copy(alpha = 0.4f),
+        animationSpec = Motion.quick(),
+        label = "checkLabel"
+    )
+    val pop by animateFloatAsState(
+        targetValue = if (met) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.45f, stiffness = 500f),
+        label = "pop"
+    )
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier
+                .size(16.dp)
+                .graphicsLayer {
+                    val s = 0.85f + 0.15f * pop
+                    scaleX = s
+                    scaleY = s
+                }
+                .clip(CircleShape)
+                .background(if (met) WebColors.BrandSoft else Color.Transparent)
+                .border(1.dp, tint, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            if (met) {
+                Icon(
+                    Icons.Filled.Check,
+                    contentDescription = null,
+                    tint = tint,
+                    modifier = Modifier.size(11.dp)
+                )
+            }
+        }
+        Spacer(Modifier.width(5.dp))
+        Text(
+            text = label,
+            color = labelColor,
+            fontSize = 12.sp,
+            fontFamily = WebFonts.Body,
+            fontWeight = FontWeight.Medium
+        )
     }
 }

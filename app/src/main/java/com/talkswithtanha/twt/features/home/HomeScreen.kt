@@ -55,6 +55,7 @@ import com.talkswithtanha.twt.core.designsystem.Motion
 import com.talkswithtanha.twt.core.designsystem.IosColors
 import com.talkswithtanha.twt.core.model.ExchangeRate
 import com.talkswithtanha.twt.features.home.components.HomeShortcuts
+import com.talkswithtanha.twt.features.home.components.HomeHeroCarousel
 import com.talkswithtanha.twt.features.home.components.TwtAccessCard
 import com.talkswithtanha.twt.features.signals.SignalTicketCard
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -83,8 +84,12 @@ fun HomeScreen(
     onOpenMarketplace: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSupport: () -> Unit,
+    /** The Chat tab, for a banner that points there. */
+    onOpenChat: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
+    val banners by viewModel.activeBanners.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
     val user by viewModel.user.collectAsStateWithLifecycle()
     val state by viewModel.state.collectAsStateWithLifecycle()
     val rate by viewModel.rate.collectAsStateWithLifecycle()
@@ -169,18 +174,39 @@ fun HomeScreen(
                 }
             }
 
+            // The access card and the banners, as one row at one size — see
+            // HomeHeroCarousel. They were two stacked blocks at two different
+            // heights, with a sliver of the next banner showing.
             item {
                 StaggeredAppear(1) {
-                    TwtAccessCard(
+                    HomeHeroCarousel(
                         holderName = user?.fullName,
                         expiresAt = user?.membershipExpiresAt,
                         grantedAt = user?.accessGrantedAt,
                         accessCode = user?.accessCode,
+                        banners = banners,
                         onContactSupport = onOpenSupport,
-                        modifier = Modifier.padding(horizontal = 16.dp)
+                        onBannerTap = { banner ->
+                            viewModel.bannerTapped(banner.id)
+                            when (banner.action) {
+                                com.talkswithtanha.twt.core.data.Banner.Action.ACADEMY -> onOpenAcademy()
+                                com.talkswithtanha.twt.core.data.Banner.Action.SIGNALS -> onOpenSignals()
+                                com.talkswithtanha.twt.core.data.Banner.Action.CHAT -> onOpenChat()
+                                com.talkswithtanha.twt.core.data.Banner.Action.URL -> runCatching {
+                                    context.startActivity(
+                                        android.content.Intent(
+                                            android.content.Intent.ACTION_VIEW,
+                                            android.net.Uri.parse(banner.url)
+                                        )
+                                    )
+                                }
+                                com.talkswithtanha.twt.core.data.Banner.Action.NONE -> Unit
+                            }
+                        }
                     )
                 }
             }
+
 
             item {
                 StaggeredAppear(2) {

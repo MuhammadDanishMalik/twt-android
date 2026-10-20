@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.core.session
 
+import com.talkswithtanha.twt.core.model.TradingProfile
 import android.util.Log
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.talkswithtanha.twt.core.data.Snapshot
@@ -33,6 +34,7 @@ import javax.inject.Singleton
 @Singleton
 class SessionRepository @Inject constructor(
     private val authService: AuthService,
+    private val authApi: AuthApi,
     private val userRepository: UserRepository,
     private val deviceIdentity: DeviceIdentity,
     private val scope: CoroutineScope
@@ -376,6 +378,11 @@ class SessionRepository @Inject constructor(
         )
     }
 
+    suspend fun completeProfileSetup(fullName: String, country: String?, profile: TradingProfile) {
+        val uid = _currentUser.value?.id ?: error("Not signed in")
+        userRepository.completeProfileSetup(uid, fullName, country, profile)
+    }
+
     suspend fun registerPushToken(token: String) {
         val uid = _currentUser.value?.id ?: authService.currentUid ?: return
         runCatching { userRepository.registerPushToken(uid, token) }
@@ -396,11 +403,24 @@ class SessionRepository @Inject constructor(
         _state.value = State.SignedOut
     }
 
+    /**
+     * Deletes the account and its data, through the server — Google Play
+     * requires the data to go, not just the login, and only the Admin SDK can
+     * remove it all. Throws with a message fit to show when that fails, and
+     * leaves the member signed in so they can try again.
+     */
     suspend fun deleteAccount() {
+        val token = authService.idToken(forceRefresh = true)
+            ?: throw IllegalStateException("Sign in again, then delete your account.")
+        when (val result = authApi.deleteAccount(token)) {
+            is ApiResult.Failed -> throw IllegalStateException(result.message)
+            ApiResult.Ok -> Unit
+        }
         profileJob?.cancel()
         profileJob = null
         watchedUid = null
-        authService.deleteAccount()
+        // The login is already gone server-side; this clears the local copy.
+        authService.signOut()
         _currentUser.value = null
         _state.value = State.SignedOut
     }

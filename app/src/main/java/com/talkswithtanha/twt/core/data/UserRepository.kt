@@ -1,5 +1,10 @@
 package com.talkswithtanha.twt.core.data
 
+import com.talkswithtanha.twt.core.model.TradingDuration
+import com.talkswithtanha.twt.core.model.Experience
+import com.talkswithtanha.twt.core.model.IbStatus
+import com.talkswithtanha.twt.core.model.BrokerStatus
+import com.talkswithtanha.twt.core.model.TradingProfile
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
@@ -8,6 +13,7 @@ import com.talkswithtanha.twt.core.firebase.FirestorePaths.Collection
 import com.talkswithtanha.twt.core.firebase.FirestorePaths.UserField as F
 import com.talkswithtanha.twt.core.model.LoginProvider
 import com.talkswithtanha.twt.core.model.MembershipType
+import com.talkswithtanha.twt.core.model.StaffArea
 import com.talkswithtanha.twt.core.model.User
 import com.talkswithtanha.twt.core.model.UserRole
 import kotlinx.coroutines.flow.Flow
@@ -43,6 +49,17 @@ interface UserRepository {
         profilePhoto: String? = null,
         country: String? = null,
         bio: String? = null
+    )
+
+    /**
+     * Saves the profile-setup answers and marks setup done, in one write — so
+     * the gate never sees the answers without the timestamp or the reverse.
+     */
+    suspend fun completeProfileSetup(
+        uid: String,
+        fullName: String,
+        country: String?,
+        profile: TradingProfile
     )
 
     suspend fun registerPushToken(uid: String, token: String)
@@ -177,6 +194,30 @@ class FirebaseUserRepository @Inject constructor(
         users.document(uid).update(payload).await()
     }
 
+    override suspend fun completeProfileSetup(
+        uid: String,
+        fullName: String,
+        country: String?,
+        profile: TradingProfile
+    ) {
+        val t = F.Trading
+        val answers = buildMap<String, Any> {
+            profile.brokerStatus?.let { put(t.BROKER_STATUS, it.stored) }
+            profile.broker?.takeIf { it.isNotBlank() }?.let { put(t.BROKER, it.trim().take(60)) }
+            profile.ibStatus?.let { put(t.IB_STATUS, it.stored) }
+            profile.experience?.let { put(t.EXPERIENCE, it.stored) }
+            profile.tradingDuration?.let { put(t.TRADING_DURATION, it.stored) }
+        }
+        val payload = mutableMapOf<String, Any>(
+            F.TRADING_PROFILE to answers,
+            F.PROFILE_SETUP_AT to FieldValue.serverTimestamp(),
+            F.UPDATED_AT to FieldValue.serverTimestamp()
+        )
+        if (fullName.isNotBlank()) payload[F.FULL_NAME] = fullName.trim()
+        country?.takeIf { it.length == 2 }?.let { payload[F.COUNTRY] = it.uppercase() }
+        users.document(uid).update(payload).await()
+    }
+
     override suspend fun registerPushToken(uid: String, token: String) {
         // arrayUnion rather than a read-modify-write: one phone can hold two
         // accounts, and two devices registering at once would otherwise each
@@ -261,6 +302,7 @@ class FirebaseUserRepository @Inject constructor(
             accessCode = snapshot.get(F.ACCESS_CODE).asNonBlankString(),
             accessGrantedAt = snapshot.getTimestamp(F.ACCESS_GRANTED_AT)?.toDate(),
             role = UserRole.from(snapshot.getString(F.ROLE)),
+            staffAccess = StaffArea.from(snapshot.get(F.STAFF_ACCESS) as? List<*>),
             isBlocked = snapshot.getBoolean(F.IS_BLOCKED) ?: false,
             referralCode = snapshot.get(F.REFERRAL_CODE).asNonBlankString(),
             fcmTokens = tokens,
@@ -269,8 +311,22 @@ class FirebaseUserRepository @Inject constructor(
             lastActiveDeviceModel = snapshot.get(F.LAST_ACTIVE_DEVICE_MODEL).asNonBlankString(),
             lastActivePlatform = snapshot.get(F.LAST_ACTIVE_PLATFORM).asNonBlankString(),
             lastLoginAt = snapshot.getTimestamp(F.LAST_LOGIN_AT)?.toDate(),
+            tradingProfile = mapTradingProfile(snapshot.get(F.TRADING_PROFILE)),
+            profileSetupAt = snapshot.getTimestamp(F.PROFILE_SETUP_AT)?.toDate(),
             createdAt = snapshot.getTimestamp(F.CREATED_AT)?.toDate() ?: Date(),
             updatedAt = snapshot.getTimestamp(F.UPDATED_AT)?.toDate() ?: Date()
+        )
+    }
+
+    private fun mapTradingProfile(raw: Any?): TradingProfile? {
+        val m = raw as? Map<*, *> ?: return null
+        val t = F.Trading
+        return TradingProfile(
+            brokerStatus = BrokerStatus.from(m[t.BROKER_STATUS] as? String),
+            broker = (m[t.BROKER] as? String)?.takeIf { it.isNotBlank() },
+            ibStatus = IbStatus.from(m[t.IB_STATUS] as? String),
+            experience = Experience.from(m[t.EXPERIENCE] as? String),
+            tradingDuration = TradingDuration.from(m[t.TRADING_DURATION] as? String)
         )
     }
 

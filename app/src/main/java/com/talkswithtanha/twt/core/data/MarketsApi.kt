@@ -152,7 +152,14 @@ object MarketsApi {
         val previous: String
     )
 
-    data class FedMeeting(val date: java.util.Date?, val likeliest: String, val outcomes: List<Pair<String, Double>>)
+    data class FedMeeting(
+        val date: java.util.Date?,
+        val likeliest: String,
+        val outcomes: List<Pair<String, Double>>,
+        /** The rate the odds imply after this meeting, and its move from the meeting before, in basis points. */
+        val impliedRate: Double?,
+        val impliedChangeBp: Int?
+    )
     data class Fed(val targetFrom: Double, val targetTo: Double, val effective: Double, val meetings: List<FedMeeting>)
 
     data class Positioning(
@@ -231,7 +238,9 @@ object MarketsApi {
                     outcomes = (0 until (outs?.length() ?: 0)).map { j ->
                         val x = outs!!.getJSONObject(j)
                         x.optString("label") to x.optDouble("probability")
-                    }
+                    },
+                    impliedRate = m.optDouble("impliedRate").takeUnless { it.isNaN() },
+                    impliedChangeBp = if (m.isNull("impliedChange")) null else m.optInt("impliedChange")
                 )
             }
         )

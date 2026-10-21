@@ -9,6 +9,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -79,6 +81,7 @@ private val Up = Color(0xFF22C55E)
 private val Down = Color(0xFFEF4444)
 private val Amber = Color(0xFFF59E0B)
 private val Muted = Color.White.copy(alpha = 0.55f)
+private val Faint = Color.White.copy(alpha = 0.38f)
 private val CardBg = Color(0xFF141414)
 private val Tabular = TextStyle(fontFeatureSettings = "tnum")
 
@@ -487,9 +490,9 @@ private fun FedPage(fed: MarketsApi.Fed?) {
             )
         }
         val upcoming = fed.meetings.filter { (it.date?.time ?: Long.MAX_VALUE) > System.currentTimeMillis() - 86_400_000 }
-        upcoming.forEachIndexed { index, meeting ->
+        upcoming.firstOrNull()?.let { meeting ->
             item {
-                SectionCard(if (index == 0) "Next meeting" else "Meeting", meeting.date?.let { dateFormat.format(it) }) {
+                SectionCard("Next meeting", meeting.date?.let { dateFormat.format(it) }) {
                     Column(Modifier.padding(horizontal = 18.dp)) {
                         val top = meeting.outcomes.maxByOrNull { it.second }
                         Text(
@@ -522,6 +525,92 @@ private fun FedPage(fed: MarketsApi.Fed?) {
                 }
             }
         }
+        if (upcoming.isNotEmpty()) item { EveryMeetingCard(upcoming) }
+        item {
+            Text(
+                "Odds are the prices of contracts on Kalshi, a US exchange regulated by the CFTC, scaled to 100% per meeting — " +
+                    "a record of what the market is paying, not a forecast and not advice.",
+                color = Faint,
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+        }
+    }
+}
+
+private val FED_OUTCOMES = listOf("Cut 50+", "Cut 25", "Hold", "Hike 25", "Hike 50+")
+
+/** Cuts wash green, holds grey, hikes red — deeper the likelier, as on the website. */
+private fun heatColor(outcome: String): Color = when {
+    outcome.startsWith("Cut") -> Up
+    outcome.startsWith("Hike") -> Down
+    else -> Color.White
+}
+
+/** White washes read far louder than colour on dark, so holds get a shallower scale. */
+private fun heatDepth(outcome: String): Double = if (outcome == "Hold") 0.22 else 0.42
+
+/**
+ * Every meeting the market prices, as one heat table: a row a meeting, a
+ * column an outcome, each cell washed by its odds. The likeliest outcome is
+ * set bold, and the implied rate after the meeting closes the row with its
+ * move in basis points.
+ */
+@Composable
+private fun EveryMeetingCard(meetings: List<MarketsApi.FedMeeting>) {
+    val dayMonth = SimpleDateFormat("d MMM", Locale.getDefault())
+    val year = SimpleDateFormat("yyyy", Locale.getDefault())
+    val header = Modifier.padding(vertical = 10.dp)
+
+    SectionCard("Every meeting", "Scaled to 100%") {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("MEETING", color = Faint, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, modifier = header.width(62.dp))
+            listOf("CUT\n50+", "CUT\n25", "HOLD", "HIKE\n25", "HIKE\n50+").forEach {
+                Text(it, color = Faint, fontSize = 9.sp, lineHeight = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp, textAlign = TextAlign.Center, modifier = header.weight(1f))
+            }
+            Text("RATE", color = Faint, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, textAlign = TextAlign.End, modifier = header.width(56.dp))
+        }
+        meetings.forEach { m ->
+            Box(Modifier.fillMaxWidth().height(0.5.dp).background(Color.White.copy(alpha = 0.07f)))
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.width(62.dp).padding(vertical = 9.dp)) {
+                    Text(m.date?.let { dayMonth.format(it) } ?: "—", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text(m.date?.let { year.format(it) } ?: "", color = Faint, fontSize = 11.sp, style = Tabular)
+                }
+                FED_OUTCOMES.forEach { outcome ->
+                    val p = m.outcomes.firstOrNull { it.first == outcome }?.second ?: 0.0
+                    val likeliest = outcome == m.likeliest
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .background(heatColor(outcome).copy(alpha = (p / 100 * heatDepth(outcome)).toFloat())),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            if (p < 1) "·" else "%.0f%%".format(p),
+                            color = if (p < 1) Faint else Color.White.copy(alpha = if (likeliest) 1f else 0.78f),
+                            fontSize = 12.sp,
+                            fontWeight = if (likeliest) FontWeight.Bold else FontWeight.Normal,
+                            style = Tabular
+                        )
+                    }
+                }
+                Column(Modifier.width(56.dp), horizontalAlignment = Alignment.End) {
+                    Text(m.impliedRate?.let { "%.2f%%".format(it) } ?: "—", color = Color.White, fontSize = 12.sp, style = Tabular)
+                    m.impliedChangeBp?.let { bp ->
+                        Text(
+                            "%+dbp".format(bp),
+                            color = if (bp > 0) Up else if (bp < 0) Down else Faint,
+                            fontSize = 10.sp,
+                            style = Tabular
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(4.dp))
     }
 }
 

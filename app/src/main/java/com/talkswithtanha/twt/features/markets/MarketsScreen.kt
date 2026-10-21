@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.markets
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -26,7 +27,14 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AccountBalance
+import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Newspaper
+import androidx.compose.material.icons.rounded.SpaceDashboard
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -75,6 +83,13 @@ private val Tabular = TextStyle(fontFeatureSettings = "tnum")
 
 /** The website's Markets sections, in its order. */
 private val PAGES = listOf("Dashboard", "Calendar", "Live news", "COT report", "Fed watch")
+private val PAGE_ICONS = listOf(
+    Icons.Rounded.SpaceDashboard,
+    Icons.Rounded.CalendarMonth,
+    Icons.Rounded.Newspaper,
+    Icons.Rounded.BarChart,
+    Icons.Rounded.AccountBalance
+)
 
 /**
  * The website's Markets area as a tab: the same five sections as its side
@@ -131,14 +146,14 @@ fun MarketsScreen() {
     charting?.let { MarketChartSheet(it, onDismiss = { charting = null }) }
 }
 
-/** The headings along the top, with a pill that slides to the current one. */
+/** The headings along the top: icon over label, with an underline that slides to the current one. */
 @Composable
 private fun PageTabs(selected: Int, onSelect: (Int) -> Unit) {
     val density = LocalDensity.current
     val bounds = remember { mutableStateMapOf<Int, Pair<Dp, Dp>>() }
     val target = bounds[selected]
-    val pillX by animateDpAsState(target?.first ?: 0.dp, spring(dampingRatio = 0.8f, stiffness = 500f), label = "pillX")
-    val pillW by animateDpAsState(target?.second ?: 0.dp, spring(dampingRatio = 0.8f, stiffness = 500f), label = "pillW")
+    val lineX by animateDpAsState(target?.first ?: 0.dp, spring(dampingRatio = 0.8f, stiffness = 500f), label = "lineX")
+    val lineW by animateDpAsState(target?.second ?: 0.dp, spring(dampingRatio = 0.8f, stiffness = 500f), label = "lineW")
     val scroll = rememberScrollState()
 
     // Keep the current heading in view, centred where the row allows.
@@ -146,56 +161,73 @@ private fun PageTabs(selected: Int, onSelect: (Int) -> Unit) {
         val (x, w) = target ?: return@LaunchedEffect
         val viewport = scroll.viewportSize
         if (viewport == 0) return@LaunchedEffect
-        val centre = with(density) { (x + w / 2 + 16.dp).roundToPx() }
+        val centre = with(density) { (x + w / 2 + 8.dp).roundToPx() }
         scroll.animateScrollTo((centre - viewport / 2).coerceIn(0, scroll.maxValue))
     }
 
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .horizontalScroll(scroll)
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-    ) {
-        if (target != null) {
-            Box(
-                Modifier
-                    .offset(x = pillX)
-                    .width(pillW)
-                    .height(38.dp)
-                    .clip(RoundedCornerShape(19.dp))
-                    .background(Color.White)
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            PAGES.forEachIndexed { index, label ->
-                val isSelected = index == selected
-                Row(
-                    Modifier
-                        .height(38.dp)
-                        .onGloballyPositioned { coords ->
-                            with(density) {
-                                bounds[index] = coords.positionInParent().x.toDp() to coords.size.width.toDp()
+    Column(Modifier.fillMaxWidth().padding(top = 6.dp)) {
+        Box(Modifier.fillMaxWidth().horizontalScroll(scroll).padding(horizontal = 8.dp)) {
+            Row {
+                PAGES.forEachIndexed { index, label ->
+                    val isSelected = index == selected
+                    val tint by animateColorAsState(
+                        if (isSelected) Color.White else Color.White.copy(alpha = 0.45f),
+                        label = "tabTint"
+                    )
+                    Column(
+                        Modifier
+                            .onGloballyPositioned { coords ->
+                                with(density) {
+                                    bounds[index] = coords.positionInParent().x.toDp() to coords.size.width.toDp()
+                                }
+                            }
+                            .clickable { onSelect(index) }
+                            .padding(horizontal = 16.dp)
+                            .padding(top = 6.dp, bottom = 10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box {
+                            Icon(PAGE_ICONS[index], contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
+                            if (label == "Live news") {
+                                Box(
+                                    Modifier
+                                        .align(Alignment.TopEnd)
+                                        .offset(x = 3.dp, y = (-2).dp)
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(IosColors.Background)
+                                        .padding(1.5.dp)
+                                        .clip(CircleShape)
+                                        .background(Up)
+                                )
                             }
                         }
-                        .clip(RoundedCornerShape(19.dp))
-                        .background(if (isSelected) Color.Transparent else Color.White.copy(alpha = 0.07f))
-                        .clickable { onSelect(index) }
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (label == "Live news") {
-                        Box(Modifier.size(7.dp).clip(CircleShape).background(Up))
-                        Spacer(Modifier.width(6.dp))
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            label.uppercase(),
+                            color = tint,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.6.sp,
+                            maxLines = 1
+                        )
                     }
-                    Text(
-                        label,
-                        color = if (isSelected) Color.Black else Color.White.copy(alpha = 0.8f),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
                 }
             }
+            if (target != null) {
+                Box(
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .offset(x = lineX)
+                        .width(lineW)
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
+                        .background(Color.White)
+                )
+            }
         }
+        Box(Modifier.fillMaxWidth().height(0.5.dp).background(Color.White.copy(alpha = 0.1f)))
+        Spacer(Modifier.height(10.dp))
     }
 }
 

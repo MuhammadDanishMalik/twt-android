@@ -268,6 +268,15 @@ fun AppNavHost(
         }
 
             // ── Support tickets ──────────────────────────────────────────
+            // ── Markets and news ─────────────────────────────────────────
+            screen(sharedScope, AppRoute.Markets.route) {
+                com.talkswithtanha.twt.features.markets.MarketsScreen()
+            }
+
+            screen(sharedScope, AppRoute.News.route) {
+                com.talkswithtanha.twt.features.markets.NewsScreen()
+            }
+
             // ── The feed ─────────────────────────────────────────────────
             screen(sharedScope, AppRoute.Feed.route) {
                 FeedScreen(

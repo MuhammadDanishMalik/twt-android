@@ -64,9 +64,13 @@ fun TwtBottomBar(
 ) {
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val selectedIndex = items.indexOfFirst { it.route == currentRoute }.coerceAtLeast(0)
+    // As wide as a tab likes to be, but never wider than the screen allows:
+    // five tabs on a narrow phone share the width rather than run off it.
+    val screenWidth = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp
+    val tabWidth = minOf(TabWidth, (screenWidth - 24.dp - 12.dp) / items.size.coerceAtLeast(1))
 
     val indicatorOffset by animateDpAsState(
-        targetValue = TabWidth * selectedIndex,
+        targetValue = tabWidth * selectedIndex,
         animationSpec = Motion.snappy(),
         label = "indicator"
     )
@@ -86,7 +90,7 @@ fun TwtBottomBar(
         Box(
             Modifier
                 .offset(x = indicatorOffset)
-                .width(TabWidth)
+                .width(tabWidth)
                 .height(52.dp)
                 .clip(RoundedCornerShape(26.dp))
                 .background(Color.White.copy(alpha = 0.10f))
@@ -97,6 +101,7 @@ fun TwtBottomBar(
                 BottomBarTab(
                     item = item,
                     selected = index == selectedIndex,
+                    width = tabWidth,
                     onClick = { onNavigate(item.route) }
                 )
             }
@@ -108,6 +113,7 @@ fun TwtBottomBar(
 private fun BottomBarTab(
     item: BottomBarItem,
     selected: Boolean,
+    width: androidx.compose.ui.unit.Dp,
     onClick: () -> Unit
 ) {
     val haptics = LocalHapticFeedback.current
@@ -133,7 +139,7 @@ private fun BottomBarTab(
 
     Column(
         modifier = Modifier
-            .width(TabWidth)
+            .width(width)
             .clip(RoundedCornerShape(26.dp))
             .clickable(
                 interactionSource = interaction,
@@ -155,6 +161,6 @@ private fun BottomBarTab(
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         item.icon(tint, Modifier.size(24.dp))
-        Text(text = item.label, fontSize = 11.sp, color = tint)
+        Text(text = item.label, fontSize = 11.sp, color = tint, maxLines = 1)
     }
 }

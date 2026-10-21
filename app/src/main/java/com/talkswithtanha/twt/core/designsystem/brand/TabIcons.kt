@@ -85,6 +85,48 @@ object TabIcons {
     }
 
     /**
+     * Markets: three candles of rising height in a rounded square, the bodies
+     * knocked out so they read as candlesticks rather than a bar chart.
+     */
+    @Composable
+    fun Markets(modifier: Modifier = Modifier, tint: Color) = Glyph(modifier, tint) {
+        val tile = Path().apply {
+            addRoundRect(RoundRect(Rect(Offset(2.2f, 2.2f), Size(21.6f, 21.6f)), CornerRadius(5.6f, 5.6f)))
+        }
+        val candles = Path().apply {
+            // wicks
+            moveTo(8f, 10.5f); lineTo(8f, 19f)
+            moveTo(13f, 7.5f); lineTo(13f, 17f)
+            moveTo(18f, 6f); lineTo(18f, 13.5f)
+            // bodies
+            addRect(Rect(Offset(6.6f, 12.6f), Size(2.8f, 4.6f)))
+            addRect(Rect(Offset(11.6f, 9.6f), Size(2.8f, 5.2f)))
+            addRect(Rect(Offset(16.6f, 7.8f), Size(2.8f, 3.8f)))
+        }
+        tile to candles
+    }
+
+    /**
+     * News: a front page — a photo, a headline beside it and a line of text,
+     * knocked out of the sheet.
+     */
+    @Composable
+    fun News(modifier: Modifier = Modifier, tint: Color) = Glyph(modifier, tint) {
+        val sheet = Path().apply {
+            addRoundRect(RoundRect(Rect(Offset(2.2f, 3.4f), Size(21.6f, 19.6f)), CornerRadius(4.6f, 4.6f)))
+        }
+        // A photo block beside the headline, then a full line of text — the
+        // front page, and distinct from the feed's plain lines.
+        val text = Path().apply {
+            addRect(Rect(Offset(7f, 8.2f), Size(3.6f, 3.6f)))
+            moveTo(14.4f, 8.4f); lineTo(19f, 8.4f)
+            moveTo(14.4f, 12f); lineTo(19f, 12f)
+            moveTo(7f, 17.2f); lineTo(19f, 17.2f)
+        }
+        sheet to text
+    }
+
+    /**
      * The feed: a card with writing on it.
      *
      * It had the chat bubble, which was the glyph the chats used before the feed

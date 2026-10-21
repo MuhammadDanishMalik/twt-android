@@ -128,4 +128,117 @@ object MarketsApi {
             }
         }.getOrNull()
     }
+
+    // ── News, calendar, the Fed and positioning — the Markets and News tabs ──
+
+    data class Story(
+        val title: String,
+        val summary: String,
+        val source: String,
+        val link: String,
+        val at: java.util.Date?,
+        /** What it is about: "USD", "XAU", "OIL", "EUR"… */
+        val tags: List<String>
+    )
+
+    data class Event(
+        val title: String,
+        val currency: String,
+        /** "High", "Medium", "Low" or "Holiday". */
+        val impact: String,
+        val at: java.util.Date?,
+        val forecast: String,
+        val previous: String
+    )
+
+    data class FedMeeting(val date: java.util.Date?, val likeliest: String, val outcomes: List<Pair<String, Double>>)
+    data class Fed(val targetFrom: Double, val targetTo: Double, val effective: Double, val meetings: List<FedMeeting>)
+
+    data class Positioning(
+        val key: String,
+        val label: String,
+        val flag: String,
+        val group: String,
+        val longPercent: Int,
+        val net: Long,
+        val change: Long
+    )
+
+    private fun isoDate(raw: String?): java.util.Date? = raw?.takeIf { it.isNotBlank() }?.let {
+        runCatching { java.time.OffsetDateTime.parse(it).toInstant().let { i -> java.util.Date.from(i) } }
+            .recoverCatching { java.util.Date.from(java.time.Instant.parse(raw)) }
+            .getOrNull()
+    }
+
+    private fun strings(a: org.json.JSONArray?): List<String> =
+        (0 until (a?.length() ?: 0)).map { a!!.getString(it) }
+
+    suspend fun news(): List<Story>? = withContext(Dispatchers.IO) {
+        val array = get("/api/news")?.optJSONArray("stories") ?: return@withContext null
+        (0 until array.length()).map { i ->
+            val o = array.getJSONObject(i)
+            Story(
+                title = o.optString("title"),
+                summary = o.optString("summary"),
+                source = o.optString("source"),
+                link = o.optString("link"),
+                at = isoDate(o.optString("at")),
+                tags = strings(o.optJSONArray("tags"))
+            )
+        }.filter { it.title.isNotBlank() && it.link.startsWith("http") }
+    }
+
+    suspend fun calendar(): List<Event>? = withContext(Dispatchers.IO) {
+        val array = get("/api/calendar")?.optJSONArray("events") ?: return@withContext null
+        (0 until array.length()).map { i ->
+            val o = array.getJSONObject(i)
+            Event(
+                title = o.optString("title"),
+                currency = o.optString("currency"),
+                impact = o.optString("impact"),
+                at = isoDate(o.optString("at")),
+                forecast = o.optString("forecast"),
+                previous = o.optString("previous")
+            )
+        }
+    }
+
+    suspend fun fed(): Fed? = withContext(Dispatchers.IO) {
+        val o = get("/api/fed") ?: return@withContext null
+        val meetings = o.optJSONArray("meetings")
+        Fed(
+            targetFrom = o.optDouble("targetFrom"),
+            targetTo = o.optDouble("targetTo"),
+            effective = o.optDouble("effective"),
+            meetings = (0 until (meetings?.length() ?: 0)).map { i ->
+                val m = meetings!!.getJSONObject(i)
+                val outs = m.optJSONArray("outcomes")
+                FedMeeting(
+                    date = isoDate(m.optString("date")),
+                    likeliest = m.optString("likeliest"),
+                    outcomes = (0 until (outs?.length() ?: 0)).map { j ->
+                        val x = outs!!.getJSONObject(j)
+                        x.optString("label") to x.optDouble("probability")
+                    }
+                )
+            }
+        )
+    }
+
+    suspend fun positioning(): Pair<String, List<Positioning>>? = withContext(Dispatchers.IO) {
+        val o = get("/api/cot") ?: return@withContext null
+        val rows = o.optJSONArray("rows") ?: return@withContext null
+        o.optString("asOf") to (0 until rows.length()).map { i ->
+            val r = rows.getJSONObject(i)
+            Positioning(
+                key = r.optString("key"),
+                label = r.optString("label"),
+                flag = r.optString("flag"),
+                group = r.optString("group"),
+                longPercent = r.optInt("longPct"),
+                net = r.optLong("net"),
+                change = r.optLong("change")
+            )
+        }
+    }
 }

@@ -34,6 +34,12 @@ private val bottomBarItems = listOf(
     BottomBarItem("Signals", AppRoute.Signals.route) { tint, modifier ->
         TabIcons.Signals(modifier, tint)
     },
+    BottomBarItem("Markets", AppRoute.Markets.route) { tint, modifier ->
+        TabIcons.Markets(modifier, tint)
+    },
+    BottomBarItem("News", AppRoute.News.route) { tint, modifier ->
+        TabIcons.News(modifier, tint)
+    },
     // The feed took this tab from the chats, which now sit behind the icon in
     // its top right corner. It is what people open the app for; the
     // conversations are one tap away.

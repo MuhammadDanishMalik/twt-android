@@ -35,6 +35,8 @@ sealed class AppRoute(val route: String) {
      * away behind the icon in its top right corner.
      */
     data object Feed : AppRoute("feed")
+    data object Markets : AppRoute("markets")
+    data object News : AppRoute("news")
 
     data object FeedPost : AppRoute("feed/{postId}") {
         const val ARG = "postId"
@@ -126,7 +128,7 @@ sealed class AppRoute(val route: String) {
     companion object {
         /** The three the bottom bar shows. Anything else hides it. */
         val bottomBarRoutes: Set<String> by lazy {
-            setOf(Home.route, Signals.route, Feed.route)
+            setOf(Home.route, Signals.route, Markets.route, News.route, Feed.route)
         }
     }
 }

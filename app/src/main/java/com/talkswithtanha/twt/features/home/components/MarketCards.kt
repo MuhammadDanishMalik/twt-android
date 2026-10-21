@@ -58,7 +58,7 @@ private fun changeColor(change: Double) = if (change >= 0) Up else Down
 
 /** The coin or flag beside an instrument, as the website draws it. */
 @Composable
-private fun InstrumentBadge(quote: MarketsApi.Quote, size: Int = 22) {
+internal fun InstrumentBadge(quote: MarketsApi.Quote, size: Int = 22) {
     val (text, bg) = when (quote.key) {
         "gold" -> "Au" to Color(0xFFB8860B)
         "silver" -> "Ag" to Color(0xFF8E8E93)

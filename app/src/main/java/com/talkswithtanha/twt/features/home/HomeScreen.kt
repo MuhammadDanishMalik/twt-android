@@ -301,6 +301,25 @@ fun HomeScreen(
                     }
                 }
             }
+
+            // Gold and the day's heatmap, from the website's Markets page. A
+            // LazyColumn only composes an item as it scrolls into view, so the
+            // cards animate in when the member reaches them, not before.
+            item(key = "markets") {
+                com.talkswithtanha.twt.features.home.components.HomeMarketsSection(
+                    onOpenNews = {
+                        runCatching {
+                            context.startActivity(
+                                android.content.Intent(
+                                    android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse(com.talkswithtanha.twt.core.data.MarketsApi.GOLD_NEWS_URL)
+                                )
+                            )
+                        }
+                    },
+                    modifier = Modifier.padding(top = 6.dp)
+                )
+            }
         }
         // The matching scrim at the bottom, drawn *over* the feed.
         //

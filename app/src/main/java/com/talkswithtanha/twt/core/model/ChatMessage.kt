@@ -34,6 +34,8 @@ data class ChatMessage(
     val isPinned: Boolean = false,
     /** Who an appreciation message is about. */
     val targetName: String? = null,
+    /** "owner", "admin" or "team" when staff wrote it — the mark beside their name. */
+    val senderRole: String? = null,
     /** True between hitting send and the server echoing the write back. */
     val isPending: Boolean = false
 ) {

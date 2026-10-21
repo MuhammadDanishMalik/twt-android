@@ -19,6 +19,17 @@ import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** One member's private thread, as the staff inbox lists it. */
+data class SupportThread(
+    val roomId: String,
+    val memberId: String,
+    val memberName: String,
+    val memberEmail: String,
+    val lastMessage: String,
+    val lastMessageAt: Date?,
+    val needsReply: Boolean
+)
+
 /** Who else has a room open, and who is typing in it. */
 data class RoomActivity(val online: Int = 0, val typing: List<String> = emptyList())
 
@@ -45,8 +56,14 @@ interface ChatRepository {
         senderId: String,
         senderName: String,
         replyTo: ChatMessage.ReplyReference? = null,
-        note: ChatMessage.NoteAttachment? = null
+        note: ChatMessage.NoteAttachment? = null,
+        senderRole: String? = null
     )
+
+    /** Every member's support thread, newest first — the staff inbox. */
+    fun observeSupportThreads(): Flow<Snapshot<List<SupportThread>>>
+    /** A staff reply: takes the thread out of the waiting queue. */
+    suspend fun markHandled(roomId: String, lastMessage: String)
 
     suspend fun edit(roomId: String, messageId: String, text: String)
     /** Deletes the member's own message, for everyone. */
@@ -137,7 +154,8 @@ class FirebaseChatRepository @Inject constructor(
         senderId: String,
         senderName: String,
         replyTo: ChatMessage.ReplyReference?,
-        note: ChatMessage.NoteAttachment?
+        note: ChatMessage.NoteAttachment?,
+        senderRole: String?
     ) {
         val payload = mutableMapOf<String, Any>(
             M.TEXT to text,
@@ -166,7 +184,44 @@ class FirebaseChatRepository @Inject constructor(
                 M.Note.NOTE_TEXT to it.noteText
             )
         }
+        senderRole?.let { payload[M.SENDER_ROLE] = it }
         messages(roomId).add(payload).await()
+    }
+
+    override fun observeSupportThreads(): Flow<Snapshot<List<SupportThread>>> =
+        db.collection(Collection.CHAT_ROOMS)
+            .whereEqualTo(R.KIND, R.KIND_SUPPORT)
+            .orderBy(R.LAST_MESSAGE_AT, Query.Direction.DESCENDING)
+            .limit(200)
+            .snapshotFlow()
+            .map { snapshot ->
+                when (snapshot) {
+                    is Snapshot.Failed -> snapshot
+                    is Snapshot.Data -> Snapshot.Data(
+                        snapshot.value.documents.map { d ->
+                            SupportThread(
+                                roomId = d.id,
+                                memberId = d.getString(R.MEMBER_ID).orEmpty(),
+                                memberName = d.getString(R.MEMBER_NAME)?.takeIf { it.isNotBlank() } ?: "Member",
+                                memberEmail = d.getString(R.MEMBER_EMAIL).orEmpty(),
+                                lastMessage = d.getString(R.LAST_MESSAGE).orEmpty(),
+                                lastMessageAt = d.getTimestamp(R.LAST_MESSAGE_AT)?.toDate(),
+                                needsReply = d.getBoolean(R.NEEDS_REPLY) ?: false
+                            )
+                        }
+                    )
+                }
+            }
+
+    override suspend fun markHandled(roomId: String, lastMessage: String) {
+        db.collection(Collection.CHAT_ROOMS).document(roomId).update(
+            mapOf(
+                R.NEEDS_REPLY to false,
+                R.LAST_MESSAGE to lastMessage.take(140),
+                R.LAST_MESSAGE_AT to FieldValue.serverTimestamp(),
+                R.UPDATED_AT to FieldValue.serverTimestamp()
+            )
+        ).await()
     }
 
     override suspend fun delete(roomId: String, messageId: String) {
@@ -335,6 +390,7 @@ class FirebaseChatRepository @Inject constructor(
             audioDurationSecs = (document.get(M.AUDIO_DURATION) as? Number)?.toInt() ?: 0,
             isPinned = document.getBoolean(M.IS_PINNED) ?: false,
             targetName = document.getString(M.TARGET_NAME),
+            senderRole = document.getString(M.SENDER_ROLE),
             // Per document, not per query. `QuerySnapshot.metadata` is true
             // while *any* write in the query is in flight, so reading it there
             // marks every message in the room as "sending" whenever one of them

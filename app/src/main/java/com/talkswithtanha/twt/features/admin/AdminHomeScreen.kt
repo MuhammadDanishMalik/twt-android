@@ -149,7 +149,7 @@ fun AdminHomeScreen(
                 AdminTile(
                     icon = Icons.AutoMirrored.Filled.Chat,
                     title = "Member chats",
-                    subtitle = "The private thread with each member",
+                    subtitle = "Every member's private thread — reply as the team",
                     modifier = Modifier.staggeredAppear(index++),
                     onClick = onChats
                 )

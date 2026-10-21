@@ -197,7 +197,8 @@ fun ChatRoomScreen(
                     state.messages,
                     openNote,
                     onLongPress = { actionsFor = it },
-                    onOpenImage = { images, index -> viewing = images to index }
+                    onOpenImage = { images, index -> viewing = images to index },
+                    supportMemberId = viewModel.supportMemberId
                 )
             }
         }
@@ -304,7 +305,8 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsWithDateDividers
     messages: List<ChatMessage>,
     onOpenNote: (ChatMessage.NoteAttachment) -> Unit,
     onLongPress: (ChatMessage) -> Unit,
-    onOpenImage: (List<String>, Int) -> Unit
+    onOpenImage: (List<String>, Int) -> Unit,
+    supportMemberId: String?
 ) {
     messages.forEachIndexed { index, message ->
         val previous = messages.getOrNull(index - 1)
@@ -313,7 +315,12 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsWithDateDividers
                 ChatDateDivider(chatDateLabel(message.timestamp))
             }
         }
-        item(key = message.id) { ChatBubble(message, onOpenNote, onLongPress, onOpenImage) }
+        // Staff are marked: by the role they posted with, or — in a private
+        // thread, for replies written before roles were recorded — by simply
+        // not being the member whose thread it is.
+        val role = message.senderRole
+            ?: if (supportMemberId != null && message.senderId != supportMemberId) "admin" else null
+        item(key = message.id) { ChatBubble(message, onOpenNote, onLongPress, onOpenImage, role) }
     }
 }
 
@@ -322,7 +329,8 @@ private fun ChatBubble(
     message: ChatMessage,
     onOpenNote: (ChatMessage.NoteAttachment) -> Unit,
     onLongPress: (ChatMessage) -> Unit,
-    onOpenImage: (List<String>, Int) -> Unit
+    onOpenImage: (List<String>, Int) -> Unit,
+    staffRole: String? = null
 ) {
     // Photos Tanha sends from the admin arrive as image links in the text;
     // they show as pictures, and the link itself is hidden.
@@ -361,12 +369,25 @@ private fun ChatBubble(
             modifier = Modifier.widthIn(max = 280.dp)
         ) {
             if (!message.isCurrentUser) {
-                Text(
-                    text = message.senderName,
-                    color = IosColors.TextSecondary,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(start = 12.dp, bottom = 4.dp)
-                )
+                Row(
+                    Modifier.padding(start = 12.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = message.senderName,
+                        color = if (staffRole != null) Color.White else IosColors.TextSecondary,
+                        fontSize = 13.sp,
+                        fontWeight = if (staffRole != null) FontWeight.SemiBold else FontWeight.Normal
+                    )
+                    if (staffRole != null) {
+                        Spacer(Modifier.width(4.dp))
+                        RoleMark(staffRole)
+                        if (staffRole == "team") {
+                            Spacer(Modifier.width(4.dp))
+                            Text("Team", color = Color(0xFF22C55E), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
             }
 
             Column(
@@ -636,7 +657,7 @@ private fun SupportHeader(onBack: () -> Unit) {
                     )
                 }
                 Text(
-                    "Private chat · he answers these himself",
+                    "Private chat · Tanha and his team",
                     color = IosColors.TextSecondary,
                     fontSize = 11.sp
                 )
@@ -841,7 +862,7 @@ private fun SupportEmptyState(onPrompt: (String) -> Unit) {
             fontWeight = FontWeight.Bold
         )
         Text(
-            "This goes straight to Tanha and nobody else can see it. Your access code, your account, or a signal you did not follow.",
+            "Only Tanha and his team can see this — no other members. Ask about your access code, your account, or a signal you did not follow.",
             color = IosColors.TextSecondary,
             fontSize = 13.sp,
             textAlign = TextAlign.Center,

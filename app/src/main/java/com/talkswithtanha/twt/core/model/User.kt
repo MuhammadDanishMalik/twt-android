@@ -104,6 +104,19 @@ data class User(
     val isStaff: Boolean get() = role == UserRole.OWNER || role == UserRole.ADMIN
 
     /**
+     * What this account's messages are marked as: Tanha ("owner"), a full
+     * admin, or a team member — an admin limited to some areas. Null for
+     * members. The rules check it against the profile, so it cannot be faked.
+     */
+    val chatRole: String?
+        get() = when {
+            role == UserRole.OWNER -> "owner"
+            role == UserRole.ADMIN && staffAccess.isEmpty() -> "admin"
+            role == UserRole.ADMIN -> "team"
+            else -> null
+        }
+
+    /**
      * May they work in this area?
      *
      * Mirrors `can()` in firestore.rules, which is what actually enforces it —

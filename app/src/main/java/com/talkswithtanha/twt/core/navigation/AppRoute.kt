@@ -118,6 +118,7 @@ sealed class AppRoute(val route: String) {
     data object AdminSignals : AppRoute("admin/signals")
     data object AdminDeals : AppRoute("admin/deals")
     data object AdminBanners : AppRoute("admin/banners")
+    data object AdminChats : AppRoute("admin/chats")
 
     data object Appearance : AppRoute("appearance")
     data object ContactSupport : AppRoute("contactSupport")

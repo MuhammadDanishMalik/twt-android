@@ -130,6 +130,10 @@ class ChatRoomViewModel @Inject constructor(
 
     val isSupportRoom: Boolean = roomId.startsWith(FirestorePaths.ChatRoom.SUPPORT_PREFIX)
 
+    /** Whose private thread this is. Anyone else writing in it is staff. */
+    val supportMemberId: String? =
+        if (isSupportRoom) roomId.removePrefix(FirestorePaths.ChatRoom.SUPPORT_PREFIX) else null
+
     val roomTitle: String = when (roomId) {
         FirestorePaths.ChatRoom.PREMIUM -> "Premium Community"
         FirestorePaths.ChatRoom.COMMUNITY -> "Community"
@@ -363,7 +367,10 @@ class ChatRoomViewModel @Inject constructor(
                 // The parent room document first, so a brand new support thread
                 // shows up in Tanha's queue rather than existing only as an
                 // orphaned subcollection.
-                if (isSupportRoom) {
+                // A member writing in their own thread creates it; staff
+                // answering someone else's must not create one of their own.
+                val ownThread = roomId == FirestorePaths.ChatRoom.support(user.id)
+                if (isSupportRoom && ownThread) {
                     chatRepository.ensureSupportRoom(
                         uid = user.id,
                         userName = user.fullName,
@@ -379,8 +386,14 @@ class ChatRoomViewModel @Inject constructor(
                     replyTo = reply?.let {
                         ChatMessage.ReplyReference(it.senderName, it.text)
                     },
-                    note = note
+                    note = note,
+                    senderRole = user.chatRole
                 )
+                // A staff reply takes the thread out of the waiting queue, the
+                // same as answering it from the admin panel.
+                if (isSupportRoom && !ownThread && user.isStaff) {
+                    runCatching { chatRepository.markHandled(roomId, text.ifEmpty { "Shared a lesson note" }) }
+                }
             }.onFailure {
                 _error.value = "That message did not send."
                 _draft.value = text
@@ -451,4 +464,25 @@ class ContactSupportViewModel @Inject constructor(
             }
         }
     }
+}
+
+/** The staff inbox: every member's private thread, waiting ones first. */
+@HiltViewModel
+class StaffInboxViewModel @Inject constructor(
+    chatRepository: ChatRepository
+) : ViewModel() {
+    val threads: StateFlow<Snapshot<List<com.talkswithtanha.twt.core.data.SupportThread>>?> =
+        chatRepository.observeSupportThreads()
+            .map { snap ->
+                when (snap) {
+                    is Snapshot.Data -> Snapshot.Data(
+                        snap.value.sortedWith(
+                            compareByDescending<com.talkswithtanha.twt.core.data.SupportThread> { it.needsReply }
+                                .thenByDescending { it.lastMessageAt?.time ?: 0L }
+                        )
+                    )
+                    else -> snap
+                }
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 }

@@ -462,6 +462,8 @@ object FirestorePaths {
         const val AUDIO_DURATION = "audioDurationSecs"
         /** Who an appreciation message is about. */
         const val TARGET_NAME = "targetName"
+        /** "owner", "admin" or "team" on staff messages; absent on members'. */
+        const val SENDER_ROLE = "senderRole"
 
         object Reply {
             const val SENDER_NAME = "senderName"

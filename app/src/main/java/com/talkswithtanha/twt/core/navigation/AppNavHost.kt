@@ -325,7 +325,7 @@ fun AppNavHost(
                 onBack = { navController.popBackStack() },
                 onPostSignal = { navController.navigate(AppRoute.AdminPostSignal.route) },
                 onTickets = { navController.navigate(AppRoute.SupportTickets.route) },
-                onChats = { navController.navigateToTab(AppRoute.ChatList.route) },
+                onChats = { navController.navigate(AppRoute.AdminChats.route) },
                 onSignals = { navController.navigate(AppRoute.AdminSignals.route) },
                 onDeals = { navController.navigate(AppRoute.AdminDeals.route) },
                 onBanners = { navController.navigate(AppRoute.AdminBanners.route) }
@@ -342,6 +342,13 @@ fun AppNavHost(
 
             sheetRoute(sharedScope, AppRoute.AdminDeals.route) {
             AdminDealsScreen(onBack = { navController.popBackStack() })
+        }
+
+            sheetRoute(sharedScope, AppRoute.AdminChats.route) {
+            com.talkswithtanha.twt.features.chat.StaffInboxScreen(
+                onBack = { navController.popBackStack() },
+                onOpenThread = { navController.navigate(AppRoute.ChatRoom.of(it)) }
+            )
         }
 
             sheetRoute(sharedScope, AppRoute.AdminBanners.route) {

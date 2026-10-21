@@ -57,20 +57,14 @@ class ChatListViewModel @Inject constructor(
                     ChatRoomSummary(
                         roomId = FirestorePaths.ChatRoom.COMMUNITY,
                         title = "Community",
-                        subtitle = "Everyone on TWT",
+                        subtitle = "Everyone on TWT, with Tanha and his team",
                         requiresAccess = false,
                         icon = Icons.Filled.Groups
                     )
                 )
-                add(
-                    ChatRoomSummary(
-                        roomId = FirestorePaths.ChatRoom.PREMIUM,
-                        title = "Premium Community",
-                        subtitle = "Signals talk and Tanha's desk",
-                        requiresAccess = true,
-                        icon = Icons.Filled.WorkspacePremium
-                    )
-                )
+                // One community for everybody, the same room the admin panel
+                // reads. A second, premium-only room split the conversation and
+                // its messages never reached Tanha's Messages page.
                 user?.let {
                     add(
                         ChatRoomSummary(

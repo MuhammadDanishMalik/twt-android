@@ -365,6 +365,7 @@ private fun periodLabel(range: String) = when (range) {
     "1W" -> "Past week"
     "1M" -> "Past month"
     "3M" -> "Past 3 months"
+    "6M" -> "Past 6 months"
     "1Y" -> "Past year"
     else -> "Past 5 years"
 }

@@ -134,7 +134,12 @@ fun MarketsScreen() {
 
         HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), beyondViewportPageCount = 1) { page ->
             when (PAGES[page]) {
-                "Dashboard" -> DashboardPage(quotes) { charting = it }
+                "Dashboard" -> DashboardPage(
+                    quotes = quotes,
+                    events = events,
+                    onCalendar = { scope.launch { pager.animateScrollToPage(PAGES.indexOf("Calendar")) } },
+                    onOpen = { charting = it }
+                )
                 "Calendar" -> CalendarPage(events)
                 "Live news" -> NewsFeed(showTitle = false)
                 "COT report" -> CotPage(positioning)
@@ -271,9 +276,17 @@ private fun SectionCard(title: String, trailing: String? = null, content: @Compo
 // ── Dashboard ────────────────────────────────────────────────────────────
 
 @Composable
-private fun DashboardPage(quotes: List<MarketsApi.Quote>?, onOpen: (MarketsApi.Quote) -> Unit) {
+private fun DashboardPage(
+    quotes: List<MarketsApi.Quote>?,
+    events: List<MarketsApi.Event>?,
+    onCalendar: () -> Unit,
+    onOpen: (MarketsApi.Quote) -> Unit
+) {
     val haptics = LocalHapticFeedback.current
     PageList {
+        item { SessionHero() }
+        item { GoldChartCard(onOpen = { quotes?.firstOrNull { it.key == "gold" }?.let(onOpen) }) }
+        item { NextReleaseCard(events, onCalendar) }
         item { LiveDeskCard(height = 242.dp, corner = 24.dp) }
         if (quotes == null) item { Loading() }
         quotes?.let { list ->

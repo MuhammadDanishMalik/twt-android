@@ -85,7 +85,8 @@ fun NewsScreen() {
 
 /**
  * The news list itself — the News tab, and the Live news page inside
- * Markets. [showTitle] adds the big "News" heading the tab has.
+ * Markets. [showTitle] adds what the tab has on top: the big "News"
+ * heading, the live desk and the next release on the calendar.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -98,6 +99,7 @@ fun NewsFeed(showTitle: Boolean, modifier: Modifier = Modifier) {
     var refreshing by remember { mutableStateOf(false) }
     var filter by rememberSaveable { mutableStateOf("All") }
     var tick by remember { mutableIntStateOf(0) }
+    var events by remember { mutableStateOf<List<MarketsApi.Event>?>(null) }
 
     suspend fun load() {
         val loaded = MarketsApi.news()
@@ -106,6 +108,7 @@ fun NewsFeed(showTitle: Boolean, modifier: Modifier = Modifier) {
     }
 
     LaunchedEffect(Unit) {
+        if (showTitle) launch { events = MarketsApi.calendar() }
         while (true) {
             load()
             delay(5 * 60_000)
@@ -138,6 +141,10 @@ fun NewsFeed(showTitle: Boolean, modifier: Modifier = Modifier) {
                         Text("News", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold)
                         Text("What is moving gold and the majors", color = Muted, fontSize = 14.sp)
                         Spacer(Modifier.height(12.dp))
+                        SessionHero()
+                        Spacer(Modifier.height(10.dp))
+                        NextReleaseCard(events)
+                        Spacer(Modifier.height(14.dp))
                     }
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FILTERS.forEach { (label, _) ->

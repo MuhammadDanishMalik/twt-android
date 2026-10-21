@@ -130,21 +130,21 @@ private fun verdictColor(label: String): Color = when {
 }
 
 /** The four desks, in UTC hours; Sydney wraps midnight. Same as the website. */
-private val SESSIONS = listOf(
+internal val SESSIONS = listOf(
     Triple("Sydney", 22, 7),
     Triple("Tokyo", 0, 9),
     Triple("London", 8, 17),
     Triple("New York", 13, 22)
 )
 
-private fun openSessions(): List<String> {
+internal fun openSessions(): List<String> {
     val hour = Calendar.getInstance(TimeZone.getTimeZone("UTC")).get(Calendar.HOUR_OF_DAY)
     return SESSIONS.filter { (_, open, close) ->
         if (open < close) hour in open until close else hour >= open || hour < close
     }.map { it.first }
 }
 
-private fun headline(open: List<String>): String = when (open.size) {
+internal fun headline(open: List<String>): String = when (open.size) {
     0 -> "The market is quiet."
     1 -> "${open[0]} is open."
     else -> "${open.dropLast(1).joinToString(", ")} and ${open.last()} are open."

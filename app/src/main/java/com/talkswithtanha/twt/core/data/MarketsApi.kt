@@ -91,6 +91,7 @@ object MarketsApi {
         Triple("1W", "5d", "30m"),
         Triple("1M", "1mo", "1d"),
         Triple("3M", "3mo", "1d"),
+        Triple("6M", "6mo", "1d"),
         Triple("1Y", "1y", "1d"),
         Triple("5Y", "5y", "1wk")
     )

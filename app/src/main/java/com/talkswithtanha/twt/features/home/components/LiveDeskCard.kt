@@ -6,7 +6,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,7 +20,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -69,6 +67,62 @@ private val BuyGreen = Color(0xFF22C55E)
 private val NeutralSlate = Color(0xFF94A3B8)
 private val Track = Color.White.copy(alpha = 0.12f)
 
+/** What the timeframe menu says, in words; the chip shows the short form. */
+private val TIMEFRAME_NAMES = mapOf(
+    "1m" to "1 minute", "5m" to "5 minutes", "15m" to "15 minutes", "30m" to "30 minutes",
+    "1h" to "1 hour", "4h" to "4 hours", "1d" to "1 day", "1w" to "1 week", "1M" to "1 month"
+)
+
+/** A rounded chip that opens a menu, the selected option ticked. */
+@Composable
+private fun PickerChip(
+    label: String,
+    description: String,
+    expanded: Boolean,
+    onOpen: () -> Unit,
+    onDismiss: () -> Unit,
+    options: List<Pair<String, String>>,
+    selected: String,
+    onSelect: (String) -> Unit,
+    monospace: Boolean = false
+) {
+    Box {
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color.White.copy(alpha = 0.08f))
+                .clickable(onClick = onOpen)
+                .padding(start = 12.dp, end = 6.dp, top = 5.dp, bottom = 5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                label,
+                color = Color.White,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = if (monospace) FontFamily.Monospace else FontFamily.Default
+            )
+            Icon(Icons.Filled.KeyboardArrowDown, description, tint = Color.White, modifier = Modifier.size(18.dp))
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+            options.forEach { (key, text) ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text,
+                            fontWeight = if (key == selected) FontWeight.Bold else FontWeight.Normal
+                        )
+                    },
+                    trailingIcon = if (key == selected) {
+                        { Text("✓", fontWeight = FontWeight.Bold) }
+                    } else null,
+                    onClick = { onSelect(key) }
+                )
+            }
+        }
+    }
+}
+
 private fun verdictColor(label: String): Color = when {
     label.contains("sell", ignoreCase = true) -> SellRed
     label.contains("buy", ignoreCase = true) -> BuyGreen
@@ -112,6 +166,7 @@ fun LiveDeskCard(height: Dp, corner: Dp, modifier: Modifier = Modifier) {
     var failed by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(true) }
     var pickingInstrument by remember { mutableStateOf(false) }
+    var pickingTimeframe by remember { mutableStateOf(false) }
     var showingRows by remember { mutableStateOf(false) }
     val instrument = TechnicalsApi.INSTRUMENTS.first { it.key == instrumentKey }
     val open = remember { openSessions() }
@@ -150,65 +205,54 @@ fun LiveDeskCard(height: Dp, corner: Dp, modifier: Modifier = Modifier) {
                 maxLines = 1,
                 modifier = Modifier.weight(1f)
             )
-            // Instrument picker
-            Box {
-                Row(
-                    Modifier
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color.White.copy(alpha = 0.08f))
-                        .clickable {
-                            Haptics.tap(haptics)
-                            pickingInstrument = true
-                        }
-                        .padding(start = 10.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(instrument.label, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                    Icon(Icons.Filled.KeyboardArrowDown, "Choose instrument", tint = Color.White, modifier = Modifier.size(18.dp))
-                }
-                DropdownMenu(expanded = pickingInstrument, onDismissRequest = { pickingInstrument = false }) {
-                    TechnicalsApi.INSTRUMENTS.forEach { option ->
-                        DropdownMenuItem(
-                            text = { Text("${option.flag}  ${option.label}") },
-                            onClick = {
-                                Haptics.tap(haptics)
-                                instrumentKey = option.key
-                                pickingInstrument = false
-                            }
-                        )
-                    }
-                }
-            }
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(10.dp))
 
-        // ── Timeframes ────────────────────────────────────────────
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color.White.copy(alpha = 0.05f))
-                .horizontalScroll(rememberScrollState())
-                .padding(3.dp),
-            horizontalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            TechnicalsApi.TIMEFRAMES.forEach { (key, label) ->
-                val selected = key == timeframe
+        // ── Instrument and timeframe, both as dropdowns ───────────
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            PickerChip(
+                label = "${instrument.flag}  ${instrument.label}",
+                description = "Choose instrument",
+                expanded = pickingInstrument,
+                onOpen = {
+                    Haptics.tap(haptics)
+                    pickingInstrument = true
+                },
+                onDismiss = { pickingInstrument = false },
+                options = TechnicalsApi.INSTRUMENTS.map { it.key to "${it.flag}  ${it.label}" },
+                selected = instrumentKey,
+                onSelect = {
+                    Haptics.tap(haptics)
+                    instrumentKey = it
+                    pickingInstrument = false
+                }
+            )
+            PickerChip(
+                label = TechnicalsApi.TIMEFRAMES.first { it.first == timeframe }.second,
+                description = "Choose timeframe",
+                expanded = pickingTimeframe,
+                onOpen = {
+                    Haptics.tap(haptics)
+                    pickingTimeframe = true
+                },
+                onDismiss = { pickingTimeframe = false },
+                options = TechnicalsApi.TIMEFRAMES.map { (key, label) -> key to (TIMEFRAME_NAMES[key] ?: label) },
+                selected = timeframe,
+                onSelect = {
+                    Haptics.tap(haptics)
+                    timeframe = it
+                    pickingTimeframe = false
+                },
+                monospace = true
+            )
+            Spacer(Modifier.weight(1f))
+            data?.let {
                 Text(
-                    label,
-                    color = if (selected) Color.Black else Color.White.copy(alpha = 0.7f),
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(9.dp))
-                        .background(if (selected) Color.White else Color.Transparent)
-                        .clickable {
-                            Haptics.tap(haptics)
-                            timeframe = key
-                        }
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                    "%,.${if (it.price < 10) 4 else 2}f".format(it.price),
+                    color = Color.White.copy(alpha = 0.75f),
+                    fontSize = 13.sp,
+                    fontFamily = FontFamily.Monospace
                 )
             }
         }

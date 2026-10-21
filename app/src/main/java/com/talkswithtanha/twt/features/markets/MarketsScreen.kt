@@ -1,8 +1,11 @@
 package com.talkswithtanha.twt.features.markets
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,29 +15,41 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.talkswithtanha.twt.core.data.MarketsApi
@@ -49,6 +64,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlin.math.abs
 
 private val Up = Color(0xFF22C55E)
 private val Down = Color(0xFFEF4444)
@@ -57,14 +73,21 @@ private val Muted = Color.White.copy(alpha = 0.55f)
 private val CardBg = Color(0xFF141414)
 private val Tabular = TextStyle(fontFeatureSettings = "tnum")
 
+/** The website's Markets sections, in its order. */
+private val PAGES = listOf("Dashboard", "Calendar", "Live news", "COT report", "Fed watch")
+
 /**
- * The website's Markets page as a tab: the live desk, every price with its
- * chart a tap away, the Fed's next move, how the big money is positioned, and
- * the week's economic calendar. All from the website's own feeds, so the app
- * and the site never disagree.
+ * The website's Markets area as a tab: the same five sections as its side
+ * menu, as pages along the top. Tap a heading or swipe between them; a pill
+ * slides under the one you are on. Everything comes from the website's own
+ * feeds, loaded once here and shared by the pages.
  */
 @Composable
 fun MarketsScreen() {
+    val haptics = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    val pager = rememberPagerState(pageCount = { PAGES.size })
+
     var quotes by remember { mutableStateOf<List<MarketsApi.Quote>?>(null) }
     var fed by remember { mutableStateOf<MarketsApi.Fed?>(null) }
     var positioning by remember { mutableStateOf<Pair<String, List<MarketsApi.Positioning>>?>(null) }
@@ -81,25 +104,116 @@ fun MarketsScreen() {
         }
     }
 
-    LazyColumn(
-        Modifier.fillMaxSize().background(IosColors.Background).statusBarsPadding(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        item {
-            Column {
-                Text("Markets", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold)
-                Text("Live prices, the Fed, positioning and this week's calendar", color = Muted, fontSize = 14.sp)
+    Column(Modifier.fillMaxSize().background(IosColors.Background).statusBarsPadding()) {
+        Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp)) {
+            Text("Markets", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold)
+        }
+
+        PageTabs(
+            selected = pager.currentPage,
+            onSelect = { index ->
+                Haptics.tap(haptics)
+                scope.launch { pager.animateScrollToPage(index) }
+            }
+        )
+
+        HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), beyondViewportPageCount = 1) { page ->
+            when (PAGES[page]) {
+                "Dashboard" -> DashboardPage(quotes) { charting = it }
+                "Calendar" -> CalendarPage(events)
+                "Live news" -> NewsFeed(showTitle = false)
+                "COT report" -> CotPage(positioning)
+                else -> FedPage(fed)
             }
         }
-        item { LiveDeskCard(height = 242.dp, corner = 24.dp) }
-        quotes?.let { list -> item { PricesCard(list) { charting = it } } }
-        fed?.let { item { FedCard(it) } }
-        positioning?.let { (asOf, rows) -> item { PositioningCard(asOf, rows) } }
-        events?.let { item { CalendarCard(it) } }
     }
 
     charting?.let { MarketChartSheet(it, onDismiss = { charting = null }) }
+}
+
+/** The headings along the top, with a pill that slides to the current one. */
+@Composable
+private fun PageTabs(selected: Int, onSelect: (Int) -> Unit) {
+    val density = LocalDensity.current
+    val bounds = remember { mutableStateMapOf<Int, Pair<Dp, Dp>>() }
+    val target = bounds[selected]
+    val pillX by animateDpAsState(target?.first ?: 0.dp, spring(dampingRatio = 0.8f, stiffness = 500f), label = "pillX")
+    val pillW by animateDpAsState(target?.second ?: 0.dp, spring(dampingRatio = 0.8f, stiffness = 500f), label = "pillW")
+    val scroll = rememberScrollState()
+
+    // Keep the current heading in view, centred where the row allows.
+    LaunchedEffect(selected, target) {
+        val (x, w) = target ?: return@LaunchedEffect
+        val viewport = scroll.viewportSize
+        if (viewport == 0) return@LaunchedEffect
+        val centre = with(density) { (x + w / 2 + 16.dp).roundToPx() }
+        scroll.animateScrollTo((centre - viewport / 2).coerceIn(0, scroll.maxValue))
+    }
+
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .horizontalScroll(scroll)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        if (target != null) {
+            Box(
+                Modifier
+                    .offset(x = pillX)
+                    .width(pillW)
+                    .height(38.dp)
+                    .clip(RoundedCornerShape(19.dp))
+                    .background(Color.White)
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            PAGES.forEachIndexed { index, label ->
+                val isSelected = index == selected
+                Row(
+                    Modifier
+                        .height(38.dp)
+                        .onGloballyPositioned { coords ->
+                            with(density) {
+                                bounds[index] = coords.positionInParent().x.toDp() to coords.size.width.toDp()
+                            }
+                        }
+                        .clip(RoundedCornerShape(19.dp))
+                        .background(if (isSelected) Color.Transparent else Color.White.copy(alpha = 0.07f))
+                        .clickable { onSelect(index) }
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (label == "Live news") {
+                        Box(Modifier.size(7.dp).clip(CircleShape).background(Up))
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    Text(
+                        label,
+                        color = if (isSelected) Color.Black else Color.White.copy(alpha = 0.8f),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PageList(content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit) {
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 120.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+        content = content
+    )
+}
+
+@Composable
+private fun Loading() {
+    Box(Modifier.fillMaxWidth().padding(top = 60.dp), Alignment.Center) {
+        CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
+    }
 }
 
 @Composable
@@ -122,199 +236,268 @@ private fun SectionCard(title: String, trailing: String? = null, content: @Compo
     }
 }
 
-// ── Prices ───────────────────────────────────────────────────────────────
+// ── Dashboard ────────────────────────────────────────────────────────────
 
 @Composable
-private fun PricesCard(quotes: List<MarketsApi.Quote>, onOpen: (MarketsApi.Quote) -> Unit) {
+private fun DashboardPage(quotes: List<MarketsApi.Quote>?, onOpen: (MarketsApi.Quote) -> Unit) {
     val haptics = LocalHapticFeedback.current
-    SectionCard("Prices", "Tap for the chart") {
-        quotes.forEach { q ->
-            val tint = if (q.change >= 0) Up else Down
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        Haptics.sheetOpen(haptics)
-                        onOpen(q)
-                    }
-                    .padding(horizontal = 18.dp, vertical = 11.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                InstrumentBadge(q, 26)
-                Spacer(Modifier.width(12.dp))
-                Text(q.label, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                Text("%,.${q.decimals}f".format(q.price), color = Color.White, fontSize = 15.sp, style = Tabular)
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    "%+.2f%%".format(q.change),
-                    color = tint,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    style = Tabular,
-                    modifier = Modifier
-                        .width(74.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(tint.copy(alpha = 0.12f))
-                        .padding(vertical = 4.dp),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
-            }
-        }
-    }
-}
-
-// ── The Fed ──────────────────────────────────────────────────────────────
-
-@Composable
-private fun FedCard(fed: MarketsApi.Fed) {
-    val next = fed.meetings.firstOrNull { (it.date?.time ?: 0) > System.currentTimeMillis() } ?: fed.meetings.firstOrNull()
-    SectionCard("The Fed", "Rate now %.2f–%.2f%%".format(fed.targetFrom, fed.targetTo)) {
-        Column(Modifier.padding(horizontal = 18.dp)) {
-            if (next == null) {
-                Text("No meeting priced yet.", color = Muted, fontSize = 14.sp)
-                return@Column
-            }
-            val top = next.outcomes.maxByOrNull { it.second }
-            Text(
-                "Next meeting ${next.date?.let { SimpleDateFormat("d MMM", Locale.getDefault()).format(it) } ?: ""}",
-                color = Color.White,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                "Markets expect: ${next.likeliest}" + (top?.let { " · %.0f%% likely".format(it.second) } ?: ""),
-                color = if (next.likeliest.contains("Cut")) Up else if (next.likeliest.contains("Hike")) Down else Amber,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(Modifier.height(12.dp))
-            next.outcomes.forEach { (label, p) ->
-                Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(label, color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp, modifier = Modifier.width(78.dp))
-                    Box(Modifier.weight(1f).height(8.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.08f))) {
-                        Box(
+    PageList {
+        item { LiveDeskCard(height = 242.dp, corner = 24.dp) }
+        if (quotes == null) item { Loading() }
+        quotes?.let { list ->
+            item {
+                SectionCard("Prices", "Tap for the chart") {
+                    list.forEach { q ->
+                        val tint = if (q.change >= 0) Up else Down
+                        Row(
                             Modifier
-                                .fillMaxWidth((p / 100).toFloat().coerceIn(0.01f, 1f))
-                                .height(8.dp)
-                                .clip(CircleShape)
-                                .background(if (label == next.likeliest) Color.White else Color.White.copy(alpha = 0.35f))
-                        )
+                                .fillMaxWidth()
+                                .clickable {
+                                    Haptics.sheetOpen(haptics)
+                                    onOpen(q)
+                                }
+                                .padding(horizontal = 18.dp, vertical = 11.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            InstrumentBadge(q, 26)
+                            Spacer(Modifier.width(12.dp))
+                            Text(q.label, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                            Text("%,.${q.decimals}f".format(q.price), color = Color.White, fontSize = 15.sp, style = Tabular)
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                "%+.2f%%".format(q.change),
+                                color = tint,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                style = Tabular,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier
+                                    .width(74.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(tint.copy(alpha = 0.12f))
+                                    .padding(vertical = 4.dp)
+                            )
+                        }
                     }
-                    Text("%.0f%%".format(p), color = Muted, fontSize = 12.sp, style = Tabular, modifier = Modifier.width(44.dp).padding(start = 8.dp))
                 }
             }
         }
     }
 }
 
-// ── Positioning ──────────────────────────────────────────────────────────
+// ── Calendar ─────────────────────────────────────────────────────────────
 
 @Composable
-private fun PositioningCard(asOf: String, rows: List<MarketsApi.Positioning>) {
-    SectionCard("Managed money", "CFTC · as of $asOf") {
-        Column(Modifier.padding(horizontal = 18.dp)) {
-            Text(
-                "How the big speculators are positioned — the share of their bets that are long.",
-                color = Muted,
-                fontSize = 13.sp
-            )
-            Spacer(Modifier.height(8.dp))
-            rows.forEach { r ->
-                Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(r.flag, fontSize = 16.sp)
-                    Spacer(Modifier.width(8.dp))
-                    Text(r.label, color = Color.White, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.width(118.dp))
-                    Row(Modifier.weight(1f).height(8.dp).clip(CircleShape)) {
-                        Box(Modifier.weight(r.longPercent.coerceIn(1, 99).toFloat()).height(8.dp).background(Up))
-                        Box(Modifier.weight((100 - r.longPercent).coerceIn(1, 99).toFloat()).height(8.dp).background(Down))
-                    }
-                    Text(
-                        "${r.longPercent}%",
-                        color = if (r.longPercent >= 50) Up else Down,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        style = Tabular,
-                        modifier = Modifier.width(48.dp).padding(start = 8.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ── Economic calendar ────────────────────────────────────────────────────
-
-@Composable
-private fun CalendarCard(events: List<MarketsApi.Event>) {
+private fun CalendarPage(events: List<MarketsApi.Event>?) {
     val haptics = LocalHapticFeedback.current
-    var importantOnly by rememberSaveable { mutableStateOf(true) }
+    var impact by rememberSaveable { mutableStateOf("High & medium") }
+    var currency by rememberSaveable { mutableStateOf("All") }
     val now = System.currentTimeMillis()
-    val upcoming = events
-        .filter { (it.at?.time ?: 0) >= now - 2 * 60 * 60 * 1000 }
-        .filter { !importantOnly || it.impact == "High" || it.impact == "Medium" }
-        .sortedBy { it.at?.time ?: 0 }
-        .take(40)
     val dayFormat = SimpleDateFormat("EEEE d MMM", Locale.getDefault())
     val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
 
-    SectionCard("This week's calendar") {
-        Row(Modifier.padding(horizontal = 18.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(true to "High & medium", false to "Everything").forEach { (value, label) ->
-                val selected = importantOnly == value
-                Text(
-                    label,
-                    color = if (selected) Color.Black else Color.White,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(if (selected) Color.White else Color.White.copy(alpha = 0.08f))
-                        .clickable {
-                            Haptics.tap(haptics)
-                            importantOnly = value
-                        }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                )
+    val currencies = listOf("All") + (events?.map { it.currency }?.filter { it.length == 3 && !it.equals("All", ignoreCase = true) }?.distinct()?.sorted() ?: emptyList())
+    val shown = events.orEmpty()
+        .filter { (it.at?.time ?: 0) >= now - 2 * 60 * 60 * 1000 }
+        .filter {
+            when (impact) {
+                "High" -> it.impact == "High"
+                "High & medium" -> it.impact == "High" || it.impact == "Medium"
+                else -> true
             }
         }
-        Spacer(Modifier.height(6.dp))
-        if (upcoming.isEmpty()) {
-            Text("Nothing scheduled.", color = Muted, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
-        }
-        var lastDay = ""
-        upcoming.forEach { e ->
-            val day = e.at?.let { dayFormat.format(it) } ?: ""
-            if (day != lastDay) {
-                lastDay = day
-                Text(
-                    if (e.at != null && isToday(e.at)) "Today" else day,
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(start = 18.dp, top = 14.dp, bottom = 4.dp)
-                )
+        .filter { currency == "All" || it.currency == currency }
+        .sortedBy { it.at?.time ?: 0 }
+
+    PageList {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                ChipRow(listOf("High", "High & medium", "Everything"), impact) {
+                    Haptics.tap(haptics); impact = it
+                }
+                ChipRow(currencies, currency) {
+                    Haptics.tap(haptics); currency = it
+                }
             }
-            Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(e.at?.let { timeFormat.format(it) } ?: "—", color = Muted, fontSize = 13.sp, style = Tabular, modifier = Modifier.width(46.dp))
-                Box(
-                    Modifier.size(8.dp).clip(CircleShape).background(
-                        when (e.impact) {
-                            "High" -> Down
-                            "Medium" -> Amber
-                            "Holiday" -> Color(0xFF64748B)
-                            else -> Color.White.copy(alpha = 0.3f)
+        }
+        when {
+            events == null -> item { Loading() }
+            shown.isEmpty() -> item { Text("Nothing scheduled for that filter.", color = Muted, fontSize = 14.sp, modifier = Modifier.padding(top = 20.dp)) }
+            else -> shown.groupBy { it.at?.let { d -> dayFormat.format(d) } ?: "" }.forEach { (day, dayEvents) ->
+                item {
+                    SectionCard(if (dayEvents.first().at?.let(::isToday) == true) "Today" else day, "${dayEvents.size} events") {
+                        dayEvents.forEach { e ->
+                            Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(e.at?.let { timeFormat.format(it) } ?: "—", color = Muted, fontSize = 13.sp, style = Tabular, modifier = Modifier.width(46.dp))
+                                Box(Modifier.size(8.dp).clip(CircleShape).background(impactColor(e.impact)))
+                                Spacer(Modifier.width(8.dp))
+                                Text(e.currency, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(40.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(e.title, color = Color.White, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                    val detail = listOfNotNull(
+                                        e.forecast.takeIf { it.isNotBlank() }?.let { "Forecast $it" },
+                                        e.previous.takeIf { it.isNotBlank() }?.let { "Previous $it" }
+                                    ).joinToString(" · ")
+                                    if (detail.isNotEmpty()) Text(detail, color = Muted, fontSize = 12.sp, style = Tabular)
+                                }
+                            }
                         }
-                    )
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(e.currency, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(40.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(e.title, color = Color.White, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    val detail = listOfNotNull(
-                        e.forecast.takeIf { it.isNotBlank() }?.let { "Forecast $it" },
-                        e.previous.takeIf { it.isNotBlank() }?.let { "Previous $it" }
-                    ).joinToString(" · ")
-                    if (detail.isNotEmpty()) Text(detail, color = Muted, fontSize = 12.sp, style = Tabular)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun impactColor(impact: String) = when (impact) {
+    "High" -> Down
+    "Medium" -> Amber
+    "Holiday" -> Color(0xFF64748B)
+    else -> Color.White.copy(alpha = 0.3f)
+}
+
+@Composable
+private fun ChipRow(options: List<String>, selected: String, onSelect: (String) -> Unit) {
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.forEach { option ->
+            val isSelected = option == selected
+            Text(
+                option,
+                color = if (isSelected) Color.Black else Color.White,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(if (isSelected) Color.White else Color.White.copy(alpha = 0.08f))
+                    .clickable { onSelect(option) }
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            )
+        }
+    }
+}
+
+// ── COT report ───────────────────────────────────────────────────────────
+
+@Composable
+private fun CotPage(data: Pair<String, List<MarketsApi.Positioning>>?) {
+    PageList {
+        if (data == null) {
+            item { Loading() }
+            return@PageList
+        }
+        val (asOf, rows) = data
+        item {
+            Text(
+                "How the big speculators — hedge funds and money managers — are positioned, from the CFTC's weekly Commitments of Traders report. As of $asOf.",
+                color = Muted,
+                fontSize = 14.sp
+            )
+        }
+        listOf("metal" to "Metals & energy", "currency" to "Currencies & crypto").forEach { (group, title) ->
+            val groupRows = rows.filter { it.group == group }
+            if (groupRows.isEmpty()) return@forEach
+            item {
+                SectionCard(title) {
+                    groupRows.forEach { r -> CotRow(r) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CotRow(r: MarketsApi.Positioning) {
+    val long = r.longPercent >= 50
+    Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 9.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(r.flag, fontSize = 16.sp)
+            Spacer(Modifier.width(8.dp))
+            Text(r.label, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text(
+                if (long) "${r.longPercent}% long" else "${100 - r.longPercent}% short",
+                color = if (long) Up else Down,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+        Spacer(Modifier.height(7.dp))
+        Row(Modifier.fillMaxWidth().height(8.dp).clip(CircleShape)) {
+            Box(Modifier.weight(r.longPercent.coerceIn(1, 99).toFloat()).height(8.dp).background(Up))
+            Box(Modifier.weight((100 - r.longPercent).coerceIn(1, 99).toFloat()).height(8.dp).background(Down))
+        }
+        Spacer(Modifier.height(5.dp))
+        Text(
+            "Net ${contracts(r.net)} contracts · ${if (r.change >= 0) "+" else "−"}${contracts(abs(r.change))} this week",
+            color = Muted,
+            fontSize = 12.sp,
+            style = Tabular
+        )
+    }
+}
+
+private fun contracts(n: Long): String = when {
+    abs(n) >= 1000 -> "%,.1fK".format(n / 1000.0)
+    else -> "%,d".format(n)
+}
+
+// ── Fed watch ────────────────────────────────────────────────────────────
+
+@Composable
+private fun FedPage(fed: MarketsApi.Fed?) {
+    val dateFormat = SimpleDateFormat("EEE d MMM yyyy", Locale.getDefault())
+    PageList {
+        if (fed == null) {
+            item { Loading() }
+            return@PageList
+        }
+        item {
+            SectionCard("Fed funds rate") {
+                Column(Modifier.padding(horizontal = 18.dp)) {
+                    Text("%.2f – %.2f%%".format(fed.targetFrom, fed.targetTo), color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold, style = Tabular)
+                    Text("Target range · effective %.2f%%".format(fed.effective), color = Muted, fontSize = 13.sp)
+                }
+            }
+        }
+        item {
+            Text(
+                "What traders are pricing for each upcoming meeting, from prediction-market odds.",
+                color = Muted,
+                fontSize = 14.sp
+            )
+        }
+        val upcoming = fed.meetings.filter { (it.date?.time ?: Long.MAX_VALUE) > System.currentTimeMillis() - 86_400_000 }
+        upcoming.forEachIndexed { index, meeting ->
+            item {
+                SectionCard(if (index == 0) "Next meeting" else "Meeting", meeting.date?.let { dateFormat.format(it) }) {
+                    Column(Modifier.padding(horizontal = 18.dp)) {
+                        val top = meeting.outcomes.maxByOrNull { it.second }
+                        Text(
+                            "${meeting.likeliest}" + (top?.let { " · %.0f%% likely".format(it.second) } ?: ""),
+                            color = when {
+                                meeting.likeliest.contains("Cut") -> Up
+                                meeting.likeliest.contains("Hike") -> Down
+                                else -> Amber
+                            },
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        meeting.outcomes.forEach { (label, p) ->
+                            Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(label, color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp, modifier = Modifier.width(78.dp))
+                                Box(Modifier.weight(1f).height(8.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.08f))) {
+                                    Box(
+                                        Modifier
+                                            .fillMaxWidth((p / 100).toFloat().coerceIn(0.01f, 1f))
+                                            .height(8.dp)
+                                            .clip(CircleShape)
+                                            .background(if (label == meeting.likeliest) Color.White else Color.White.copy(alpha = 0.35f))
+                                    )
+                                }
+                                Text("%.0f%%".format(p), color = Muted, fontSize = 12.sp, style = Tabular, modifier = Modifier.width(44.dp).padding(start = 8.dp))
+                            }
+                        }
+                    }
                 }
             }
         }

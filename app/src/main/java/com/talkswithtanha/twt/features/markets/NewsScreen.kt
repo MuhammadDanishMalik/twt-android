@@ -78,9 +78,18 @@ private val TAG_LABELS = mapOf(
  * headlines from the wires, filtered to what moves gold and the majors.
  * A tap opens the full story; pull down to refresh.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewsScreen() {
+    NewsFeed(showTitle = true, modifier = Modifier.background(IosColors.Background).statusBarsPadding())
+}
+
+/**
+ * The news list itself — the News tab, and the Live news page inside
+ * Markets. [showTitle] adds the big "News" heading the tab has.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NewsFeed(showTitle: Boolean, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
@@ -116,7 +125,7 @@ fun NewsScreen() {
                 refreshing = false
             }
         },
-        modifier = Modifier.fillMaxSize().background(IosColors.Background).statusBarsPadding()
+        modifier = modifier.fillMaxSize()
     ) {
         LazyColumn(
             Modifier.fillMaxSize(),
@@ -125,9 +134,11 @@ fun NewsScreen() {
         ) {
             item {
                 Column {
-                    Text("News", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold)
-                    Text("What is moving gold and the majors", color = Muted, fontSize = 14.sp)
-                    Spacer(Modifier.height(12.dp))
+                    if (showTitle) {
+                        Text("News", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold)
+                        Text("What is moving gold and the majors", color = Muted, fontSize = 14.sp)
+                        Spacer(Modifier.height(12.dp))
+                    }
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FILTERS.forEach { (label, _) ->
                             val selected = label == filter

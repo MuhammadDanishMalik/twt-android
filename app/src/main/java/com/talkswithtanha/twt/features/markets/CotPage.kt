@@ -1,6 +1,12 @@
 package com.talkswithtanha.twt.features.markets
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -31,7 +37,9 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -60,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.talkswithtanha.twt.core.data.MarketsApi
 import com.talkswithtanha.twt.core.designsystem.Haptics
+import com.talkswithtanha.twt.core.designsystem.components.RollingNumber
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -187,8 +196,14 @@ private fun Hairline() {
 
 @Composable
 private fun PositionCard(r: MarketsApi.Positioning) {
-    var hover by remember(r.key) { mutableStateOf<Int?>(null) }
-    val point = hover?.let { r.history.getOrNull(it) }
+    val haptics = LocalHapticFeedback.current
+    // The finger's week. Held as an int state and only written when the week
+    // actually changes, so dragging within one bar recomposes nothing.
+    var hover by remember(r.key) { mutableIntStateOf(-1) }
+    // Kept after the finger lifts, so the readout stays readable.
+    val point by remember(r.key) { derivedStateOf { r.history.getOrNull(hover) } }
+    // The currency reports have no commercials group, only zeros; leave the line out there.
+    val hasCommercials = remember(r.key) { r.history.any { it.commercialNet != 0L } }
 
     Card {
         CardHeader("${r.label} · ${specLabel(r)} net, 5 years", r.index?.let { "COT index $it" })
@@ -197,16 +212,23 @@ private fun PositionCard(r: MarketsApi.Positioning) {
             return@Card
         }
         Box(Modifier.padding(start = 10.dp, end = 14.dp, top = 14.dp)) {
-            PositionChart(r.history, hover) { hover = it }
+            PositionChart(r.history, hover.takeIf { it >= 0 }, hasCommercials) { week ->
+                if (week != null && week != hover) {
+                    hover = week
+                    Haptics.tick(haptics)
+                }
+            }
         }
         Row(Modifier.padding(horizontal = 18.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(width = 10.dp, height = 10.dp).clip(RoundedCornerShape(2.dp)).background(Buy.copy(alpha = 0.55f)))
             Spacer(Modifier.width(6.dp))
             Text(specLabel(r), color = Muted, fontSize = 12.sp)
-            Spacer(Modifier.width(16.dp))
-            Box(Modifier.size(width = 14.dp, height = 2.dp).background(BrandLine))
-            Spacer(Modifier.width(6.dp))
-            Text("Commercials", color = Muted, fontSize = 12.sp)
+            if (hasCommercials) {
+                Spacer(Modifier.width(16.dp))
+                Box(Modifier.size(width = 14.dp, height = 2.dp).background(BrandLine))
+                Spacer(Modifier.width(6.dp))
+                Text("Commercials", color = Muted, fontSize = 12.sp)
+            }
         }
         // The readout sits under the chart: a finger on the chart would cover a tooltip.
         Column(
@@ -217,14 +239,25 @@ private fun PositionCard(r: MarketsApi.Positioning) {
                 .border(0.5.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(14.dp))
                 .padding(horizontal = 14.dp, vertical = 11.dp)
         ) {
-            if (point == null) {
+            val week = point
+            if (week == null) {
                 Text("Touch and drag across the chart to read any week.", color = Faint, fontSize = 13.sp)
             } else {
-                Text(weekLabel(point.date), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                AnimatedContent(
+                    targetState = week.date,
+                    transitionSpec = {
+                        val forward = targetState > initialState
+                        (fadeIn(spring(stiffness = 520f)) + slideInHorizontally(spring(dampingRatio = 0.85f, stiffness = 420f)) { if (forward) it / 6 else -it / 6 })
+                            .togetherWith(fadeOut(spring(stiffness = 520f)))
+                    },
+                    label = "week"
+                ) { date ->
+                    Text(weekLabel(date), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
                 Spacer(Modifier.height(4.dp))
-                ReadoutLine(specLabel(r), signed(point.net), tint(point.net))
-                ReadoutLine("Commercials", signed(point.commercialNet), tint(point.commercialNet))
-                ReadoutLine("Open interest", "%,d".format(point.openInterest), Color.White)
+                ReadoutLine(specLabel(r), signed(week.net), tint(week.net))
+                if (hasCommercials) ReadoutLine("Commercials", signed(week.commercialNet), tint(week.commercialNet))
+                ReadoutLine("Open interest", "%,d".format(week.openInterest), Color.White)
             }
         }
     }
@@ -237,7 +270,7 @@ private val BrandLine = Color(0xFFE8B931)
 private fun ReadoutLine(label: String, value: String, color: Color) {
     Row(Modifier.fillMaxWidth().padding(vertical = 1.dp)) {
         Text(label, color = Muted, fontSize = 13.sp, modifier = Modifier.weight(1f))
-        Text(value, color = color, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, style = Mono)
+        RollingNumber(value, color = color, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, style = Mono)
     }
 }
 
@@ -250,14 +283,14 @@ private fun shortK(v: Double): String =
     if (kotlin.math.abs(v) >= 1000) "${if (v > 0) "+" else if (v < 0) "−" else ""}${(kotlin.math.abs(v) / 1000).roundToInt()}k" else v.roundToInt().toString()
 
 @Composable
-private fun PositionChart(history: List<MarketsApi.CotWeek>, hover: Int?, onHover: (Int?) -> Unit) {
+private fun PositionChart(history: List<MarketsApi.CotWeek>, hover: Int?, showCommercials: Boolean, onHover: (Int?) -> Unit) {
     val measurer = rememberTextMeasurer()
     val labelStyle = Mono.copy(color = Faint, fontSize = 9.sp)
     val grow = remember(history) { Animatable(0f) }
     LaunchedEffect(history) { grow.animateTo(1f, tween(900, easing = FastOutSlowInEasing)) }
 
-    val max = maxOf(history.maxOf { maxOf(it.net, it.commercialNet) }, 0L).toDouble()
-    val min = minOf(history.minOf { minOf(it.net, it.commercialNet) }, 0L).toDouble()
+    val max = maxOf(history.maxOf { if (showCommercials) maxOf(it.net, it.commercialNet) else it.net }, 0L).toDouble()
+    val min = minOf(history.minOf { if (showCommercials) minOf(it.net, it.commercialNet) else it.net }, 0L).toDouble()
     val span = (max - min).takeIf { it > 0 } ?: 1.0
 
     Canvas(
@@ -305,7 +338,7 @@ private fun PositionChart(history: List<MarketsApi.CotWeek>, hover: Int?, onHove
         }
         drawLine(Color.White.copy(alpha = 0.3f), Offset(padLeft, zero), Offset(size.width, zero), 1f)
 
-        clipRect(right = padLeft + plotW * grow.value) {
+        if (showCommercials) clipRect(right = padLeft + plotW * grow.value) {
             val line = Path()
             history.forEachIndexed { i, w ->
                 if (i == 0) line.moveTo(x(i), y(w.commercialNet.toDouble())) else line.lineTo(x(i), y(w.commercialNet.toDouble()))
@@ -332,8 +365,10 @@ private fun PositionChart(history: List<MarketsApi.CotWeek>, hover: Int?, onHove
             )
             drawCircle(CardBg, 5.dp.toPx(), Offset(x(i), y(w.net.toDouble())))
             drawCircle(if (w.net >= 0) Buy else Sell, 3.5.dp.toPx(), Offset(x(i), y(w.net.toDouble())))
-            drawCircle(CardBg, 5.dp.toPx(), Offset(x(i), y(w.commercialNet.toDouble())))
-            drawCircle(BrandLine, 3.5.dp.toPx(), Offset(x(i), y(w.commercialNet.toDouble())))
+            if (showCommercials) {
+                drawCircle(CardBg, 5.dp.toPx(), Offset(x(i), y(w.commercialNet.toDouble())))
+                drawCircle(BrandLine, 3.5.dp.toPx(), Offset(x(i), y(w.commercialNet.toDouble())))
+            }
         }
     }
 }

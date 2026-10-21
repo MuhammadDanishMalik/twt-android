@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.sp
 import com.talkswithtanha.twt.core.data.MarketsApi
 import com.talkswithtanha.twt.core.designsystem.Haptics
 import com.talkswithtanha.twt.core.designsystem.IosColors
+import com.talkswithtanha.twt.core.designsystem.components.RollingNumber
 import com.talkswithtanha.twt.features.home.components.InstrumentBadge
 import com.talkswithtanha.twt.features.home.components.LiveDeskCard
 import com.talkswithtanha.twt.features.home.components.MarketChartSheet
@@ -273,6 +274,22 @@ private fun SectionCard(title: String, trailing: String? = null, content: @Compo
     }
 }
 
+/** The day's change as a tinted pill; the number rolls and the tint eases across when it flips. */
+@Composable
+private fun ChangePill(change: Double, tint: Color) {
+    val wash by animateColorAsState(tint.copy(alpha = 0.12f), spring(stiffness = 300f), label = "pillWash")
+    Box(
+        Modifier
+            .width(74.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(wash)
+            .padding(vertical = 4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        RollingNumber("%+.2f%%".format(change), color = tint, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
 // ── Dashboard ────────────────────────────────────────────────────────────
 
 @Composable
@@ -307,21 +324,9 @@ private fun DashboardPage(
                             InstrumentBadge(q, 26)
                             Spacer(Modifier.width(12.dp))
                             Text(q.label, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                            Text("%,.${q.decimals}f".format(q.price), color = Color.White, fontSize = 15.sp, style = Tabular)
+                            RollingNumber("%,.${q.decimals}f".format(q.price), color = Color.White, fontSize = 15.sp)
                             Spacer(Modifier.width(10.dp))
-                            Text(
-                                "%+.2f%%".format(q.change),
-                                color = tint,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                style = Tabular,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier
-                                    .width(74.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(tint.copy(alpha = 0.12f))
-                                    .padding(vertical = 4.dp)
-                            )
+                            ChangePill(q.change, tint)
                         }
                     }
                 }

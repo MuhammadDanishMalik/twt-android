@@ -248,11 +248,10 @@ fun LiveDeskCard(height: Dp, corner: Dp, modifier: Modifier = Modifier) {
             )
             Spacer(Modifier.weight(1f))
             data?.let {
-                Text(
+                com.talkswithtanha.twt.core.designsystem.components.RollingNumber(
                     "%,.${if (it.price < 10) 4 else 2}f".format(it.price),
                     color = Color.White.copy(alpha = 0.75f),
-                    fontSize = 13.sp,
-                    style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum")
+                    fontSize = 13.sp
                 )
             }
         }

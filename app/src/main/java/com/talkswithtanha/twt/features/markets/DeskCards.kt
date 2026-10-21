@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.talkswithtanha.twt.core.data.MarketsApi
 import com.talkswithtanha.twt.core.designsystem.Haptics
+import com.talkswithtanha.twt.core.designsystem.components.RollingNumber
 import com.talkswithtanha.twt.features.home.components.SESSIONS
 import com.talkswithtanha.twt.features.home.components.headline
 import com.talkswithtanha.twt.features.home.components.openSessions
@@ -181,7 +182,7 @@ fun GoldChartCard(onOpen: () -> Unit) {
                 Overline("Gold · $range")
                 Spacer(Modifier.width(10.dp))
                 change?.let {
-                    Text("%+.2f%%".format(it), color = tint, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, style = Tabular)
+                    RollingNumber("%+.2f%%".format(it), color = tint, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -347,13 +348,12 @@ fun NextReleaseCard(events: List<MarketsApi.Event>?, onCalendar: (() -> Unit)? =
                 ImpactBars(next.impact)
             }
             Spacer(Modifier.height(10.dp))
-            Text(
+            RollingNumber(
                 countdown,
                 color = Color.White,
                 fontSize = 40.sp,
                 fontWeight = FontWeight.Medium,
-                fontFamily = FontFamily.Monospace,
-                letterSpacing = (-1).sp
+                style = TextStyle(fontFamily = FontFamily.Monospace, letterSpacing = (-1).sp)
             )
             Spacer(Modifier.height(8.dp))
             Text(next.title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)

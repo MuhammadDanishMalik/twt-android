@@ -19,6 +19,9 @@ import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** Who else has a room open, and who is typing in it. */
+data class RoomActivity(val online: Int = 0, val typing: List<String> = emptyList())
+
 interface ChatRepository {
     /** Live window on the most recent messages in a room, oldest first. */
     fun observeMessages(
@@ -46,6 +49,14 @@ interface ChatRepository {
     )
 
     suspend fun edit(roomId: String, messageId: String, text: String)
+    /** Deletes the member's own message, for everyone. */
+    suspend fun delete(roomId: String, messageId: String)
+
+    /** Who has the room open and who is typing, live. Excludes [currentUserId]. */
+    fun observeActivity(roomId: String, currentUserId: String): Flow<RoomActivity>
+    /** Marks this member in the room (or out of it, with [present] false). */
+    suspend fun setPresence(roomId: String, uid: String, name: String, present: Boolean)
+    suspend fun setTyping(roomId: String, uid: String, name: String, typing: Boolean)
     /** Reacts with [emoji]; the same emoji again removes it, another one swaps. */
     suspend fun react(roomId: String, messageId: String, uid: String, emoji: String)
     suspend fun markSeen(roomId: String, messageId: String, uid: String)
@@ -156,6 +167,45 @@ class FirebaseChatRepository @Inject constructor(
             )
         }
         messages(roomId).add(payload).await()
+    }
+
+    override suspend fun delete(roomId: String, messageId: String) {
+        messages(roomId).document(messageId).delete().await()
+    }
+
+    override fun observeActivity(roomId: String, currentUserId: String): Flow<RoomActivity> =
+        db.collection(Collection.CHAT_ROOMS).document(roomId).snapshotFlow().map { snapshot ->
+            val doc = (snapshot as? Snapshot.Data)?.value
+            val now = System.currentTimeMillis()
+            fun entries(field: String, timeKey: String, freshMs: Long): List<String> =
+                (doc?.get(field) as? Map<*, *>).orEmpty().mapNotNull { (uid, value) ->
+                    val entry = value as? Map<*, *> ?: return@mapNotNull null
+                    if (uid == currentUserId) return@mapNotNull null
+                    val at = (entry[timeKey] as? Timestamp)?.toDate()?.time ?: return@mapNotNull null
+                    if (now - at > freshMs) return@mapNotNull null
+                    (entry["name"] as? String)?.takeIf { it.isNotBlank() } ?: "Someone"
+                }
+            RoomActivity(
+                // Present = seen in the last two minutes; apps refresh every 30 s.
+                online = entries(R.PRESENCE, "lastSeenAt", 2 * 60_000L).size,
+                // Typing goes stale fast: a phone that died mid-sentence must not
+                // keep "typing…" up for good.
+                typing = entries(R.TYPING, "typingAt", 8_000L)
+            )
+        }
+
+    override suspend fun setPresence(roomId: String, uid: String, name: String, present: Boolean) {
+        db.collection(Collection.CHAT_ROOMS).document(roomId).update(
+            "${R.PRESENCE}.$uid",
+            if (present) mapOf("name" to name, "lastSeenAt" to FieldValue.serverTimestamp()) else FieldValue.delete()
+        ).await()
+    }
+
+    override suspend fun setTyping(roomId: String, uid: String, name: String, typing: Boolean) {
+        db.collection(Collection.CHAT_ROOMS).document(roomId).update(
+            "${R.TYPING}.$uid",
+            if (typing) mapOf("name" to name, "typingAt" to FieldValue.serverTimestamp()) else FieldValue.delete()
+        ).await()
     }
 
     override suspend fun edit(roomId: String, messageId: String, text: String) {
@@ -280,6 +330,11 @@ class FirebaseChatRepository @Inject constructor(
             isEdited = document.getBoolean(M.IS_EDITED) ?: false,
             seenBy = seenBy,
             myReaction = (document.get(M.REACTED_BY) as? Map<*, *>)?.get(currentUserId) as? String,
+            type = ChatMessage.Type.from(document.getString(M.TYPE)),
+            audioUrl = document.getString(M.AUDIO_URL)?.takeIf { it.startsWith("http") },
+            audioDurationSecs = (document.get(M.AUDIO_DURATION) as? Number)?.toInt() ?: 0,
+            isPinned = document.getBoolean(M.IS_PINNED) ?: false,
+            targetName = document.getString(M.TARGET_NAME),
             // Per document, not per query. `QuerySnapshot.metadata` is true
             // while *any* write in the query is in flight, so reading it there
             // marks every message in the room as "sending" whenever one of them

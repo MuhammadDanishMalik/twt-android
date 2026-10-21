@@ -1,6 +1,7 @@
 package com.talkswithtanha.twt.features.chat
 
 import androidx.compose.foundation.combinedClickable
+import kotlinx.coroutines.launch
 import com.talkswithtanha.twt.core.designsystem.components.ImageViewer
 import com.talkswithtanha.twt.core.images.Cloudinary
 import androidx.compose.foundation.layout.offset
@@ -96,6 +97,20 @@ fun ChatRoomScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val savedNotes by viewModel.savedNotes.collectAsStateWithLifecycle()
+    val editing by viewModel.editing.collectAsStateWithLifecycle()
+    val activity by viewModel.activity.collectAsStateWithLifecycle()
+    // Which pin the bar shows (0 = newest), and whether the bar is hidden.
+    var pinIndex by remember { mutableStateOf(0) }
+    var pinsHidden by remember { mutableStateOf(false) }
+    val pins = state.messages.filter { it.isPinned }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+
+    // In the room while this screen is up: the admin's "online now" counts it.
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        viewModel.onRoomVisible(true)
+        onDispose { viewModel.onRoomVisible(false) }
+    }
     var pickingNote by remember { mutableStateOf(false) }
     var actionsFor by remember { mutableStateOf<ChatMessage?>(null) }
     // A chat photo open full screen: every image in that message, and which one.
@@ -129,7 +144,28 @@ fun ChatRoomScreen(
         when {
             viewModel.isSellerChat -> SellerHeader(onBack)
             viewModel.isSupportRoom -> SupportHeader(onBack)
-            else -> RoomHeader(title = viewModel.roomTitle, onBack = onBack)
+            else -> RoomHeader(
+                title = viewModel.roomTitle,
+                subtitle = when {
+                    activity.typing.size == 1 -> "${activity.typing.first()} is typing…"
+                    activity.typing.size > 1 -> "${activity.typing.size} people are typing…"
+                    activity.online > 0 -> "${activity.online + 1} online"
+                    else -> null
+                },
+                onBack = onBack
+            )
+        }
+
+        if (!pinsHidden) {
+            PinnedBar(
+                pins = pins,
+                shownIndex = pinIndex,
+                onTap = { pin ->
+                    lazyIndexOf(state.messages, pin.id)?.let { scope.launch { listState.animateScrollToItem(it) } }
+                    pinIndex++
+                },
+                onClose = { pinsHidden = true }
+            )
         }
 
         when {
@@ -183,6 +219,10 @@ fun ChatRoomScreen(
             state.pendingNote?.let { PendingNoteBanner(it, onCancel = { viewModel.setPendingNote(null) }) }
         }
 
+        (editing ?: state.replyTo)?.let { target ->
+            ComposeBanner(editing = editing != null, message = target, onCancel = viewModel::cancelCompose)
+        }
+
         ChatInputBar(
             draft = state.draft,
             enabled = state.canPost,
@@ -196,6 +236,28 @@ fun ChatRoomScreen(
     actionsFor?.let { message ->
         MessageActionsSheet(
             message = message,
+            onReply = {
+                actionsFor = null
+                viewModel.setReplyTo(message)
+            },
+            onCopy = {
+                actionsFor = null
+                clipboard.setText(androidx.compose.ui.text.AnnotatedString(message.text.removePrefix(FORWARDED_PREFIX)))
+                toast("Copied")
+            },
+            onEdit = if (message.canEdit && message.type == ChatMessage.Type.TEXT) {
+                {
+                    actionsFor = null
+                    viewModel.startEdit(message)
+                }
+            } else null,
+            onDelete = if (message.isCurrentUser) {
+                {
+                    actionsFor = null
+                    viewModel.delete(message)
+                    toast("Message deleted")
+                }
+            } else null,
             onReact = { emoji ->
                 actionsFor = null
                 viewModel.toggleReaction(message, emoji)
@@ -313,7 +375,12 @@ private fun ChatBubble(
                     .background(
                         if (message.isCurrentUser) IosColors.Accent else Color(0xFF2C2C2E)
                     )
-                    .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(20.dp))
+                    .border(
+                        if (message.type == ChatMessage.Type.ANNOUNCEMENT) 1.dp else 0.5.dp,
+                        if (message.type == ChatMessage.Type.ANNOUNCEMENT) Color(0xFFFBBF24).copy(alpha = 0.6f)
+                        else Color.White.copy(alpha = 0.15f),
+                        RoundedCornerShape(20.dp)
+                    )
                     // Hold any message to react; someone else's also to
                     // report it or block them.
                     .combinedClickable(
@@ -326,6 +393,8 @@ private fun ChatBubble(
                     .padding(horizontal = 14.dp, vertical = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                if (message.type == ChatMessage.Type.ANNOUNCEMENT) AnnouncementTag()
+
                 message.replyTo?.let { reply ->
                     Row(
                         Modifier
@@ -377,8 +446,22 @@ private fun ChatBubble(
                     )
                 }
 
-                if (bodyText.isNotEmpty()) {
-                    Text(text = bodyText, color = Color.White, fontSize = 16.sp)
+                when {
+                    message.type == ChatMessage.Type.VOICE_NOTE && message.audioUrl != null ->
+                        VoiceNotePlayer(message.audioUrl, message.audioDurationSecs, message.isCurrentUser)
+                    message.type == ChatMessage.Type.APPRECIATION -> AppreciationCard(message)
+                    bodyText.isNotEmpty() -> {
+                        val forwarded = bodyText.startsWith(FORWARDED_PREFIX)
+                        if (forwarded) ForwardedLabel()
+                        Text(
+                            text = richText(
+                                bodyText.removePrefix(FORWARDED_PREFIX),
+                                linkColor = if (message.isCurrentUser) Color.White else IosColors.Accent
+                            ),
+                            color = Color.White,
+                            fontSize = 16.sp
+                        )
+                    }
                 }
             }
 
@@ -496,16 +579,19 @@ private fun ChatDateDivider(label: String) {
 }
 
 @Composable
-private fun RoomHeader(title: String, onBack: () -> Unit) {
+private fun RoomHeader(title: String, subtitle: String?, onBack: () -> Unit) {
     Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         BackButton(onBack)
-        Text(
-            text = title,
-            color = Color.White,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.align(Alignment.Center)
-        )
+        Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(text = title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            subtitle?.let {
+                Text(
+                    text = it,
+                    color = if (it.endsWith("typing…")) IosColors.Accent else IosColors.TextSecondary,
+                    fontSize = 13.sp
+                )
+            }
+        }
     }
 }
 
@@ -903,6 +989,18 @@ private fun ChatInputBar(
             )
         }
     }
+}
+
+/** Where a message sits in the list, counting the day dividers before it. */
+private fun lazyIndexOf(messages: List<ChatMessage>, id: String): Int? {
+    var index = 0
+    messages.forEachIndexed { i, m ->
+        val previous = messages.getOrNull(i - 1)
+        if (previous == null || !isSameDay(previous.timestamp, m.timestamp)) index++
+        if (m.id == id) return index
+        index++
+    }
+    return null
 }
 
 private val IMAGE_URL = Regex(

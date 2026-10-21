@@ -456,6 +456,12 @@ object FirestorePaths {
         const val SEEN_BY = "seenBy"
         /** uid → the one emoji that member reacted with. */
         const val REACTED_BY = "reactedBy"
+        /** "text", "announcement", "appreciation", "voice_note" or "deal_card". */
+        const val TYPE = "type"
+        const val AUDIO_URL = "audioUrl"
+        const val AUDIO_DURATION = "audioDurationSecs"
+        /** Who an appreciation message is about. */
+        const val TARGET_NAME = "targetName"
 
         object Reply {
             const val SENDER_NAME = "senderName"
@@ -490,6 +496,11 @@ object FirestorePaths {
          */
         const val KIND = "kind"
         const val KIND_SUPPORT = "support"
+
+        /** uid → { name, lastSeenAt }: who has the room open. */
+        const val PRESENCE = "presence"
+        /** uid → { name, typingAt }: who is composing right now. */
+        const val TYPING = "typing"
 
         const val MEMBER_ID = "memberId"
         const val MEMBER_NAME = "memberName"

@@ -26,10 +26,31 @@ data class ChatMessage(
     val seenBy: List<String> = emptyList(),
     /** The emoji this member reacted with, if any. One per member per message. */
     val myReaction: String? = null,
+    val type: Type = Type.TEXT,
+    /** A voice note's audio, and its length in seconds. */
+    val audioUrl: String? = null,
+    val audioDurationSecs: Int = 0,
+    /** Pinned by the team; shown in the bar under the room header. */
+    val isPinned: Boolean = false,
+    /** Who an appreciation message is about. */
+    val targetName: String? = null,
     /** True between hitting send and the server echoing the write back. */
     val isPending: Boolean = false
 ) {
     data class ReplyReference(val senderName: String, val text: String)
+
+    /** What kind of message it is, as the admin and the apps write `type`. */
+    enum class Type { TEXT, ANNOUNCEMENT, APPRECIATION, VOICE_NOTE, DEAL_CARD;
+        companion object {
+            fun from(raw: String?): Type = when (raw) {
+                "announcement" -> ANNOUNCEMENT
+                "appreciation" -> APPRECIATION
+                "voice_note" -> VOICE_NOTE
+                "deal_card" -> DEAL_CARD
+                else -> TEXT
+            }
+        }
+    }
 
     /**
      * A copy of a saved lesson note, taken at the moment it was shared. A copy

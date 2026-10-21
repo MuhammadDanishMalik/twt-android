@@ -21,6 +21,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -57,6 +61,10 @@ private val QUICK_REACTIONS = listOf("👍", "❤️", "😂", "😮", "😢", "
 @Composable
 fun MessageActionsSheet(
     message: ChatMessage,
+    onReply: () -> Unit,
+    onCopy: () -> Unit,
+    onEdit: (() -> Unit)?,
+    onDelete: (() -> Unit)?,
     onReact: (String) -> Unit,
     onReport: (ReportReason) -> Unit,
     onBlock: () -> Unit,
@@ -120,6 +128,30 @@ fun MessageActionsSheet(
 
             AnimatedContent(targetState = choosingReason, label = "moderation") { reasons ->
                 Column {
+                    if (!reasons) {
+                        ActionRow(Icons.AutoMirrored.Filled.Reply, "Reply", null) {
+                            Haptics.tap(haptics)
+                            onReply()
+                        }
+                        if (message.text.isNotBlank()) {
+                            ActionRow(Icons.Outlined.ContentCopy, "Copy", null) {
+                                Haptics.tap(haptics)
+                                onCopy()
+                            }
+                        }
+                        onEdit?.let { edit ->
+                            ActionRow(Icons.Outlined.Edit, "Edit", "Within 5 minutes of sending") {
+                                Haptics.tap(haptics)
+                                edit()
+                            }
+                        }
+                        onDelete?.let { del ->
+                            ActionRow(Icons.Outlined.Delete, "Delete", "Removed for everyone", destructive = true) {
+                                Haptics.toggleOn(haptics)
+                                del()
+                            }
+                        }
+                    }
                     if (!reasons && !message.isCurrentUser) {
                         ActionRow(Icons.Outlined.Flag, "Report message", "The team reviews every report") {
                             Haptics.tap(haptics)
@@ -177,7 +209,7 @@ fun MessageActionsSheet(
 private fun ActionRow(
     icon: ImageVector,
     title: String,
-    subtitle: String,
+    subtitle: String?,
     destructive: Boolean = false,
     onClick: () -> Unit
 ) {
@@ -193,7 +225,7 @@ private fun ActionRow(
         Spacer(Modifier.width(16.dp))
         Column {
             Text(title, color = tint, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-            Text(subtitle, color = IosColors.TextSecondary, fontSize = 13.sp)
+            subtitle?.let { Text(it, color = IosColors.TextSecondary, fontSize = 13.sp) }
         }
     }
 }

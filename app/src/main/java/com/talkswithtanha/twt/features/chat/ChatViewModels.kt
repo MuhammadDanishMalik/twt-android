@@ -140,6 +140,21 @@ class ChatRoomViewModel @Inject constructor(
     private val _replyTo = MutableStateFlow<ChatMessage?>(null)
     private val _pendingNote = MutableStateFlow<ChatMessage.NoteAttachment?>(null)
     private val _error = MutableStateFlow<String?>(null)
+    private val _editing = MutableStateFlow<ChatMessage?>(null)
+    /** The member's own message being edited, if any; its text is in the draft. */
+    val editing: StateFlow<ChatMessage?> = _editing.asStateFlow()
+
+    /** Who else is in the room and who is typing. Not shown in support threads. */
+    val activity: StateFlow<com.talkswithtanha.twt.core.data.RoomActivity> = session.currentUser
+        .flatMapLatest { user ->
+            if (user == null || isSupportRoom) flowOf(com.talkswithtanha.twt.core.data.RoomActivity())
+            else chatRepository.observeActivity(roomId, user.id)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), com.talkswithtanha.twt.core.data.RoomActivity())
+
+    private var presenceJob: kotlinx.coroutines.Job? = null
+    private var typingClearJob: kotlinx.coroutines.Job? = null
+    private var lastTypingWrite = 0L
 
     private val messages: StateFlow<Snapshot<List<ChatMessage>>?> = session.currentUser
         .flatMapLatest { user ->
@@ -216,13 +231,85 @@ class ChatRoomViewModel @Inject constructor(
             }
     }
 
-    fun onDraftChange(value: String) { _draft.value = value }
+    fun onDraftChange(value: String) {
+        _draft.value = value
+        reportTyping(value.isNotBlank())
+    }
+
+    /**
+     * "Ali is typing…" for the others in the room. Written at most every 3 s
+     * while keys are going, and cleared 4 s after the last one.
+     */
+    private fun reportTyping(active: Boolean) {
+        if (isSupportRoom) return
+        val user = session.currentUser.value ?: return
+        typingClearJob?.cancel()
+        if (!active) {
+            if (lastTypingWrite != 0L) {
+                lastTypingWrite = 0L
+                viewModelScope.launch { runCatching { chatRepository.setTyping(roomId, user.id, user.fullName, false) } }
+            }
+            return
+        }
+        val now = System.currentTimeMillis()
+        if (now - lastTypingWrite > 3_000) {
+            lastTypingWrite = now
+            viewModelScope.launch { runCatching { chatRepository.setTyping(roomId, user.id, user.fullName, true) } }
+        }
+        typingClearJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(4_000)
+            reportTyping(false)
+        }
+    }
+
+    /**
+     * Marks this member in the room while it is on screen, refreshed every 30 s
+     * so the admin's "online now" stays honest; cleared when they leave.
+     */
+    fun onRoomVisible(visible: Boolean) {
+        if (isSupportRoom) return
+        val user = session.currentUser.value ?: return
+        presenceJob?.cancel()
+        if (visible) {
+            presenceJob = viewModelScope.launch {
+                while (true) {
+                    runCatching { chatRepository.setPresence(roomId, user.id, user.fullName, true) }
+                    kotlinx.coroutines.delay(30_000)
+                }
+            }
+        } else {
+            reportTyping(false)
+            viewModelScope.launch { runCatching { chatRepository.setPresence(roomId, user.id, user.fullName, false) } }
+        }
+    }
+
+    /** Starts editing the member's own message: its text goes into the box. */
+    fun startEdit(message: ChatMessage) {
+        _replyTo.value = null
+        _editing.value = message
+        _draft.value = message.text
+    }
+
+    /** Drops a reply or an edit in progress. */
+    fun cancelCompose() {
+        if (_editing.value != null) _draft.value = ""
+        _editing.value = null
+        _replyTo.value = null
+    }
+
+    fun delete(message: ChatMessage) = viewModelScope.launch {
+        runCatching { chatRepository.delete(roomId, message.id) }
+            .onFailure { _error.value = "That message could not be deleted." }
+    }
 
     /** A quick reply fills the box rather than sending: the member nearly
      *  always wants to add an amount or a sentence of their own. */
     fun useQuickReply(text: String) { _draft.value = text }
 
-    fun setReplyTo(message: ChatMessage?) { _replyTo.value = message }
+    fun setReplyTo(message: ChatMessage?) {
+        if (_editing.value != null) cancelCompose()
+        _replyTo.value = message
+    }
 
     /** Attaches a saved note to the next message — a copy, since notes live
      *  only on this phone. Null clears it. */
@@ -241,6 +328,24 @@ class ChatRoomViewModel @Inject constructor(
     fun send() {
         val user = session.currentUser.value ?: return
         val text = _draft.value.trim()
+        reportTyping(false)
+
+        // Saving an edit rather than sending something new.
+        _editing.value?.let { original ->
+            if (text.isEmpty()) return
+            _editing.value = null
+            _draft.value = ""
+            if (text == original.text) return
+            viewModelScope.launch {
+                runCatching { chatRepository.edit(roomId, original.id, text) }
+                    .onFailure {
+                        _error.value = "That edit did not save."
+                        _editing.value = original
+                        _draft.value = text
+                    }
+            }
+            return
+        }
         val note = _pendingNote.value
         // A shared note can go out on its own, as on iOS.
         if (text.isEmpty() && note == null) return

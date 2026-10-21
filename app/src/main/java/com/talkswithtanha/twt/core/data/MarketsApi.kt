@@ -162,8 +162,19 @@ object MarketsApi {
         val group: String,
         val longPercent: Int,
         val net: Long,
-        val change: Long
+        val change: Long,
+        /** Where this week's net sits in its three-year range, 0–100; null when there is too little history. */
+        val index: Int?,
+        val openInterest: Long,
+        val openInterestChange: Long,
+        /** Weekly, oldest first, about five years. */
+        val history: List<CotWeek>,
+        /** This week by trader group: managed money, producers, swap dealers… */
+        val groups: List<CotGroup>
     )
+
+    data class CotWeek(val date: String, val net: Long, val commercialNet: Long, val openInterest: Long)
+    data class CotGroup(val name: String, val long: Long, val short: Long, val net: Long, val change: Long)
 
     private fun isoDate(raw: String?): java.util.Date? = raw?.takeIf { it.isNotBlank() }?.let {
         runCatching { java.time.OffsetDateTime.parse(it).toInstant().let { i -> java.util.Date.from(i) } }
@@ -238,7 +249,22 @@ object MarketsApi {
                 group = r.optString("group"),
                 longPercent = r.optInt("longPct"),
                 net = r.optLong("net"),
-                change = r.optLong("change")
+                change = r.optLong("change"),
+                index = if (r.isNull("index")) null else r.optInt("index"),
+                openInterest = r.optLong("openInterest"),
+                openInterestChange = r.optLong("openInterestChange"),
+                history = r.optJSONArray("history").let { a ->
+                    (0 until (a?.length() ?: 0)).map { j ->
+                        val w = a!!.getJSONObject(j)
+                        CotWeek(w.optString("date"), w.optLong("net"), w.optLong("commercialNet"), w.optLong("openInterest"))
+                    }
+                },
+                groups = r.optJSONArray("groups").let { a ->
+                    (0 until (a?.length() ?: 0)).map { j ->
+                        val g = a!!.getJSONObject(j)
+                        CotGroup(g.optString("group"), g.optLong("long"), g.optLong("short"), g.optLong("net"), g.optLong("change"))
+                    }
+                }
             )
         }
     }

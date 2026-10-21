@@ -82,7 +82,9 @@ fun HomeHeroCarousel(
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalHapticFeedback.current
-    val pageCount = 1 + banners.size
+    // Page 0 is the access card, page 1 the live desk, banners after them.
+    val firstBanner = 2
+    val pageCount = firstBanner + banners.size
     val pager = rememberPagerState(pageCount = { pageCount })
     val dragging by pager.interactionSource.collectIsDraggedAsState()
 
@@ -100,11 +102,12 @@ fun HomeHeroCarousel(
     }
 
     LaunchedEffect(pager.currentPage, dragging, banners.size) {
-        // Page 0 is the card. Nothing automatic happens there.
-        if (dragging || banners.size < 2 || pager.currentPage == 0) return@LaunchedEffect
+        // The card and the live desk are read, not glanced at: nothing
+        // automatic happens on either. Banners cycle among themselves.
+        if (dragging || banners.size < 2 || pager.currentPage < firstBanner) return@LaunchedEffect
         delay(5_000)
         val next = pager.currentPage + 1
-        pager.animateScrollToPage(if (next >= pageCount) 1 else next)
+        pager.animateScrollToPage(if (next >= pageCount) firstBanner else next)
     }
 
     Column(modifier.fillMaxWidth()) {
@@ -138,12 +141,14 @@ fun HomeHeroCarousel(
                         // swipe that moves the pager.
                         tiltEnabled = false
                     )
+                } else if (page == 1) {
+                    LiveDeskCard(height = HeroHeight, corner = HeroCorner)
                 } else {
                     BannerPage(
-                        banner = banners[page - 1],
+                        banner = banners[page - firstBanner],
                         onTap = {
                             Haptics.tap(haptics)
-                            onBannerTap(banners[page - 1])
+                            onBannerTap(banners[page - firstBanner])
                         }
                     )
                 }

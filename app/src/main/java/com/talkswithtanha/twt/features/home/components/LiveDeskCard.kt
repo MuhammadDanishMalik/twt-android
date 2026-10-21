@@ -100,7 +100,7 @@ private fun PickerChip(
                 color = Color.White,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
-                fontFamily = if (monospace) FontFamily.Monospace else FontFamily.Default
+                style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = if (monospace) "tnum" else null)
             )
             Icon(Icons.Filled.KeyboardArrowDown, description, tint = Color.White, modifier = Modifier.size(18.dp))
         }
@@ -252,7 +252,7 @@ fun LiveDeskCard(height: Dp, corner: Dp, modifier: Modifier = Modifier) {
                     "%,.${if (it.price < 10) 4 else 2}f".format(it.price),
                     color = Color.White.copy(alpha = 0.75f),
                     fontSize = 13.sp,
-                    fontFamily = FontFamily.Monospace
+                    style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum")
                 )
             }
         }
@@ -329,7 +329,7 @@ fun LiveDeskCard(height: Dp, corner: Dp, modifier: Modifier = Modifier) {
                                 row.value?.let { "%.2f".format(it) } ?: "—",
                                 color = Color.White.copy(alpha = 0.6f),
                                 fontSize = 13.sp,
-                                fontFamily = FontFamily.Monospace
+                                style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum")
                             )
                             Spacer(Modifier.width(12.dp))
                             Text(
@@ -373,7 +373,7 @@ private fun GaugeColumn(
             "${gauge.sell} · ${gauge.neutral} · ${gauge.buy}",
             color = Color.White.copy(alpha = 0.45f),
             fontSize = 10.sp,
-            fontFamily = FontFamily.Monospace
+            style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum")
         )
     }
 }

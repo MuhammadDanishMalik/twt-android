@@ -75,4 +75,57 @@ object MarketsApi {
             ?.optInt("longPct", -1)
             ?.takeIf { it in 0..100 }
     }
+
+    // ── Price history for the chart sheet ────────────────────────────────
+
+    /** Yahoo's symbols for our instruments — the ones the website uses. */
+    private val YAHOO = mapOf(
+        "gold" to "GC=F", "silver" to "SI=F", "eurusd" to "EURUSD=X", "gbpusd" to "GBPUSD=X",
+        "usdjpy" to "USDJPY=X", "audusd" to "AUDUSD=X", "usdcad" to "USDCAD=X", "usdchf" to "USDCHF=X",
+        "nzdusd" to "NZDUSD=X", "gbpjpy" to "GBPJPY=X", "btc" to "BTC-USD", "eth" to "ETH-USD"
+    )
+
+    /** The chart's ranges: label → Yahoo range and candle size. */
+    val RANGES = listOf(
+        Triple("1D", "1d", "5m"),
+        Triple("1W", "5d", "30m"),
+        Triple("1M", "1mo", "1d"),
+        Triple("3M", "3mo", "1d"),
+        Triple("1Y", "1y", "1d"),
+        Triple("5Y", "5y", "1wk")
+    )
+
+    data class Candle(val time: Long, val open: Double, val high: Double, val low: Double, val close: Double)
+
+    /** Candles for [key] over the range labelled [rangeLabel]; null if unavailable. */
+    suspend fun history(key: String, rangeLabel: String): List<Candle>? = withContext(Dispatchers.IO) {
+        val symbol = YAHOO[key] ?: return@withContext null
+        val (_, range, interval) = RANGES.firstOrNull { it.first == rangeLabel } ?: return@withContext null
+        runCatching {
+            val url = "https://query1.finance.yahoo.com/v8/finance/chart/" +
+                java.net.URLEncoder.encode(symbol, "UTF-8") + "?range=$range&interval=$interval"
+            val request = Request.Builder().url(url).header("User-Agent", "Mozilla/5.0 (TradeWithTanha app)").get().build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@use null
+                val result = JSONObject(response.body?.string() ?: return@use null)
+                    .getJSONObject("chart").getJSONArray("result").getJSONObject(0)
+                val stamps = result.optJSONArray("timestamp") ?: return@use null
+                val quote = result.getJSONObject("indicators").getJSONArray("quote").getJSONObject(0)
+                val o = quote.optJSONArray("open"); val h = quote.optJSONArray("high")
+                val l = quote.optJSONArray("low"); val c = quote.optJSONArray("close")
+                (0 until stamps.length()).mapNotNull { i ->
+                    // Holidays and gaps come back as nulls; skipping them keeps the line honest.
+                    if (c == null || c.isNull(i)) return@mapNotNull null
+                    val close = c.getDouble(i)
+                    Candle(
+                        time = stamps.getLong(i) * 1000,
+                        open = o?.takeUnless { it.isNull(i) }?.getDouble(i) ?: close,
+                        high = h?.takeUnless { it.isNull(i) }?.getDouble(i) ?: close,
+                        low = l?.takeUnless { it.isNull(i) }?.getDouble(i) ?: close,
+                        close = close
+                    )
+                }.takeIf { it.size >= 2 }
+            }
+        }.getOrNull()
+    }
 }

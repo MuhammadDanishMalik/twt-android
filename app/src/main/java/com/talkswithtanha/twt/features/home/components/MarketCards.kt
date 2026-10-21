@@ -116,6 +116,7 @@ fun GoldPriceCard(
     quote: MarketsApi.Quote,
     longPercent: Int?,
     onOpenNews: () -> Unit,
+    onOpenChart: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalHapticFeedback.current
@@ -141,6 +142,10 @@ fun GoldPriceCard(
             .clip(RoundedCornerShape(24.dp))
             .background(CardBg)
             .border(0.5.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(24.dp))
+            .clickable {
+                Haptics.sheetOpen(haptics)
+                onOpenChart()
+            }
             .padding(20.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -154,7 +159,7 @@ fun GoldPriceCard(
                 "%,.${quote.decimals}f".format(shownPrice),
                 color = Color.White,
                 fontSize = 40.sp,
-                fontFamily = FontFamily.Monospace,
+                style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"),
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.weight(1f)
             )
@@ -162,7 +167,7 @@ fun GoldPriceCard(
                 signed(quote.change),
                 color = changeColor(quote.change),
                 fontSize = 15.sp,
-                fontFamily = FontFamily.Monospace,
+                style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"),
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier
                     .graphicsLayer {
@@ -191,9 +196,9 @@ fun GoldPriceCard(
         }
         Spacer(Modifier.height(6.dp))
         Row(Modifier.fillMaxWidth()) {
-            Text("L %.${quote.decimals}f".format(quote.low), color = Muted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+            Text("L %.${quote.decimals}f".format(quote.low), color = Muted, fontSize = 12.sp, style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"))
             Spacer(Modifier.weight(1f))
-            Text("H %.${quote.decimals}f".format(quote.high), color = Muted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+            Text("H %.${quote.decimals}f".format(quote.high), color = Muted, fontSize = 12.sp, style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"))
         }
 
         // ── Managed money ─────────────────────────────────────────
@@ -242,7 +247,7 @@ fun GoldPriceCard(
  * moved — a quiet day is a quiet grid — and they pop in one after another.
  */
 @Composable
-fun HeatmapCard(quotes: List<MarketsApi.Quote>, modifier: Modifier = Modifier) {
+fun HeatmapCard(quotes: List<MarketsApi.Quote>, onOpen: (MarketsApi.Quote) -> Unit, modifier: Modifier = Modifier) {
     val (seen, seenModifier) = rememberSeen()
     Column(
         modifier
@@ -265,7 +270,7 @@ fun HeatmapCard(quotes: List<MarketsApi.Quote>, modifier: Modifier = Modifier) {
             quotes.chunked(3).forEachIndexed { row, chunk ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     chunk.forEachIndexed { col, quote ->
-                        HeatTile(quote, index = row * 3 + col, start = seen, modifier = Modifier.weight(1f))
+                        HeatTile(quote, index = row * 3 + col, start = seen, onOpen = { onOpen(quote) }, modifier = Modifier.weight(1f))
                     }
                     repeat(3 - chunk.size) { Spacer(Modifier.weight(1f)) }
                 }
@@ -275,7 +280,8 @@ fun HeatmapCard(quotes: List<MarketsApi.Quote>, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun HeatTile(quote: MarketsApi.Quote, index: Int, start: Boolean, modifier: Modifier) {
+private fun HeatTile(quote: MarketsApi.Quote, index: Int, start: Boolean, onOpen: () -> Unit, modifier: Modifier) {
+    val haptics = LocalHapticFeedback.current
     val pop = remember { Animatable(0f) }
     val count = remember { Animatable(0f) }
     LaunchedEffect(start) {
@@ -298,6 +304,10 @@ private fun HeatTile(quote: MarketsApi.Quote, index: Int, start: Boolean, modifi
             .clip(RoundedCornerShape(16.dp))
             .background(tint.copy(alpha = 0.06f + 0.22f * strength))
             .border(0.5.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
+            .clickable {
+                Haptics.sheetOpen(haptics)
+                onOpen()
+            }
             .padding(horizontal = 12.dp, vertical = 12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -310,7 +320,7 @@ private fun HeatTile(quote: MarketsApi.Quote, index: Int, start: Boolean, modifi
             signed(quote.change * count.value),
             color = tint,
             fontSize = 16.sp,
-            fontFamily = FontFamily.Monospace,
+            style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"),
             fontWeight = FontWeight.SemiBold
         )
     }
@@ -325,6 +335,7 @@ private fun HeatTile(quote: MarketsApi.Quote, index: Int, start: Boolean, modifi
 fun HomeMarketsSection(onOpenNews: () -> Unit, modifier: Modifier = Modifier) {
     var quotes by remember { mutableStateOf<List<MarketsApi.Quote>?>(null) }
     var longPercent by remember { mutableStateOf<Int?>(null) }
+    var charting by remember { mutableStateOf<MarketsApi.Quote?>(null) }
     LaunchedEffect(Unit) {
         launch { longPercent = MarketsApi.goldLongPercent() }
         while (true) {
@@ -334,7 +345,10 @@ fun HomeMarketsSection(onOpenNews: () -> Unit, modifier: Modifier = Modifier) {
     }
     val list = quotes ?: return
     Column(modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        list.firstOrNull { it.key == "gold" }?.let { GoldPriceCard(it, longPercent, onOpenNews) }
-        HeatmapCard(list)
+        list.firstOrNull { it.key == "gold" }?.let { gold ->
+            GoldPriceCard(gold, longPercent, onOpenNews, onOpenChart = { charting = gold })
+        }
+        HeatmapCard(list, onOpen = { charting = it })
     }
+    charting?.let { MarketChartSheet(it, onDismiss = { charting = null }) }
 }

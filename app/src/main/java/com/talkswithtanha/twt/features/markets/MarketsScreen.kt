@@ -353,6 +353,7 @@ private fun CalendarPage(events: List<MarketsApi.Event>?) {
         }
         .filter { currency == "All" || it.currency == currency }
         .sortedBy { it.at?.time ?: 0 }
+    val upNext = shown.firstOrNull { (it.at?.time ?: 0) > now }
 
     PageList {
         item {
@@ -360,7 +361,7 @@ private fun CalendarPage(events: List<MarketsApi.Event>?) {
                 ChipRow(listOf("High", "High & medium", "Everything"), impact) {
                     Haptics.tap(haptics); impact = it
                 }
-                ChipRow(currencies, currency) {
+                ChipRow(currencies, currency, label = { if (it == "All") it else withFlag(it) }) {
                     Haptics.tap(haptics); currency = it
                 }
             }
@@ -372,11 +373,19 @@ private fun CalendarPage(events: List<MarketsApi.Event>?) {
                 item {
                     SectionCard(if (dayEvents.first().at?.let(::isToday) == true) "Today" else day, "${dayEvents.size} events") {
                         dayEvents.forEach { e ->
+                            if (e === upNext) UpNextMarker(e, now)
                             Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text(e.at?.let { timeFormat.format(it) } ?: "—", color = Muted, fontSize = 13.sp, style = Tabular, modifier = Modifier.width(46.dp))
-                                Box(Modifier.size(8.dp).clip(CircleShape).background(impactColor(e.impact)))
-                                Spacer(Modifier.width(8.dp))
-                                Text(e.currency, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(40.dp))
+                                Column(Modifier.width(58.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(currencyFlag(e.currency), fontSize = 15.sp)
+                                        Spacer(Modifier.width(5.dp))
+                                        Text(e.currency, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    Spacer(Modifier.height(4.dp))
+                                    ImpactBars(e.impact)
+                                }
+                                Spacer(Modifier.width(6.dp))
                                 Column(Modifier.weight(1f)) {
                                     Text(e.title, color = Color.White, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                     val detail = listOfNotNull(
@@ -394,20 +403,46 @@ private fun CalendarPage(events: List<MarketsApi.Event>?) {
     }
 }
 
-private fun impactColor(impact: String) = when (impact) {
-    "High" -> Down
-    "Medium" -> Amber
-    "Holiday" -> Color(0xFF64748B)
-    else -> Color.White.copy(alpha = 0.3f)
+/** A green strip above the next release still to come, with how long until it. */
+@Composable
+private fun UpNextMarker(e: MarketsApi.Event, now: Long) {
+    val mins = (((e.at?.time ?: now) - now) / 60_000).coerceAtLeast(0)
+    val inText = when {
+        mins >= 24 * 60 -> "in ${mins / (24 * 60)}d ${mins % (24 * 60) / 60}h"
+        mins >= 60 -> "in ${mins / 60}h ${mins % 60}m"
+        else -> "in ${mins}m"
+    }
+    Row(
+        Modifier.fillMaxWidth().background(Up.copy(alpha = 0.08f)).padding(horizontal = 18.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            "UP NEXT",
+            color = Up,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.2.sp,
+            modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Up.copy(alpha = 0.16f)).padding(horizontal = 8.dp, vertical = 3.dp)
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(inText, color = Up, fontSize = 13.sp, style = Tabular)
+        Spacer(Modifier.width(10.dp))
+        Box(Modifier.weight(1f).height(1.dp).background(Up.copy(alpha = 0.3f)))
+    }
 }
 
 @Composable
-private fun ChipRow(options: List<String>, selected: String, onSelect: (String) -> Unit) {
+private fun ChipRow(
+    options: List<String>,
+    selected: String,
+    label: (String) -> String = { it },
+    onSelect: (String) -> Unit
+) {
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { option ->
             val isSelected = option == selected
             Text(
-                option,
+                label(option),
                 color = if (isSelected) Color.Black else Color.White,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,

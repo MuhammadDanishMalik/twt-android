@@ -66,7 +66,12 @@ private val FILTERS = listOf(
     "Silver" to setOf("XAG")
 )
 
-/** What each tag is shown as on a story. */
+/** The filters' icons — a flag or symbol for what each one covers. */
+private val FILTER_ICONS = mapOf(
+    "Gold" to "🥇", "Dollar" to "🇺🇸", "Forex" to "💱", "Oil" to "🛢️", "Silver" to "🥈"
+)
+
+/** What each tag is shown as on a story, after its flag. */
 private val TAG_LABELS = mapOf(
     "XAU" to "Gold", "XAG" to "Silver", "OIL" to "Oil", "USD" to "Dollar",
     "EUR" to "Euro", "GBP" to "Pound", "JPY" to "Yen", "AUD" to "Aussie",
@@ -150,7 +155,7 @@ fun NewsFeed(showTitle: Boolean, modifier: Modifier = Modifier) {
                         FILTERS.forEach { (label, _) ->
                             val selected = label == filter
                             Text(
-                                label,
+                                FILTER_ICONS[label]?.let { "$it $label" } ?: label,
                                 color = if (selected) Color.Black else Color.White,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold,
@@ -211,7 +216,7 @@ private fun StoryRow(story: MarketsApi.Story, now: Long, onOpen: () -> Unit) {
             Spacer(Modifier.weight(1f))
             story.tags.take(2).forEach { tag ->
                 Text(
-                    TAG_LABELS[tag] ?: tag,
+                    "${currencyFlag(tag)} ${TAG_LABELS[tag] ?: tag}",
                     color = Color.White,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,

@@ -72,12 +72,6 @@ private val Faint = Color.White.copy(alpha = 0.35f)
 private val CardBg = Color(0xFF141414)
 private val Tabular = TextStyle(fontFeatureSettings = "tnum")
 
-/** Currency → flag, for the next-release card. */
-private val CURRENCY_FLAGS = mapOf(
-    "USD" to "🇺🇸", "EUR" to "🇪🇺", "GBP" to "🇬🇧", "JPY" to "🇯🇵", "AUD" to "🇦🇺",
-    "CAD" to "🇨🇦", "CHF" to "🇨🇭", "NZD" to "🇳🇿", "CNY" to "🇨🇳"
-)
-
 @Composable
 private fun Card(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Column(
@@ -292,7 +286,7 @@ private fun AreaChart(candles: List<MarketsApi.Candle>, color: Color, range: Str
 
 /** Three bars, lit by how much the release tends to move the market. */
 @Composable
-private fun ImpactBars(impact: String) {
+internal fun ImpactBars(impact: String) {
     val lit = when (impact) { "High" -> 3; "Medium" -> 2; "Low" -> 1; else -> 0 }
     val color = when (impact) { "High" -> Red; "Medium" -> Color(0xFFF59E0B); else -> Muted }
     Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -346,7 +340,7 @@ fun NextReleaseCard(events: List<MarketsApi.Event>?, onCalendar: (() -> Unit)? =
         Box(Modifier.fillMaxWidth().height(0.5.dp).background(Color.White.copy(alpha = 0.08f)))
         Column(Modifier.padding(18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(CURRENCY_FLAGS[next.currency] ?: "🌐", fontSize = 18.sp)
+                Text(currencyFlag(next.currency), fontSize = 18.sp)
                 Spacer(Modifier.width(8.dp))
                 Text(next.currency, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.width(10.dp))

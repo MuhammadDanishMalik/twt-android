@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.admin
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -266,7 +267,7 @@ private fun LabelledField(
                     text = hint,
                     color = IosColors.TextSecondary.copy(alpha = 0.5f),
                     fontSize = 15.sp,
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = WebFonts.Mono,
                     textAlign = TextAlign.End,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -281,7 +282,7 @@ private fun LabelledField(
                 textStyle = LocalTextStyle.current.copy(
                     color = IosColors.TextPrimary,
                     fontSize = 15.sp,
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = WebFonts.Mono,
                     textAlign = TextAlign.End
                 ),
                 cursorBrush = SolidColor(IosColors.TextPrimary),

@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.home.components
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -65,7 +66,7 @@ import java.util.Locale
 private val Up = Color(0xFF22C55E)
 private val Down = Color(0xFFEF4444)
 private val Muted = Color.White.copy(alpha = 0.55f)
-private val Tabular = TextStyle(fontFeatureSettings = "tnum")
+private val Tabular = TextStyle(fontFamily = WebFonts.Body, fontFeatureSettings = "tnum")
 
 /**
  * The market chart for one instrument, opened from a heatmap tile or the gold
@@ -180,7 +181,7 @@ fun MarketChartSheet(quote: MarketsApi.Quote, onDismiss: () -> Unit) {
                         }
                     )
                     failed -> Text("Chart unavailable right now.", color = Muted, fontSize = 14.sp)
-                    else -> CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
+                    else -> com.talkswithtanha.twt.core.designsystem.components.ChartSkeleton("Loading ${quote.label} chart", Modifier.fillMaxSize().padding(horizontal = 16.dp))
                 }
             }
 

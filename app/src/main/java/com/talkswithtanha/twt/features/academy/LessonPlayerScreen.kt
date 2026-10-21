@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.academy
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.webkit.WebChromeClient
@@ -312,7 +313,7 @@ private fun NoteRow(note: VideoNote, onSeek: () -> Unit, onDelete: () -> Unit, m
             color = IosColors.Accent,
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = WebFonts.Mono,
             modifier = Modifier
                 .clip(CircleShape)
                 .background(IosColors.Accent.copy(alpha = 0.13f))

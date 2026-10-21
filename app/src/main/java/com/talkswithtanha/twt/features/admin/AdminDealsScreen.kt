@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.admin
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -180,7 +181,7 @@ private fun DealCard(deal: Deal, isWorking: Boolean, onAction: (PendingDealActio
                 color = IosColors.TextPrimary,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace
+                fontFamily = WebFonts.Mono
             )
             Spacer(Modifier.size(8.dp))
             Box(
@@ -219,7 +220,7 @@ private fun DealCard(deal: Deal, isWorking: Boolean, onAction: (PendingDealActio
             text = "${deal.payLabel()} → ${deal.receiveLabel()}",
             color = IosColors.TextSecondary,
             fontSize = 12.sp,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = WebFonts.Mono,
             modifier = Modifier.padding(top = 2.dp)
         )
         deal.paymentReference?.takeIf { it.isNotBlank() }?.let {

@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.markets
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
@@ -68,6 +69,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.talkswithtanha.twt.core.data.MarketsApi
 import com.talkswithtanha.twt.core.designsystem.Haptics
+import com.talkswithtanha.twt.core.designsystem.components.rememberChunks
+import com.talkswithtanha.twt.core.designsystem.components.SkeletonRows
+import com.talkswithtanha.twt.core.designsystem.components.SkeletonCard
+import com.talkswithtanha.twt.core.designsystem.components.Shimmer
+import com.talkswithtanha.twt.core.designsystem.components.LoadMoreButton
+import com.talkswithtanha.twt.core.designsystem.components.ChartSkeleton
+import com.talkswithtanha.twt.core.designsystem.bouncyClick
+import com.talkswithtanha.twt.core.designsystem.appear
 import com.talkswithtanha.twt.core.designsystem.components.RollingNumber
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -79,7 +88,7 @@ private val Sell = Color(0xFFEF4444)
 private val Muted = Color.White.copy(alpha = 0.55f)
 private val Faint = Color.White.copy(alpha = 0.38f)
 private val CardBg = Color(0xFF141414)
-private val Mono = TextStyle(fontFamily = FontFamily.Monospace, fontFeatureSettings = "tnum")
+private val Mono = TextStyle(fontFamily = WebFonts.Mono, fontFeatureSettings = "tnum")
 
 /** About three years of weeks, for the sparklines in the list. */
 private const val SPARK_WEEKS = 156
@@ -104,8 +113,14 @@ internal fun CotPage(data: Pair<String, List<MarketsApi.Positioning>>?) {
     var focusKey by rememberSaveable { mutableStateOf("gold") }
 
     if (data == null) {
-        Box(Modifier.fillMaxWidth().padding(top = 60.dp), Alignment.Center) {
-            CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(84, 92, 140).forEach { Shimmer(Modifier.width(it.dp), height = 36.dp, cornerRadius = 18.dp) }
+            }
+            SkeletonCard(label = "Loading five years of positioning") {
+                ChartSkeleton("Reading the CFTC report", Modifier.height(220.dp).padding(horizontal = 14.dp))
+            }
+            SkeletonCard(label = "Loading trader groups") { SkeletonRows(4, leading = false) }
         }
         return
     }
@@ -138,7 +153,7 @@ internal fun CotPage(data: Pair<String, List<MarketsApi.Positioning>>?) {
                         modifier = Modifier
                             .clip(RoundedCornerShape(18.dp))
                             .background(if (selected) Color.White else Color.White.copy(alpha = 0.07f))
-                            .clickable { choose(r.key) }
+                            .bouncyClick(pressedScale = 0.93f, haptic = false) { choose(r.key) }
                             .padding(horizontal = 14.dp, vertical = 8.dp)
                     )
                 }
@@ -175,6 +190,7 @@ private fun Card(content: @Composable () -> Unit) {
             .clip(RoundedCornerShape(24.dp))
             .background(CardBg)
             .border(0.5.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(24.dp))
+            .appear()
     ) { content() }
 }
 
@@ -200,19 +216,27 @@ private fun PositionCard(r: MarketsApi.Positioning) {
     // The finger's week. Held as an int state and only written when the week
     // actually changes, so dragging within one bar recomposes nothing.
     var hover by remember(r.key) { mutableIntStateOf(-1) }
+    // A year at a time: the latest first, earlier ones as the member asks.
+    val years = rememberChunks(initial = 1, step = 1, key = r.key)
+    // Five years and a few weeks is "5 years"; the last chunk takes the odd weeks with it.
+    val totalYears = maxOf(1, (r.history.size + 26) / 52)
+    val shown = remember(r.key, years.shown) {
+        if (years.shown >= totalYears) r.history else r.history.takeLast(52 * years.shown)
+    }
     // Kept after the finger lifts, so the readout stays readable.
-    val point by remember(r.key) { derivedStateOf { r.history.getOrNull(hover) } }
+    val point by remember(r.key, years.shown) { derivedStateOf { shown.getOrNull(hover) } }
+    val scope = rememberCoroutineScope()
     // The currency reports have no commercials group, only zeros; leave the line out there.
     val hasCommercials = remember(r.key) { r.history.any { it.commercialNet != 0L } }
 
     Card {
-        CardHeader("${r.label} · ${specLabel(r)} net, 5 years", r.index?.let { "COT index $it" })
+        CardHeader("${r.label} · ${specLabel(r)} net", r.index?.let { "COT index $it" })
         if (r.history.size < 2) {
             Text("Not enough history.", color = Muted, fontSize = 13.sp, modifier = Modifier.padding(18.dp))
             return@Card
         }
         Box(Modifier.padding(start = 10.dp, end = 14.dp, top = 14.dp)) {
-            PositionChart(r.history, hover.takeIf { it >= 0 }, hasCommercials) { week ->
+            PositionChart(shown, hover.takeIf { it >= 0 }, hasCommercials) { week ->
                 if (week != null && week != hover) {
                     hover = week
                     Haptics.tick(haptics)
@@ -259,6 +283,21 @@ private fun PositionCard(r: MarketsApi.Positioning) {
                 if (hasCommercials) ReadoutLine("Commercials", signed(week.commercialNet), tint(week.commercialNet))
                 ReadoutLine("Open interest", "%,d".format(week.openInterest), Color.White)
             }
+        }
+        if (years.loading) {
+            SkeletonRows(1, leading = false, trailing = false, rowHeight = 28.dp, modifier = Modifier.padding(bottom = 10.dp))
+        }
+        if (shown.size < r.history.size) {
+            LoadMoreButton(
+                loading = years.loading,
+                onClick = {
+                    hover = -1
+                    scope.launch { years.more() }
+                },
+                label = "Load an earlier year",
+                remaining = "${years.shown} of $totalYears years",
+                modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 14.dp)
+            )
         }
     }
 }
@@ -451,7 +490,7 @@ private fun MarketsCard(rows: List<MarketsApi.Positioning>, focusKey: String, on
                 Modifier
                     .fillMaxWidth()
                     .background(if (r.key == focusKey) Color.White.copy(alpha = 0.04f) else Color.Transparent)
-                    .clickable { onChoose(r.key) }
+                    .bouncyClick(pressedScale = 0.985f, haptic = false) { onChoose(r.key) }
                     .padding(horizontal = 18.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {

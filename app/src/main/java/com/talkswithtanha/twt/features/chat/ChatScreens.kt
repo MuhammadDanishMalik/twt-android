@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.chat
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -91,6 +92,7 @@ fun ChatListScreen(
             text = "Chats",
             color = Color.White,
             fontSize = 34.sp,
+            fontFamily = WebFonts.Display,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(start = 20.dp, top = 12.dp, bottom = 16.dp)
         )

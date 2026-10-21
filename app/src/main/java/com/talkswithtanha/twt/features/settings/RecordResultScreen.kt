@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.settings
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -274,7 +275,7 @@ private fun NumberRow(
             textStyle = TextStyle(
                 color = IosColors.TextPrimary,
                 fontSize = 16.sp,
-                fontFamily = FontFamily.Monospace
+                fontFamily = WebFonts.Mono
             ),
             cursorBrush = SolidColor(IosColors.Accent),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

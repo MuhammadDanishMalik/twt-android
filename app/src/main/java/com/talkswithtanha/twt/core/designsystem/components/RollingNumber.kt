@@ -54,7 +54,7 @@ fun RollingNumber(
     fontSize: TextUnit,
     modifier: Modifier = Modifier,
     fontWeight: FontWeight? = null,
-    style: TextStyle = TextStyle.Default
+    style: TextStyle = androidx.compose.material3.LocalTextStyle.current
 ) {
     val tint by animateColorAsState(color, spring(stiffness = Spring.StiffnessMediumLow), label = "rollingTint")
     val textStyle = style.merge(TextStyle(fontFeatureSettings = "tnum"))

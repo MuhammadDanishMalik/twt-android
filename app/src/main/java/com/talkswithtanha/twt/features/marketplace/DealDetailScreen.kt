@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.marketplace
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
@@ -464,7 +465,7 @@ private fun CopyRow(label: String, value: String, onCopy: (String, String) -> Un
                 color = Color.White,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
-                fontFamily = FontFamily.Monospace
+                fontFamily = WebFonts.Mono
             )
         }
         AnimatedContent(
@@ -515,7 +516,7 @@ private fun SummaryLine(label: String, value: String, monospaced: Boolean = fals
             color = Color.White,
             fontSize = if (monospaced) 13.sp else 14.sp,
             fontWeight = FontWeight.SemiBold,
-            fontFamily = if (monospaced) FontFamily.Monospace else FontFamily.Default
+            fontFamily = if (monospaced) WebFonts.Mono else WebFonts.Body
         )
     }
 }
@@ -770,7 +771,7 @@ private fun ConfirmPaymentSheet(
                         text = "e.g. 4829173645",
                         color = Color.White.copy(alpha = 0.25f),
                         fontSize = 16.sp,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = WebFonts.Mono
                     )
                 }
                 BasicTextField(
@@ -780,7 +781,7 @@ private fun ConfirmPaymentSheet(
                     textStyle = TextStyle(
                         color = Color.White,
                         fontSize = 16.sp,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = WebFonts.Mono
                     ),
                     cursorBrush = SolidColor(IosColors.Accent),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),

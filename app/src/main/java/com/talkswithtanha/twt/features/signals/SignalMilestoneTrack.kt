@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.signals
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -167,7 +168,7 @@ fun SignalMilestoneTrack(signal: Signal) {
                         text = stop.price,
                         color = Color.White.copy(alpha = 0.6f),
                         fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = WebFonts.Mono,
                         maxLines = 1,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )

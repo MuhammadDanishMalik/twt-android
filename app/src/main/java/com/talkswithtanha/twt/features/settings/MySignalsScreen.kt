@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.settings
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -268,7 +269,7 @@ private fun FollowRow(
                         color = if (pips >= 0) IosColors.BuyGreen else IosColors.SellRed,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = WebFonts.Mono
                     )
                 }
                 Text(follow.outcome.label, color = IosColors.TextSecondary, fontSize = 11.sp)

@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.signals
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.animation.animateContentSize
 import com.talkswithtanha.twt.core.designsystem.Motion
 import java.text.SimpleDateFormat
@@ -237,7 +238,7 @@ private fun AnalysisCard(
                     fontWeight = FontWeight.Medium,
                     // Tabular digits, so a column of these cards lines its
                     // times up instead of wobbling at every 1.
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = WebFonts.Mono,
                     letterSpacing = (-0.2).sp,
                     maxLines = 1
                 )

@@ -95,7 +95,7 @@ fun PostDetailScreen(
         val post = state.post
         if (post == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = IosColors.TextSecondary)
+                com.talkswithtanha.twt.core.designsystem.components.LoadingLabel("Loading the post")
             }
             return@Column
         }

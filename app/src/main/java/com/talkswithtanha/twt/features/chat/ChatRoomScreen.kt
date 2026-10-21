@@ -187,6 +187,19 @@ fun ChatRoomScreen(
                 }
             }
 
+            state.messages.isEmpty() -> Column(
+                Modifier.weight(1f).fillMaxWidth().padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.Bottom)
+            ) {
+                // Bubbles' shapes, alternating sides, while the room opens.
+                listOf(0.62f to false, 0.45f to true, 0.7f to false, 0.38f to true).forEach { (width, own) ->
+                    Box(Modifier.fillMaxWidth(), contentAlignment = if (own) Alignment.CenterEnd else Alignment.CenterStart) {
+                        com.talkswithtanha.twt.core.designsystem.components.Shimmer(Modifier.fillMaxWidth(width), height = 40.dp, cornerRadius = 18.dp)
+                    }
+                }
+                com.talkswithtanha.twt.core.designsystem.components.LoadingLabel("Loading messages", Modifier.align(Alignment.CenterHorizontally))
+            }
+
             else -> LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f),

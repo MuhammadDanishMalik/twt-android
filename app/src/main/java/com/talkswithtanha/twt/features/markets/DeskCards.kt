@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.markets
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -57,6 +58,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.talkswithtanha.twt.core.data.MarketsApi
 import com.talkswithtanha.twt.core.designsystem.Haptics
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.animateColorAsState
+import com.talkswithtanha.twt.core.designsystem.components.SkeletonCard
+import com.talkswithtanha.twt.core.designsystem.components.Shimmer
+import com.talkswithtanha.twt.core.designsystem.components.ChartSkeleton
+import com.talkswithtanha.twt.core.designsystem.bouncyClick
+import com.talkswithtanha.twt.core.designsystem.appear
 import com.talkswithtanha.twt.core.designsystem.components.RollingNumber
 import com.talkswithtanha.twt.features.home.components.SESSIONS
 import com.talkswithtanha.twt.features.home.components.headline
@@ -71,7 +79,7 @@ private val Red = Color(0xFFEF4444)
 private val Muted = Color.White.copy(alpha = 0.55f)
 private val Faint = Color.White.copy(alpha = 0.35f)
 private val CardBg = Color(0xFF141414)
-private val Tabular = TextStyle(fontFeatureSettings = "tnum")
+private val Tabular = TextStyle(fontFamily = WebFonts.Body, fontFeatureSettings = "tnum")
 
 @Composable
 private fun Card(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
@@ -81,6 +89,7 @@ private fun Card(modifier: Modifier = Modifier, content: @Composable () -> Unit)
             .clip(RoundedCornerShape(24.dp))
             .background(CardBg)
             .border(0.5.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(24.dp))
+            .appear()
     ) { content() }
 }
 
@@ -112,13 +121,14 @@ fun SessionHero() {
                 buildAnnotatedString {
                     append(headline(open))
                     append("\nHere’s what moves ")
-                    withStyle(SpanStyle(color = Green, fontFamily = FontFamily.Serif, fontStyle = FontStyle.Italic, fontWeight = FontWeight.Normal)) {
+                    withStyle(SpanStyle(color = Green, fontFamily = WebFonts.Serif, fontStyle = FontStyle.Italic, fontWeight = FontWeight.Normal, fontSize = 32.sp)) {
                         append("gold.")
                     }
                 },
                 color = Color.White,
-                fontSize = 26.sp,
-                lineHeight = 31.sp,
+                fontSize = 28.sp,
+                lineHeight = 30.sp,
+                fontFamily = WebFonts.Display,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = (-0.5).sp
             )
@@ -176,7 +186,7 @@ fun GoldChartCard(onOpen: () -> Unit) {
     val change = data?.let { (it.last().close / it.first().close - 1) * 100 }
     val tint = if ((change ?: 0.0) >= 0) Green else Red
 
-    Card(Modifier.clickable { Haptics.sheetOpen(haptics); onOpen() }) {
+    Card(Modifier.bouncyClick(pressedScale = 0.985f, haptic = false) { Haptics.sheetOpen(haptics); onOpen() }) {
         Column(Modifier.padding(vertical = 16.dp)) {
             Row(Modifier.padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
                 Overline("Gold · $range")
@@ -195,19 +205,18 @@ fun GoldChartCard(onOpen: () -> Unit) {
             ) {
                 CHART_RANGES.forEach { label ->
                     val selected = label == range
+                    val fill by animateColorAsState(if (selected) Color.White.copy(alpha = 0.12f) else Color.Transparent, spring(stiffness = 500f), label = "rangeFill")
+                    val ink by animateColorAsState(if (selected) Color.White else Muted, spring(stiffness = 500f), label = "rangeInk")
                     Text(
                         label,
-                        color = if (selected) Color.White else Muted,
+                        color = ink,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         style = Tabular,
                         modifier = Modifier
+                            .bouncyClick(pressedScale = 0.9f) { range = label }
                             .clip(RoundedCornerShape(15.dp))
-                            .background(if (selected) Color.White.copy(alpha = 0.12f) else Color.Transparent)
-                            .clickable {
-                                Haptics.tap(haptics)
-                                range = label
-                            }
+                            .background(fill)
                             .padding(horizontal = 13.dp, vertical = 6.dp)
                     )
                 }
@@ -217,7 +226,7 @@ fun GoldChartCard(onOpen: () -> Unit) {
                 when {
                     data != null -> AreaChart(data, tint, range)
                     failed -> Text("The chart could not be loaded.", color = Muted, fontSize = 13.sp)
-                    else -> CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
+                    else -> ChartSkeleton("Loading the gold chart", Modifier.fillMaxSize().padding(horizontal = 14.dp))
                 }
             }
         }
@@ -319,7 +328,20 @@ fun NextReleaseCard(events: List<MarketsApi.Event>?, onCalendar: (() -> Unit)? =
             now = System.currentTimeMillis()
         }
     }
-    if (events == null) return
+    if (events == null) {
+        SkeletonCard(label = "Loading the next release") {
+            Column(Modifier.padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Shimmer(Modifier.width(90.dp), height = 18.dp)
+                Shimmer(Modifier.width(210.dp), height = 40.dp, cornerRadius = 10.dp)
+                Shimmer(Modifier.fillMaxWidth(0.8f), height = 16.dp)
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Shimmer(Modifier.weight(1f), height = 58.dp, cornerRadius = 14.dp)
+                    Shimmer(Modifier.weight(1f), height = 58.dp, cornerRadius = 14.dp)
+                }
+            }
+        }
+        return
+    }
     val next = events
         .filter { it.impact != "Holiday" && (it.at?.time ?: 0) > now }
         .minByOrNull { it.at!!.time } ?: return
@@ -353,7 +375,7 @@ fun NextReleaseCard(events: List<MarketsApi.Event>?, onCalendar: (() -> Unit)? =
                 color = Color.White,
                 fontSize = 40.sp,
                 fontWeight = FontWeight.Medium,
-                style = TextStyle(fontFamily = FontFamily.Monospace, letterSpacing = (-1).sp)
+                style = TextStyle(fontFamily = WebFonts.Mono, letterSpacing = (-1).sp)
             )
             Spacer(Modifier.height(8.dp))
             Text(next.title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
@@ -372,10 +394,7 @@ fun NextReleaseCard(events: List<MarketsApi.Event>?, onCalendar: (() -> Unit)? =
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable {
-                    Haptics.tap(haptics)
-                    onCalendar()
-                }
+                .bouncyClick(pressedScale = 0.98f) { onCalendar() }
                 .padding(horizontal = 18.dp, vertical = 14.dp)
         )
     }

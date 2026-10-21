@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.markets
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
@@ -65,6 +66,12 @@ import androidx.compose.ui.unit.sp
 import com.talkswithtanha.twt.core.data.MarketsApi
 import com.talkswithtanha.twt.core.designsystem.Haptics
 import com.talkswithtanha.twt.core.designsystem.IosColors
+import com.talkswithtanha.twt.core.designsystem.components.rememberChunks
+import com.talkswithtanha.twt.core.designsystem.components.SkeletonRows
+import com.talkswithtanha.twt.core.designsystem.components.SkeletonCard
+import com.talkswithtanha.twt.core.designsystem.components.LoadMoreButton
+import com.talkswithtanha.twt.core.designsystem.bouncyClick
+import com.talkswithtanha.twt.core.designsystem.appear
 import com.talkswithtanha.twt.core.designsystem.components.RollingNumber
 import com.talkswithtanha.twt.features.home.components.InstrumentBadge
 import com.talkswithtanha.twt.features.home.components.LiveDeskCard
@@ -83,7 +90,7 @@ private val Amber = Color(0xFFF59E0B)
 private val Muted = Color.White.copy(alpha = 0.55f)
 private val Faint = Color.White.copy(alpha = 0.38f)
 private val CardBg = Color(0xFF141414)
-private val Tabular = TextStyle(fontFeatureSettings = "tnum")
+private val Tabular = TextStyle(fontFamily = WebFonts.Body, fontFeatureSettings = "tnum")
 
 /** The website's Markets sections, in its order. */
 private val PAGES = listOf("Dashboard", "Calendar", "Live news", "COT report", "Fed watch")
@@ -125,7 +132,7 @@ fun MarketsScreen() {
 
     Column(Modifier.fillMaxSize().background(IosColors.Background).statusBarsPadding()) {
         Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp)) {
-            Text("Markets", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold)
+            Text("Markets", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold, fontFamily = WebFonts.Display)
         }
 
         PageTabs(
@@ -250,11 +257,10 @@ private fun PageList(content: androidx.compose.foundation.lazy.LazyListScope.() 
     )
 }
 
+/** A card's skeleton while its data is on the way: says what is loading, then the rows' shape. */
 @Composable
-private fun Loading() {
-    Box(Modifier.fillMaxWidth().padding(top = 60.dp), Alignment.Center) {
-        CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
-    }
+private fun Loading(label: String, rows: Int = 6, leading: Boolean = true) {
+    SkeletonCard(label = label) { SkeletonRows(rows, leading = leading) }
 }
 
 @Composable
@@ -266,6 +272,7 @@ private fun SectionCard(title: String, trailing: String? = null, content: @Compo
             .background(CardBg)
             .border(0.5.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(24.dp))
             .padding(vertical = 16.dp)
+            .appear()
     ) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(title.uppercase(), color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
@@ -308,16 +315,17 @@ private fun DashboardPage(
         item { GoldChartCard(onOpen = { quotes?.firstOrNull { it.key == "gold" }?.let(onOpen) }) }
         item { NextReleaseCard(events, onCalendar) }
         item { LiveDeskCard(height = 242.dp, corner = 24.dp) }
-        if (quotes == null) item { Loading() }
+        if (quotes == null) item { Loading("Loading prices", rows = 8) }
         quotes?.let { list ->
             item {
                 SectionCard("Prices", "Tap for the chart") {
-                    list.forEach { q ->
+                    list.forEachIndexed { i, q ->
                         val tint = if (q.change >= 0) Up else Down
                         Row(
                             Modifier
                                 .fillMaxWidth()
-                                .clickable {
+                                .appear(i)
+                                .bouncyClick(haptic = false) {
                                     Haptics.sheetOpen(haptics)
                                     onOpen(q)
                                 }
@@ -362,6 +370,10 @@ private fun CalendarPage(events: List<MarketsApi.Event>?) {
         .filter { currency == "All" || it.currency == currency }
         .sortedBy { it.at?.time ?: 0 }
     val upNext = shown.firstOrNull { (it.at?.time ?: 0) > now }
+    // Three days at a time; a new filter starts the count again.
+    val days = rememberChunks(initial = 3, key = impact to currency)
+    val scope = rememberCoroutineScope()
+    val dayCount = shown.map { it.at?.let { d -> dayFormat.format(d) } ?: "" }.distinct().size
 
     PageList {
         item {
@@ -375,9 +387,9 @@ private fun CalendarPage(events: List<MarketsApi.Event>?) {
             }
         }
         when {
-            events == null -> item { Loading() }
+            events == null -> item { Loading("Loading the calendar", rows = 7, leading = false) }
             shown.isEmpty() -> item { Text("Nothing scheduled for that filter.", color = Muted, fontSize = 14.sp, modifier = Modifier.padding(top = 20.dp)) }
-            else -> shown.groupBy { it.at?.let { d -> dayFormat.format(d) } ?: "" }.forEach { (day, dayEvents) ->
+            else -> shown.groupBy { it.at?.let { d -> dayFormat.format(d) } ?: "" }.entries.take(days.shown).forEach { (day, dayEvents) ->
                 item {
                     SectionCard(if (dayEvents.first().at?.let(::isToday) == true) "Today" else day, "${dayEvents.size} events") {
                         dayEvents.forEach { e ->
@@ -406,6 +418,17 @@ private fun CalendarPage(events: List<MarketsApi.Event>?) {
                         }
                     }
                 }
+            }
+        }
+        if (events != null && dayCount > days.shown) {
+            if (days.loading) item { Loading("Loading more days", rows = 3, leading = false) }
+            item {
+                LoadMoreButton(
+                    loading = days.loading,
+                    onClick = { scope.launch { days.more() } },
+                    label = "Load more days",
+                    remaining = "${dayCount - days.shown} left"
+                )
             }
         }
     }
@@ -449,15 +472,17 @@ private fun ChipRow(
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { option ->
             val isSelected = option == selected
+            val fill by animateColorAsState(if (isSelected) Color.White else Color.White.copy(alpha = 0.08f), spring(stiffness = 500f), label = "chipFill")
+            val ink by animateColorAsState(if (isSelected) Color.Black else Color.White, spring(stiffness = 500f), label = "chipInk")
             Text(
                 label(option),
-                color = if (isSelected) Color.Black else Color.White,
+                color = ink,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier
+                    .bouncyClick(pressedScale = 0.93f, haptic = false) { onSelect(option) }
                     .clip(RoundedCornerShape(14.dp))
-                    .background(if (isSelected) Color.White else Color.White.copy(alpha = 0.08f))
-                    .clickable { onSelect(option) }
+                    .background(fill)
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             )
         }
@@ -471,7 +496,7 @@ private fun FedPage(fed: MarketsApi.Fed?) {
     val dateFormat = SimpleDateFormat("EEE d MMM yyyy", Locale.getDefault())
     PageList {
         if (fed == null) {
-            item { Loading() }
+            item { Loading("Loading Fed odds", rows = 5, leading = false) }
             return@PageList
         }
         item {
@@ -563,6 +588,8 @@ private fun EveryMeetingCard(meetings: List<MarketsApi.FedMeeting>) {
     val year = SimpleDateFormat("yyyy", Locale.getDefault())
     val header = Modifier.padding(vertical = 10.dp)
 
+    val rows = rememberChunks(initial = 6, step = 6)
+    val scope = rememberCoroutineScope()
     SectionCard("Every meeting", "Scaled to 100%") {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("MEETING", color = Faint, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, modifier = header.width(62.dp))
@@ -571,9 +598,9 @@ private fun EveryMeetingCard(meetings: List<MarketsApi.FedMeeting>) {
             }
             Text("RATE", color = Faint, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, textAlign = TextAlign.End, modifier = header.width(56.dp))
         }
-        meetings.forEach { m ->
+        meetings.take(rows.shown).forEachIndexed { i, m ->
             Box(Modifier.fillMaxWidth().height(0.5.dp).background(Color.White.copy(alpha = 0.07f)))
-            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).appear(i % 6).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.width(62.dp).padding(vertical = 9.dp)) {
                     Text(m.date?.let { dayMonth.format(it) } ?: "—", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     Text(m.date?.let { year.format(it) } ?: "", color = Faint, fontSize = 11.sp, style = Tabular)
@@ -609,6 +636,19 @@ private fun EveryMeetingCard(meetings: List<MarketsApi.FedMeeting>) {
                     }
                 }
             }
+        }
+        if (rows.loading) {
+            Spacer(Modifier.height(8.dp))
+            SkeletonRows(2, leading = false, rowHeight = 36.dp)
+        }
+        if (meetings.size > rows.shown) {
+            LoadMoreButton(
+                loading = rows.loading,
+                onClick = { scope.launch { rows.more() } },
+                label = "Later meetings",
+                remaining = "${meetings.size - rows.shown} more",
+                modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 10.dp)
+            )
         }
         Spacer(Modifier.height(4.dp))
     }

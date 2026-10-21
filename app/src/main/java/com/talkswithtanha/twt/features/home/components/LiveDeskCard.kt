@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.home.components
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
@@ -100,7 +101,7 @@ private fun PickerChip(
                 color = Color.White,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
-                style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = if (monospace) "tnum" else null)
+                style = androidx.compose.ui.text.TextStyle(fontFamily = WebFonts.Body, fontFeatureSettings = if (monospace) "tnum" else null)
             )
             Icon(Icons.Filled.KeyboardArrowDown, description, tint = Color.White, modifier = Modifier.size(18.dp))
         }
@@ -328,7 +329,7 @@ fun LiveDeskCard(height: Dp, corner: Dp, modifier: Modifier = Modifier) {
                                 row.value?.let { "%.2f".format(it) } ?: "—",
                                 color = Color.White.copy(alpha = 0.6f),
                                 fontSize = 13.sp,
-                                style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum")
+                                style = androidx.compose.ui.text.TextStyle(fontFamily = WebFonts.Body, fontFeatureSettings = "tnum")
                             )
                             Spacer(Modifier.width(12.dp))
                             Text(
@@ -372,7 +373,7 @@ private fun GaugeColumn(
             "${gauge.sell} · ${gauge.neutral} · ${gauge.buy}",
             color = Color.White.copy(alpha = 0.45f),
             fontSize = 10.sp,
-            style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum")
+            style = androidx.compose.ui.text.TextStyle(fontFamily = WebFonts.Body, fontFeatureSettings = "tnum")
         )
     }
 }

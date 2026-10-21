@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.signals
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -226,7 +227,7 @@ fun SignalTicketCard(
                         style = LocalTextStyle.current.copy(
                             fontSize = 34.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
+                            fontFamily = WebFonts.Mono
                         ),
                         color = if (signal.pipsGained == null) Color.White else tint
                     )
@@ -310,7 +311,7 @@ private fun TicketLevel(
             style = LocalTextStyle.current.copy(
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
-                fontFamily = FontFamily.Monospace
+                fontFamily = WebFonts.Mono
             ),
             color = Color.White
         )

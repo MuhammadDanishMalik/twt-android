@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.chat
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -327,7 +328,7 @@ private fun TimestampPill(text: String, onAccent: Boolean, small: Boolean = fals
         color = if (onAccent) Color.White else IosColors.Accent,
         fontSize = if (small) 11.sp else 13.sp,
         fontWeight = FontWeight.Bold,
-        fontFamily = FontFamily.Monospace,
+        fontFamily = WebFonts.Mono,
         modifier = Modifier
             .clip(CircleShape)
             .background(if (onAccent) Color.White.copy(alpha = 0.22f) else IosColors.Accent.copy(alpha = 0.13f))

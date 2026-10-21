@@ -1,5 +1,8 @@
 package com.talkswithtanha.twt.features.chat
 
+import androidx.compose.foundation.lazy.itemsIndexed
+import com.talkswithtanha.twt.core.designsystem.bouncyClick
+import com.talkswithtanha.twt.core.designsystem.appear
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -147,8 +150,11 @@ fun StaffInboxScreen(
         }
 
         when (val s = snapshot) {
-            null -> Box(Modifier.fillMaxSize(), Alignment.Center) {
-                CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
+            null -> Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                com.talkswithtanha.twt.core.designsystem.components.LoadingLabel("Loading member chats", Modifier.padding(start = 4.dp))
+                com.talkswithtanha.twt.core.designsystem.components.SkeletonCard {
+                    com.talkswithtanha.twt.core.designsystem.components.SkeletonRows(7, trailing = false)
+                }
             }
             is Snapshot.Failed -> Box(Modifier.fillMaxSize().padding(32.dp), Alignment.Center) {
                 Text(
@@ -167,7 +173,9 @@ fun StaffInboxScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    items(shown, key = { it.roomId }) { thread -> ThreadRow(thread) { onOpenThread(thread.roomId) } }
+                    itemsIndexed(shown, key = { _, thread -> thread.roomId }) { index, thread ->
+                        Box(Modifier.appear(index % 8)) { ThreadRow(thread) { onOpenThread(thread.roomId) } }
+                    }
                 }
             }
         }
@@ -179,8 +187,8 @@ private fun ThreadRow(thread: SupportThread, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
+            .bouncyClick(pressedScale = 0.98f, haptic = false, onClick = onClick)
             .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

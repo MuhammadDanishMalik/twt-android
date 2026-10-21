@@ -61,7 +61,8 @@ fun TwtTheme(
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
-    val typography = remember(context) { twtTypography(TwtType.displayFamily(context)) }
+    // The website's faces everywhere: Bricolage Grotesque, condensed for titles.
+    val typography = remember(context) { twtTypography(WebFonts.Display) }
     val colors = if (darkTheme) DarkColors else LightColors
 
     val view = LocalView.current

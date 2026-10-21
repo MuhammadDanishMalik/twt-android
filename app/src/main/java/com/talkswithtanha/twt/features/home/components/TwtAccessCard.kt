@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.home.components
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -225,7 +226,7 @@ fun TwtAccessCard(
                     color = Color.White.copy(alpha = 0.62f),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = WebFonts.Mono,
                     letterSpacing = 2.sp
                 )
             }
@@ -331,7 +332,7 @@ private fun CardField(
             style = LocalTextStyle.current.copy(
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = WebFonts.Mono,
                 letterSpacing = 1.2.sp
             ),
             color = Color.White,

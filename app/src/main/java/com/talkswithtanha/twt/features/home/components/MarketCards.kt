@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.home.components
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
@@ -159,7 +160,7 @@ fun GoldPriceCard(
                 "%,.${quote.decimals}f".format(shownPrice),
                 color = Color.White,
                 fontSize = 40.sp,
-                style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"),
+                style = androidx.compose.ui.text.TextStyle(fontFamily = WebFonts.Body, fontFeatureSettings = "tnum"),
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.weight(1f)
             )
@@ -167,7 +168,7 @@ fun GoldPriceCard(
                 signed(quote.change),
                 color = changeColor(quote.change),
                 fontSize = 15.sp,
-                style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"),
+                style = androidx.compose.ui.text.TextStyle(fontFamily = WebFonts.Body, fontFeatureSettings = "tnum"),
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier
                     .graphicsLayer {
@@ -196,9 +197,9 @@ fun GoldPriceCard(
         }
         Spacer(Modifier.height(6.dp))
         Row(Modifier.fillMaxWidth()) {
-            Text("L %.${quote.decimals}f".format(quote.low), color = Muted, fontSize = 12.sp, style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"))
+            Text("L %.${quote.decimals}f".format(quote.low), color = Muted, fontSize = 12.sp, style = androidx.compose.ui.text.TextStyle(fontFamily = WebFonts.Body, fontFeatureSettings = "tnum"))
             Spacer(Modifier.weight(1f))
-            Text("H %.${quote.decimals}f".format(quote.high), color = Muted, fontSize = 12.sp, style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"))
+            Text("H %.${quote.decimals}f".format(quote.high), color = Muted, fontSize = 12.sp, style = androidx.compose.ui.text.TextStyle(fontFamily = WebFonts.Body, fontFeatureSettings = "tnum"))
         }
 
         // ── Managed money ─────────────────────────────────────────
@@ -320,7 +321,7 @@ private fun HeatTile(quote: MarketsApi.Quote, index: Int, start: Boolean, onOpen
             signed(quote.change * count.value),
             color = tint,
             fontSize = 16.sp,
-            style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"),
+            style = androidx.compose.ui.text.TextStyle(fontFamily = WebFonts.Body, fontFeatureSettings = "tnum"),
             fontWeight = FontWeight.SemiBold
         )
     }

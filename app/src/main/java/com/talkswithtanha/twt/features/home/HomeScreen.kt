@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.home
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
@@ -235,6 +236,7 @@ fun HomeScreen(
                             text = "Today's Signals",
                             color = Color.White,
                             fontSize = 28.sp,
+                            fontFamily = WebFonts.Display,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(Modifier.size(8.dp))
@@ -369,6 +371,7 @@ private fun HomeHeader(
                 text = firstName,
                 color = Color.White,
                 fontSize = 34.sp,
+                fontFamily = WebFonts.Display,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1
             )

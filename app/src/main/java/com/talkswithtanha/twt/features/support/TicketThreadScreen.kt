@@ -104,7 +104,7 @@ fun TicketThreadScreen(
         val ticket = state.ticket
         if (ticket == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = IosColors.TextSecondary)
+                com.talkswithtanha.twt.core.designsystem.components.LoadingLabel("Loading the ticket")
             }
             return@Column
         }

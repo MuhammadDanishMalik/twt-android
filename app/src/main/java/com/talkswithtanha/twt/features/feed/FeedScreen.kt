@@ -1,5 +1,8 @@
 package com.talkswithtanha.twt.features.feed
 
+import androidx.compose.foundation.lazy.itemsIndexed
+import com.talkswithtanha.twt.core.designsystem.components.LoadingLabel
+import com.talkswithtanha.twt.core.designsystem.appear
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -140,7 +143,13 @@ fun FeedScreen(
                 }
             }
 
-            items(state.posts, key = { it.id }) { post ->
+            if (state.posts.isEmpty() && state.isLoading) {
+                item { LoadingLabel("Loading the feed", Modifier.padding(start = 20.dp, top = 8.dp, bottom = 4.dp)) }
+                items(3) { PostSkeleton() }
+            }
+
+            itemsIndexed(state.posts, key = { _, post -> post.id }) { index, post ->
+                Box(Modifier.appear(index % 6)) {
                 PostRow(
                     post = post,
                     myReaction = state.myReactions[post.id],
@@ -157,6 +166,7 @@ fun FeedScreen(
                     onFollowSignal = viewModel::follow,
                     onUnfollowSignal = viewModel::unfollow
                 )
+                }
                 Divider()
             }
         }
@@ -746,5 +756,23 @@ internal fun shortAgo(date: Date): String {
         seconds < 86_400 -> "${TimeUnit.SECONDS.toHours(seconds)}h"
         seconds < 604_800 -> "${TimeUnit.SECONDS.toDays(seconds)}d"
         else -> "${TimeUnit.SECONDS.toDays(seconds) / 7}w"
+    }
+}
+
+/** A post's shape while the feed loads: avatar and name, three lines of text, a media block. */
+@Composable
+private fun PostSkeleton() {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            com.talkswithtanha.twt.core.designsystem.components.Shimmer(Modifier.size(40.dp), height = 40.dp, cornerRadius = 20.dp)
+            Spacer(Modifier.width(10.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                com.talkswithtanha.twt.core.designsystem.components.Shimmer(Modifier.width(120.dp), height = 12.dp, cornerRadius = 6.dp)
+                com.talkswithtanha.twt.core.designsystem.components.Shimmer(Modifier.width(70.dp), height = 9.dp, cornerRadius = 5.dp)
+            }
+        }
+        com.talkswithtanha.twt.core.designsystem.components.Shimmer(Modifier.fillMaxWidth(0.95f), height = 12.dp, cornerRadius = 6.dp)
+        com.talkswithtanha.twt.core.designsystem.components.Shimmer(Modifier.fillMaxWidth(0.7f), height = 12.dp, cornerRadius = 6.dp)
+        com.talkswithtanha.twt.core.designsystem.components.Shimmer(Modifier.fillMaxWidth(), height = 180.dp, cornerRadius = 16.dp)
     }
 }

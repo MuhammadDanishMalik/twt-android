@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.markets
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
@@ -49,6 +50,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.talkswithtanha.twt.core.data.MarketsApi
 import com.talkswithtanha.twt.core.designsystem.Haptics
+import com.talkswithtanha.twt.core.designsystem.components.rememberChunks
+import com.talkswithtanha.twt.core.designsystem.components.Shimmer
+import com.talkswithtanha.twt.core.designsystem.components.LoadingLabel
+import com.talkswithtanha.twt.core.designsystem.components.LoadMoreButton
+import com.talkswithtanha.twt.core.designsystem.bouncyClick
+import com.talkswithtanha.twt.core.designsystem.appear
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.animateColorAsState
 import com.talkswithtanha.twt.core.designsystem.IosColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -105,6 +115,8 @@ fun NewsFeed(showTitle: Boolean, modifier: Modifier = Modifier) {
     var filter by rememberSaveable { mutableStateOf("All") }
     var tick by remember { mutableIntStateOf(0) }
     var events by remember { mutableStateOf<List<MarketsApi.Event>?>(null) }
+    // Ten stories at a time; changing the filter starts again from the top ten.
+    val chunks = rememberChunks(initial = 10, key = filter)
 
     suspend fun load() {
         val loaded = MarketsApi.news()
@@ -143,7 +155,7 @@ fun NewsFeed(showTitle: Boolean, modifier: Modifier = Modifier) {
             item {
                 Column {
                     if (showTitle) {
-                        Text("News", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold)
+                        Text("News", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold, fontFamily = WebFonts.Display)
                         Text("What is moving gold and the majors", color = Muted, fontSize = 14.sp)
                         Spacer(Modifier.height(12.dp))
                         SessionHero()
@@ -154,18 +166,17 @@ fun NewsFeed(showTitle: Boolean, modifier: Modifier = Modifier) {
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FILTERS.forEach { (label, _) ->
                             val selected = label == filter
+                            val fill by animateColorAsState(if (selected) Color.White else Color.White.copy(alpha = 0.08f), spring(stiffness = 500f), label = "filterFill")
+                            val ink by animateColorAsState(if (selected) Color.Black else Color.White, spring(stiffness = 500f), label = "filterInk")
                             Text(
                                 FILTER_ICONS[label]?.let { "$it $label" } ?: label,
-                                color = if (selected) Color.Black else Color.White,
+                                color = ink,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier
+                                    .bouncyClick(pressedScale = 0.93f) { filter = label }
                                     .clip(RoundedCornerShape(16.dp))
-                                    .background(if (selected) Color.White else Color.White.copy(alpha = 0.08f))
-                                    .clickable {
-                                        Haptics.tap(haptics)
-                                        filter = label
-                                    }
+                                    .background(fill)
                                     .padding(horizontal = 14.dp, vertical = 7.dp)
                             )
                         }
@@ -177,18 +188,27 @@ fun NewsFeed(showTitle: Boolean, modifier: Modifier = Modifier) {
                 shown == null && failed -> item {
                     Text("News could not be loaded. Pull down to try again.", color = Muted, fontSize = 14.sp, modifier = Modifier.padding(top = 24.dp))
                 }
-                shown == null -> item {
-                    Box(Modifier.fillMaxWidth().padding(top = 40.dp), Alignment.Center) {
-                        CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
-                    }
+                shown == null -> {
+                    item { LoadingLabel("Loading the latest headlines", Modifier.padding(start = 4.dp, top = 4.dp)) }
+                    items(5) { StorySkeleton() }
                 }
                 shown.isEmpty() -> item {
                     Text("No $filter stories right now.", color = Muted, fontSize = 14.sp, modifier = Modifier.padding(top = 24.dp))
                 }
-                else -> items(shown, key = { it.link }) { story ->
-                    StoryRow(story, now = tick.let { System.currentTimeMillis() }) {
-                        Haptics.tap(haptics)
-                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(story.link))) }
+                else -> {
+                    itemsIndexed(shown.take(chunks.shown), key = { _, story -> story.link }) { index, story ->
+                        StoryRow(story, now = tick.let { System.currentTimeMillis() }, order = index % 10) {
+                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(story.link))) }
+                        }
+                    }
+                    if (chunks.loading) items(2) { StorySkeleton() }
+                    if (shown.size > chunks.shown) item {
+                        LoadMoreButton(
+                            loading = chunks.loading,
+                            onClick = { scope.launch { chunks.more() } },
+                            label = "More headlines",
+                            remaining = "${shown.size - chunks.shown} left"
+                        )
                     }
                 }
             }
@@ -196,15 +216,35 @@ fun NewsFeed(showTitle: Boolean, modifier: Modifier = Modifier) {
     }
 }
 
+/** A story card's shape while the headlines load: source line, two lines of title, a summary line. */
 @Composable
-private fun StoryRow(story: MarketsApi.Story, now: Long, onOpen: () -> Unit) {
+private fun StorySkeleton() {
     Column(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
             .background(CardBg)
             .border(0.5.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(18.dp))
-            .clickable(onClick = onOpen)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp)
+    ) {
+        Shimmer(Modifier.width(120.dp), height = 10.dp, cornerRadius = 5.dp)
+        Shimmer(Modifier.fillMaxWidth(0.92f), height = 14.dp, cornerRadius = 7.dp)
+        Shimmer(Modifier.fillMaxWidth(0.66f), height = 14.dp, cornerRadius = 7.dp)
+        Shimmer(Modifier.fillMaxWidth(0.8f), height = 10.dp, cornerRadius = 5.dp)
+    }
+}
+
+@Composable
+private fun StoryRow(story: MarketsApi.Story, now: Long, order: Int, onOpen: () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .appear(order)
+            .bouncyClick(pressedScale = 0.98f, onClick = onOpen)
+            .clip(RoundedCornerShape(18.dp))
+            .background(CardBg)
+            .border(0.5.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(18.dp))
             .padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

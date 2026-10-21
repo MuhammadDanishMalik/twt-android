@@ -202,7 +202,7 @@ private fun ZoomableImage(url: String, onZoomChanged: (Boolean) -> Unit) {
             contentScale = ContentScale.Fit,
             loading = {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(28.dp))
+                    LoadingLabel("Loading image")
                 }
             },
             modifier = Modifier

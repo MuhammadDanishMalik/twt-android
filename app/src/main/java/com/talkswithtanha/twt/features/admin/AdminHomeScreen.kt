@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.admin
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -99,7 +100,7 @@ fun AdminHomeScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = SettingsMetrics.pageInset)
         ) {
-            Text("Admin", color = IosColors.TextPrimary, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            Text("Admin", color = IosColors.TextPrimary, fontSize = 28.sp, fontWeight = FontWeight.Bold, fontFamily = WebFonts.Display)
             Text(
                 text = "Signed in as ${state.user?.fullName ?: "staff"} · ${state.user?.role?.stored?.replaceFirstChar { it.uppercase() } ?: ""}",
                 color = IosColors.TextSecondary,

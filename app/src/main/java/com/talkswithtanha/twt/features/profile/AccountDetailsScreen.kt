@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.profile
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -217,7 +218,7 @@ private fun DetailRow(
             style = LocalTextStyle.current.copy(
                 fontSize = if (monospaced) 15.sp else 16.sp,
                 fontWeight = if (monospaced) FontWeight.Medium else FontWeight.Normal,
-                fontFamily = if (monospaced) FontFamily.Monospace else FontFamily.Default,
+                fontFamily = if (monospaced) WebFonts.Mono else WebFonts.Body,
                 textAlign = TextAlign.End
             ),
             color = IosColors.TextPrimary,

@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.marketplace
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -201,6 +202,7 @@ private fun ExchangeHeader(seller: MarketplaceSeller, onBack: () -> Unit) {
                 text = "Exchange",
                 color = Color.White,
                 fontSize = 28.sp,
+                fontFamily = WebFonts.Display,
                 fontWeight = FontWeight.Bold
             )
             Spacer(Modifier.weight(1f))

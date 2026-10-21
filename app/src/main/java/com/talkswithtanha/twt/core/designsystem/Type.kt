@@ -48,7 +48,8 @@ object TwtType {
         )
     }
 
-    val body: FontFamily = FontFamily.SansSerif
+    /** The website's Bricolage Grotesque — the brand face, for every line in the app. */
+    val body: FontFamily get() = WebFonts.Body
 
     @Suppress("DiscouragedApi") // Resolving by name is the entire point here.
     private fun fontId(context: Context, name: String): Int? =
@@ -96,7 +97,7 @@ fun twtTypography(display: FontFamily): Typography {
             lineHeight = 28.sp
         ),
         titleLarge = TextStyle(
-            fontFamily = body,
+            fontFamily = display,
             fontWeight = FontWeight.SemiBold,
             fontSize = 18.sp,
             lineHeight = 24.sp

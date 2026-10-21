@@ -19,6 +19,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Row
@@ -95,6 +96,37 @@ fun Modifier.pressScale(
         scaleY = scale
     }
 }
+
+/**
+ * A tap target that answers the finger: it gives a little under the press
+ * and springs back on release — the same press every card in the app uses —
+ * with the shared tap haptic. One modifier instead of a clickable, an
+ * interaction source and a pressScale at every call site.
+ */
+fun Modifier.bouncyClick(
+    enabled: Boolean = true,
+    pressedScale: Float = 0.97f,
+    haptic: Boolean = true,
+    onClick: () -> Unit
+): Modifier = composed {
+    val source = remember { MutableInteractionSource() }
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    this
+        .pressScale(source, pressedScale)
+        .clickable(interactionSource = source, indication = null, enabled = enabled) {
+            if (haptic) Haptics.tap(haptics)
+            onClick()
+        }
+}
+
+/**
+ * Rises and fades in the first time it is composed — which in a lazy list
+ * is the moment the row scrolls into view, so content keeps arriving as the
+ * member reads down rather than all landing at once off-screen. [order]
+ * staggers siblings that appear together; keep it to their position within
+ * the visible group, not the whole list.
+ */
+fun Modifier.appear(order: Int = 0): Modifier = staggeredAppear(order.coerceAtMost(6))
 
 /**
  * Rises and fades in once, [index] places down a list.

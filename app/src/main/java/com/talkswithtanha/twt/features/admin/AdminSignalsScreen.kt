@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.admin
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -209,7 +210,7 @@ private fun SignalRow(
             text = "Entry ${signal.entryPrice} · Stop ${signal.stopLoss}",
             color = IosColors.TextSecondary,
             fontSize = 12.sp,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = WebFonts.Mono,
             modifier = Modifier.padding(top = 6.dp)
         )
 

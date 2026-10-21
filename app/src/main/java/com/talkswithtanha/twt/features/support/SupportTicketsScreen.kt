@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.support
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -99,6 +100,7 @@ fun SupportTicketsScreen(
                         text = if (scope == 1) "Member tickets" else "Your tickets",
                         color = IosColors.TextPrimary,
                         fontSize = 28.sp,
+                        fontFamily = WebFonts.Display,
                         fontWeight = FontWeight.Bold
                     )
                     Text(

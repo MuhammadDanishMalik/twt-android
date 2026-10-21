@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.signals
 
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.foundation.lazy.itemsIndexed
 import com.talkswithtanha.twt.core.designsystem.components.ImageViewer
 import android.content.Intent
@@ -311,7 +312,7 @@ fun SignalDetailScreen(
                                     color = if (it >= 0) IosColors.BuyGreen else IosColors.SellRed,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    fontFamily = FontFamily.Monospace
+                                    fontFamily = WebFonts.Mono
                                 )
                             }
                         }
@@ -557,7 +558,7 @@ private fun ResultCard(signal: Signal) {
                         color = tint,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = WebFonts.Mono
                     )
                 }
             }

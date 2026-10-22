@@ -1,7 +1,10 @@
 package com.talkswithtanha.twt.features.signals.live
 
-import android.widget.MediaController
-import android.widget.VideoView
+import android.graphics.Matrix
+import android.graphics.SurfaceTexture
+import android.media.MediaPlayer
+import android.view.Surface
+import android.view.TextureView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,7 +38,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.core.net.toUri
 import com.talkswithtanha.twt.core.data.LiveDrawing
 import com.talkswithtanha.twt.core.designsystem.IosColors
 import com.talkswithtanha.twt.core.designsystem.WebFonts
@@ -44,7 +46,7 @@ import com.talkswithtanha.twt.core.designsystem.components.LoadingLabel
 
 /**
  * Tanha on camera about one candle, played with sound — the tap that opened
- * it is the go-ahead. The platform's own VideoView, so no player library.
+ * it is the go-ahead. The platform's own MediaPlayer, so no player library.
  */
 @Composable
 fun VideoNotePlayer(note: LiveDrawing, onClose: () -> Unit) {
@@ -69,23 +71,49 @@ fun VideoNotePlayer(note: LiveDrawing, onClose: () -> Unit) {
                     .background(Color.Black),
                 contentAlignment = Alignment.Center
             ) {
+                // A TextureView rather than VideoView: a SurfaceView draws on its
+                // own layer and ignores the squircle clip. Cropped to fill, like
+                // the website's object-fit: cover.
                 AndroidView(
                     factory = { context ->
-                        VideoView(context).apply {
-                            setMediaController(MediaController(context).also { it.setAnchorView(this) })
-                            setOnPreparedListener { player ->
-                                player.isLooping = true
-                                ready = true
-                                start()
+                        TextureView(context).apply {
+                            val view = this
+                            var player: MediaPlayer? = null
+                            surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+                                override fun onSurfaceTextureAvailable(texture: SurfaceTexture, width: Int, height: Int) {
+                                    player = MediaPlayer().apply {
+                                        setSurface(Surface(texture))
+                                        isLooping = true
+                                        setOnPreparedListener { mp ->
+                                            fill(view, mp.videoWidth, mp.videoHeight)
+                                            ready = true
+                                            mp.start()
+                                        }
+                                        setOnErrorListener { _, _, _ ->
+                                            failed = true
+                                            true
+                                        }
+                                        runCatching {
+                                            setDataSource(note.url.orEmpty())
+                                            prepareAsync()
+                                        }.onFailure { failed = true }
+                                    }
+                                }
+
+                                override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, width: Int, height: Int) {
+                                    player?.let { fill(view, it.videoWidth, it.videoHeight) }
+                                }
+
+                                override fun onSurfaceTextureDestroyed(texture: SurfaceTexture): Boolean {
+                                    player?.release()
+                                    player = null
+                                    return true
+                                }
+
+                                override fun onSurfaceTextureUpdated(texture: SurfaceTexture) = Unit
                             }
-                            setOnErrorListener { _, _, _ ->
-                                failed = true
-                                true
-                            }
-                            setVideoURI(note.url.orEmpty().toUri())
                         }
                     },
-                    onRelease = { it.stopPlayback() },
                     modifier = Modifier.fillMaxSize()
                 )
                 when {
@@ -127,6 +155,15 @@ fun VideoNotePlayer(note: LiveDrawing, onClose: () -> Unit) {
             }
         }
     }
+}
+
+/** Scales the video so it covers the view, centred, cropping what falls outside. */
+private fun fill(view: TextureView, videoW: Int, videoH: Int) {
+    if (videoW <= 0 || videoH <= 0 || view.width == 0 || view.height == 0) return
+    val vw = view.width.toFloat()
+    val vh = view.height.toFloat()
+    val scale = maxOf(vw / videoW, vh / videoH)
+    view.setTransform(Matrix().apply { setScale(videoW * scale / vw, videoH * scale / vh, vw / 2f, vh / 2f) })
 }
 
 /** A superellipse: the iOS app-icon shape. */

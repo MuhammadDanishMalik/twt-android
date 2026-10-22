@@ -72,7 +72,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.flow.stateIn
 import java.util.Locale
 import javax.inject.Inject
@@ -86,15 +87,22 @@ data class LiveUiState(
 class LiveAnalysisViewModel @Inject constructor(
     repository: LiveAnalysisRepository
 ) : ViewModel() {
-    val state: StateFlow<LiveUiState> = repository.observeLive()
-        .map { snap ->
-            when (snap) {
-                is Snapshot.Data -> LiveUiState(snap.value, loaded = true)
-                // Refused or offline: the chart still works, only the levels are missing.
-                is Snapshot.Failed -> LiveUiState(emptyList(), loaded = true)
-            }
+    /**
+     * A refused or dropped listener is dead for good, so it is opened again
+     * after a pause — access that arrives later (a renewed membership, new
+     * rules) shows up without the member restarting the app. The chart works
+     * meanwhile; only the levels are missing.
+     */
+    val state: StateFlow<LiveUiState> = flow {
+        while (true) {
+            var failed = false
+            repository.observeLive()
+                .takeWhile { snap -> (snap !is Snapshot.Failed).also { if (!it) failed = true } }
+                .collect { snap -> emit(LiveUiState((snap as Snapshot.Data).value, loaded = true)) }
+            if (failed) emit(LiveUiState(emptyList(), loaded = true))
+            delay(10_000)
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LiveUiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LiveUiState())
 }
 
 /** A trade's entry, stop and targets, as lines for the chart. */

@@ -329,6 +329,16 @@ private fun DrawScope.drawChart(
         ti += every
     }
 
+    // The brand, faint, behind everything — a screenshot says where it came from.
+    val mark = measurer.measure(
+        "Trade With Tanha",
+        TextStyle(color = Color.White.copy(alpha = 0.05f), fontSize = (plotW / density / 9f).coerceIn(18f, 40f).sp, fontWeight = FontWeight.Bold, fontFamily = WebFonts.Display)
+    )
+    val site = measurer.measure("tradewithtanha.io", TextStyle(color = Color.White.copy(alpha = 0.05f), fontSize = 12.sp, fontFamily = WebFonts.Body))
+    val markTop = plotH / 2f - (mark.size.height + site.size.height) / 2f
+    drawText(mark, topLeft = Offset((plotW - mark.size.width) / 2f, markTop))
+    drawText(site, topLeft = Offset((plotW - site.size.width) / 2f, markTop + mark.size.height))
+
     // Zones behind the candles.
     drawings.filter { it.kind == LiveDrawing.Kind.ZONE }.forEach { d ->
         val c = drawColor(d.color)

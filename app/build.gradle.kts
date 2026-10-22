@@ -118,6 +118,14 @@ android {
             "ADMIN_API_BASE",
             "\"${project.findProperty("adminApiBase") ?: ""}\""
         )
+        // Live charts: the member site's /api/live. -PliveApiBase=... points a
+        // debug build at the site running on this computer
+        // (http://10.0.2.2:3210/userdashboard/api/live from the emulator).
+        buildConfigField(
+            "String",
+            "LIVE_API_BASE",
+            "\"${project.findProperty("liveApiBase") ?: "https://tradewithtanha.io/userdashboard/api/live"}\""
+        )
     }
 
     buildFeatures {

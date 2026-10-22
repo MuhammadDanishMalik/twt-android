@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit
  */
 object LiveApi {
 
-    private const val BASE = "https://tradewithtanha.io/userdashboard/api/live"
+    private val BASE = com.talkswithtanha.twt.BuildConfig.LIVE_API_BASE
 
     enum class Kind(val label: String) { METAL("Metals"), FX("Forex"), INDEX("Indices"), ENERGY("Energy"), CRYPTO("Crypto") }
 

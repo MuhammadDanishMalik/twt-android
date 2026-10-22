@@ -307,7 +307,9 @@ private fun HeatTile(quote: MarketsApi.Quote, index: Int, start: Boolean, onOpen
             }
             .clip(RoundedCornerShape(16.dp))
             .background(tint.copy(alpha = 0.06f + 0.22f * strength))
-            .border(0.5.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
+            // A fine white rim and the app's edge shine, so each tile reads as its own card.
+            .border(0.8.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(16.dp))
+            .edgeShine(RoundedCornerShape(16.dp), strength = 0.6f)
             .clickable {
                 Haptics.sheetOpen(haptics)
                 onOpen()

@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.markets
 
+import com.talkswithtanha.twt.core.designsystem.edgeShine
 import com.talkswithtanha.twt.core.designsystem.WebFonts
 import android.content.Intent
 import android.net.Uri
@@ -225,6 +226,7 @@ private fun StorySkeleton() {
             .clip(RoundedCornerShape(18.dp))
             .background(CardBg)
             .border(0.5.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(18.dp))
+            .edgeShine(RoundedCornerShape(18.dp))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(9.dp)
     ) {
@@ -245,6 +247,7 @@ private fun StoryRow(story: MarketsApi.Story, now: Long, order: Int, onOpen: () 
             .clip(RoundedCornerShape(18.dp))
             .background(CardBg)
             .border(0.5.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(18.dp))
+            .edgeShine(RoundedCornerShape(18.dp))
             .padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

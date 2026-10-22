@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.signals
 
+import com.talkswithtanha.twt.core.designsystem.edgeShine
 import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -123,6 +124,7 @@ fun SignalTicketCard(
                 )
             }
             .border(0.5.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(22.dp))
+            .edgeShine(RoundedCornerShape(22.dp))
             .then(
                 if (onOpen == null) Modifier else Modifier.clickable(
                     interactionSource = interaction,

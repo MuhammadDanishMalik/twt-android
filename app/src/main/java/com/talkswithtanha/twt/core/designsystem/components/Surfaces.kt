@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.core.designsystem.components
 
+import com.talkswithtanha.twt.core.designsystem.edgeShine
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -69,6 +70,7 @@ fun TwtCard(
         .clip(shape)
         .background(MaterialTheme.colorScheme.surface)
         .let { if (border != null) it.border(border, shape) else it }
+        .edgeShine(shape)
         .let { chain ->
             if (onClick == null) chain else chain.clickable(
                 interactionSource = interaction,

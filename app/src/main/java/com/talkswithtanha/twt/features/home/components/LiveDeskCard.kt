@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.home.components
 
+import com.talkswithtanha.twt.core.designsystem.edgeShine
 import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -190,6 +191,7 @@ fun LiveDeskCard(height: Dp, corner: Dp, modifier: Modifier = Modifier) {
             .clip(RoundedCornerShape(corner))
             .background(Brush.verticalGradient(listOf(Color(0xFF17201A), Color(0xFF111111))))
             .border(0.5.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(corner))
+            .edgeShine(RoundedCornerShape(corner))
             .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
         // ── Sessions ──────────────────────────────────────────────

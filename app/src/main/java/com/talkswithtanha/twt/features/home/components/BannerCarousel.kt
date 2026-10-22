@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.home.components
 
+import com.talkswithtanha.twt.core.designsystem.edgeShine
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -97,6 +98,7 @@ fun BannerCarousel(
                     .clip(RoundedCornerShape(20.dp))
                     .background(Color(0xFF141414))
                     .border(0.5.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(20.dp))
+                    .edgeShine(RoundedCornerShape(20.dp))
                     .clickable(
                         interactionSource = dragInteraction,
                         indication = null,

@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.home.components
 
+import com.talkswithtanha.twt.core.designsystem.edgeShine
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.AnimatedContent
@@ -376,6 +377,7 @@ private fun ShortcutDeck(
                             )
                         )
                         .border(0.5.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(20.dp))
+                        .edgeShine(RoundedCornerShape(20.dp))
                 ) {
                     // Only the front card's content is composed at all.
                     //
@@ -519,6 +521,7 @@ fun HomeEntryCard(
                 Brush.linearGradient(listOf(Color(0xFF1A1A1A), Color(0xFF111111)))
             )
             .border(0.5.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(20.dp))
+            .edgeShine(RoundedCornerShape(20.dp))
             .clickable(
                 interactionSource = interaction,
                 indication = null

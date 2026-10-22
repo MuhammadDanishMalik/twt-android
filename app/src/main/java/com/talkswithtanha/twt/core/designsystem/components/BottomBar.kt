@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.core.designsystem.components
 
+import com.talkswithtanha.twt.core.designsystem.edgeShine
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -84,6 +85,7 @@ fun TwtBottomBar(
             .clip(RoundedCornerShape(32.dp))
             .background(Color(0xFF1C1C1E).copy(alpha = 0.96f))
             .border(0.5.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(32.dp))
+            .edgeShine(RoundedCornerShape(32.dp))
             .padding(horizontal = 6.dp),
         contentAlignment = Alignment.CenterStart
     ) {

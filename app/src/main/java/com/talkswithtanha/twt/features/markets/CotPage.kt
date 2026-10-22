@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.markets
 
+import com.talkswithtanha.twt.core.designsystem.edgeShine
 import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
@@ -190,6 +191,7 @@ private fun Card(content: @Composable () -> Unit) {
             .clip(RoundedCornerShape(24.dp))
             .background(CardBg)
             .border(0.5.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(24.dp))
+            .edgeShine(RoundedCornerShape(24.dp))
             .appear()
     ) { content() }
 }

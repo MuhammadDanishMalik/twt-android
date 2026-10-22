@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.home.components
 
+import com.talkswithtanha.twt.core.designsystem.edgeShine
 import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -143,6 +144,7 @@ fun GoldPriceCard(
             .clip(RoundedCornerShape(24.dp))
             .background(CardBg)
             .border(0.5.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(24.dp))
+            .edgeShine(RoundedCornerShape(24.dp))
             .clickable {
                 Haptics.sheetOpen(haptics)
                 onOpenChart()
@@ -257,6 +259,7 @@ fun HeatmapCard(quotes: List<MarketsApi.Quote>, onOpen: (MarketsApi.Quote) -> Un
             .clip(RoundedCornerShape(24.dp))
             .background(CardBg)
             .border(0.5.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(24.dp))
+            .edgeShine(RoundedCornerShape(24.dp))
     ) {
         Text(
             "HEATMAP · TODAY",

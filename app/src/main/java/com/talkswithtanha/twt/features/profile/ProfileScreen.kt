@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.profile
 
+import com.talkswithtanha.twt.core.images.Cloudinary
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -121,7 +122,7 @@ fun ProfileScreen(
                             val photo = user?.profilePhoto
                             if (photo != null) {
                                 AsyncImage(
-                                    model = photo,
+                                    model = Cloudinary.avatar(photo, size = 256),
                                     contentDescription = null,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier.fillMaxSize()

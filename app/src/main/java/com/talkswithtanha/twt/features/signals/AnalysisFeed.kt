@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.signals
 
+import com.talkswithtanha.twt.core.designsystem.edgeShine
 import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.animation.animateContentSize
 import com.talkswithtanha.twt.core.designsystem.Motion
@@ -104,6 +105,7 @@ private fun AnalysisCard(
             .clip(RoundedCornerShape(20.dp))
             .background(CardFill)
             .border(0.5.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(20.dp))
+            .edgeShine(RoundedCornerShape(20.dp))
     ) {
         // ── The chart ────────────────────────────────────────────────────
         Box(

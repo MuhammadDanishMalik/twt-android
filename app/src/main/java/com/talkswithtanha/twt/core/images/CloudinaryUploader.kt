@@ -35,25 +35,31 @@ class CloudinaryUploader @Inject constructor() {
     private val client = OkHttpClient()
 
     /**
-     * Uploads [bitmap] as a JPEG and returns its delivery URL.
+     * Uploads [bitmap] as a WebP and returns its delivery URL.
      *
-     * JPEG at 90 rather than PNG: an avatar is a photograph, and the PNG of a
-     * photograph is several times the size for no visible gain. Cloudinary
-     * re-encodes on delivery anyway — `f_auto` will hand out AVIF or WebP — so
-     * this only decides what crosses the member's mobile data on the way up.
+     * Scaled down to [MAX_AVATAR_EDGE] first — a phone photo is 4000px across
+     * and an avatar is never drawn larger than a few hundred — then WebP at 82,
+     * which is a fraction of the JPEG's size at the same look. Cloudinary
+     * re-encodes on delivery anyway (`f_auto` hands out AVIF or WebP), so this
+     * decides what crosses the member's mobile data on the way up and what
+     * sits in storage.
      */
     suspend fun uploadAvatar(bitmap: Bitmap): UploadResult = withContext(Dispatchers.IO) {
+        val scaled = bitmap.scaledToFit(MAX_AVATAR_EDGE)
         val bytes = ByteArrayOutputStream().use { stream ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream)
+            @Suppress("DEPRECATION") // WEBP is the lossy encoder below API 30.
+            val format = if (android.os.Build.VERSION.SDK_INT >= 30) Bitmap.CompressFormat.WEBP_LOSSY else Bitmap.CompressFormat.WEBP
+            scaled.compress(format, 82, stream)
             stream.toByteArray()
         }
+        if (scaled !== bitmap) scaled.recycle()
 
         val body = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
             .addFormDataPart(
                 name = "file",
-                filename = "avatar.jpg",
-                body = bytes.toRequestBody("image/jpeg".toMediaType())
+                filename = "avatar.webp",
+                body = bytes.toRequestBody("image/webp".toMediaType())
             )
             .addFormDataPart("upload_preset", Cloudinary.AVATAR_PRESET)
             .build()
@@ -132,4 +138,17 @@ class CloudinaryUploader @Inject constructor() {
             UploadResult.Failed(error.message ?: "Could not reach Cloudinary")
         }
     }
+
+    private companion object {
+        /** The longest edge an avatar is uploaded at, in pixels. */
+        const val MAX_AVATAR_EDGE = 1024
+    }
+}
+
+/** This bitmap scaled so its longest edge is at most [maxEdge]; itself when already small enough. */
+private fun Bitmap.scaledToFit(maxEdge: Int): Bitmap {
+    val longest = maxOf(width, height)
+    if (longest <= maxEdge) return this
+    val ratio = maxEdge.toFloat() / longest
+    return Bitmap.createScaledBitmap(this, (width * ratio).toInt().coerceAtLeast(1), (height * ratio).toInt().coerceAtLeast(1), true)
 }

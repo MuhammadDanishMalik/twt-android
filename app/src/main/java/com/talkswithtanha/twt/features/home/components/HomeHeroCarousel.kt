@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.home.components
 
+import com.talkswithtanha.twt.core.designsystem.edgeShine
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -193,6 +194,7 @@ private fun BannerPage(
             .clip(RoundedCornerShape(HeroCorner))
             .background(Color(0xFF141414))
             .border(0.5.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(HeroCorner))
+            .edgeShine(RoundedCornerShape(HeroCorner))
             // `detectTapGestures` rather than `clickable`: a tap opens the
             // banner, and anything that turns into a drag is left for the pager
             // underneath rather than being swallowed here.

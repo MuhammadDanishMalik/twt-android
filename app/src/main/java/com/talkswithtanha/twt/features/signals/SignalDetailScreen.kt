@@ -1,5 +1,7 @@
 package com.talkswithtanha.twt.features.signals
 
+import com.talkswithtanha.twt.core.images.Cloudinary
+import com.talkswithtanha.twt.core.designsystem.edgeShine
 import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.foundation.lazy.itemsIndexed
 import com.talkswithtanha.twt.core.designsystem.components.ImageViewer
@@ -233,7 +235,8 @@ fun SignalDetailScreen(
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             itemsIndexed(teamImages) { index, url ->
                                 AsyncImage(
-                                    model = url,
+                                    // A 172dp thumbnail: ask Cloudinary for a small WebP/AVIF, not the full screenshot.
+                                    model = Cloudinary.wide(url, width = 600),
                                     contentDescription = "Chart for ${signal.pair}",
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
@@ -448,6 +451,7 @@ fun DetailCard(
             .clip(RoundedCornerShape(22.dp))
             .background(CardSurface)
             .border(0.5.dp, CardRim, RoundedCornerShape(22.dp))
+            .edgeShine(RoundedCornerShape(22.dp))
             .padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {

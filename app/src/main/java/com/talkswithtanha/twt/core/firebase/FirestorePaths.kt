@@ -196,6 +196,23 @@ object FirestorePaths {
 
         /** Held at the top of the feed until it is unpinned. */
         const val IS_PINNED = "isPinned"
+
+        // The website's desk fields (twt-web/lib/feed-repo.ts).
+        const val TYPE = "type"
+        const val BODY_MD = "bodyMd"
+        const val PAIRS = "pairs"
+        const val COMMENTS_ENABLED = "commentsEnabled"
+        const val IMAGE_ALTS = "imageAlts"
+        const val TRANSCRIPT = "transcript"
+        const val PUBLISH_AT = "publishAt"
+        const val CHAPTERS = "chapters"
+        const val VIDEO_START = "videoStart"
+        const val LINK = "link"
+        const val VIEW_COUNT = "viewCount"
+        const val SAVE_COUNT = "saveCount"
+
+        /** Stamped by "Update trade"; recently bumped setups sit at the top. */
+        const val BUMPED_AT = "bumpedAt"
     }
 
     object FeedCommentField {

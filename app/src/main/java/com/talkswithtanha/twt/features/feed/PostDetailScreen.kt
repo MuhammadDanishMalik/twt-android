@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.talkswithtanha.twt.core.designsystem.IosColors
+import com.talkswithtanha.twt.core.designsystem.WebFonts
 import com.talkswithtanha.twt.core.designsystem.brand.FeedIcons
 import com.talkswithtanha.twt.core.designsystem.components.MemberAvatar
 import com.talkswithtanha.twt.core.model.FeedComment
@@ -59,6 +60,8 @@ import com.talkswithtanha.twt.core.model.FeedComment
 @Composable
 fun PostDetailScreen(
     onBack: () -> Unit,
+    onOpenSignal: (String) -> Unit = {},
+    onAsk: (String) -> Unit = {},
     viewModel: PostDetailViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -89,7 +92,7 @@ fun PostDetailScreen(
                 FeedIcons.Back(Modifier.size(18.dp), Color.White)
             }
             Spacer(Modifier.width(14.dp))
-            Text("Post", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text("Post", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, fontFamily = WebFonts.Display)
         }
 
         val post = state.post
@@ -105,22 +108,39 @@ fun PostDetailScreen(
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
             item {
-                PostRow(
+                val signalId = state.signal?.id
+                FeedCard(
                     post = post,
-                    myReaction = state.myReaction,
-                    canModerate = state.canModerate,
-                    onOpen = {},
-                    onReact = viewModel::react,
-                    isSaved = state.isSaved,
-                    onSave = viewModel::toggleSave,
                     signal = state.signal,
+                    quote = state.quote,
+                    myReaction = state.myReaction,
+                    unread = false,
+                    savedIn = state.feedState.saved[post.id],
+                    collections = state.feedState.collections,
                     isFollowingSignal = state.isFollowingSignal,
-                    onTogglePin = viewModel::togglePin,
-                    onFollowSignal = viewModel::follow,
-                    onUnfollowSignal = viewModel::unfollow,
-                    // Deleting the post itself is done from the feed row; this
-                    // screen only ever leaves.
-                    onDelete = onBack
+                    canModerate = state.canModerate,
+                    updates = remember(signalId) { signalId?.let(viewModel::updatesFor) ?: NoUpdates },
+                    actions = CardActions(
+                        onReact = viewModel::react,
+                        onSave = viewModel::save,
+                        onFollow = viewModel::follow,
+                        onUnfollow = viewModel::unfollow,
+                        onOpenSignal = { onOpenSignal(it.id) },
+                        onAsk = { state.user?.let { onAsk(it.id) } },
+                        onTogglePin = viewModel::togglePin,
+                        // Deleting the post itself is done from the feed; this screen only leaves.
+                        onDelete = onBack
+                    ),
+                    expanded = true,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+                Text(
+                    if (post.commentsEnabled) "Questions" else "Questions are off for this post",
+                    color = IosColors.TextSecondary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = WebFonts.Body,
+                    modifier = Modifier.padding(start = 20.dp, top = 8.dp, bottom = 4.dp)
                 )
                 Hairline()
             }
@@ -149,10 +169,10 @@ fun PostDetailScreen(
                 Hairline()
             }
 
-            if (state.topLevel.isEmpty()) {
+            if (state.topLevel.isEmpty() && post.commentsEnabled) {
                 item {
                     Text(
-                        text = "No replies yet. Say something.",
+                        text = "No questions yet. Ask Tanha anything about this post.",
                         color = IosColors.TextSecondary,
                         fontSize = 14.sp,
                         modifier = Modifier.padding(20.dp)
@@ -161,7 +181,7 @@ fun PostDetailScreen(
             }
         }
 
-        ReplyBar(
+        if (post.commentsEnabled) ReplyBar(
             value = draft,
             replyingTo = replyingTo,
             isSending = state.isSending,
@@ -214,6 +234,17 @@ private fun CommentRow(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold
                 )
+                // Tanha's answer, marked so it stands out among the questions.
+                if (comment.isAuthorReply) {
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "Tanha",
+                        color = Color.Black,
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.Black,
+                        modifier = Modifier.clip(RoundedCornerShape(5.dp)).background(IosColors.BuyGreen).padding(horizontal = 5.dp, vertical = 1.dp)
+                    )
+                }
                 Spacer(Modifier.width(6.dp))
                 Text("· ${shortAgo(comment.createdAt)}", color = IosColors.TextSecondary, fontSize = 12.sp)
             }
@@ -307,7 +338,7 @@ private fun ReplyBar(
                     .padding(horizontal = 14.dp, vertical = 11.dp)
             ) {
                 if (value.isEmpty()) {
-                    Text("Post your reply", color = IosColors.TextSecondary, fontSize = 15.sp)
+                    Text(if (replyingTo == null) "Ask a question" else "Post your reply", color = IosColors.TextSecondary, fontSize = 15.sp)
                 }
                 BasicTextField(
                     value = value,

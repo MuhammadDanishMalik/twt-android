@@ -283,7 +283,9 @@ fun AppNavHost(
                     onOpenPost = { navController.navigate(AppRoute.FeedPost.of(it)) },
                     onOpenSignal = { navController.navigate(AppRoute.SignalDetail.of(it)) },
                     onOpenChats = { navController.navigate(AppRoute.ChatList.route) },
-                    onCompose = { navController.navigate(AppRoute.NewFeedPost.route) }
+                    onCompose = { navController.navigate(AppRoute.NewFeedPost.route) },
+                    // "Ask" on a setup opens the member's own thread with the desk.
+                    onAsk = { uid -> navController.navigate(AppRoute.ChatRoom.of(com.talkswithtanha.twt.core.firebase.FirestorePaths.ChatRoom.support(uid))) }
                 )
             }
 
@@ -292,7 +294,11 @@ fun AppNavHost(
             route = AppRoute.FeedPost.route,
             arguments = listOf(navArgument(AppRoute.FeedPost.ARG) { type = NavType.StringType })
         ) {
-            PostDetailScreen(onBack = { navController.popBackStack() })
+            PostDetailScreen(
+                onBack = { navController.popBackStack() },
+                onOpenSignal = { navController.navigate(AppRoute.SignalDetail.of(it)) },
+                onAsk = { uid -> navController.navigate(AppRoute.ChatRoom.of(com.talkswithtanha.twt.core.firebase.FirestorePaths.ChatRoom.support(uid))) }
+            )
         }
 
             sheetRoute(sharedScope, AppRoute.NewFeedPost.route) {

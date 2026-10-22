@@ -24,7 +24,9 @@ object VoicePlayer {
         val isPlaying: Boolean = false,
         val positionMs: Int = 0,
         val durationMs: Int = 0,
-        val isPreparing: Boolean = false
+        val isPreparing: Boolean = false,
+        /** 1, 1.5 or 2 — kept from one note to the next, as podcast apps do. */
+        val speed: Float = 1f
     ) {
         fun progressFor(url: String): Float =
             if (this.url != url || durationMs <= 0) 0f
@@ -53,8 +55,9 @@ object VoicePlayer {
     }
 
     private fun play(url: String) {
+        val speed = _state.value.speed
         release()
-        _state.value = State(url = url, isPreparing = true)
+        _state.value = State(url = url, isPreparing = true, speed = speed)
 
         val instance = MediaPlayer()
         player = instance
@@ -64,12 +67,14 @@ object VoicePlayer {
                 // Guard against a note the member moved on from while this one
                 // was still buffering: the old player must not start talking.
                 if (player !== instance) return@setOnPreparedListener
+                if (speed != 1f) runCatching { it.playbackParams = it.playbackParams.setSpeed(speed) }
                 it.start()
                 _state.value = State(
                     url = url,
                     isPlaying = true,
                     durationMs = it.duration,
-                    isPreparing = false
+                    isPreparing = false,
+                    speed = speed
                 )
             }
             instance.setOnCompletionListener {
@@ -88,6 +93,24 @@ object VoicePlayer {
             release()
             _state.value = State()
         }
+    }
+
+    /** The next speed: 1× → 1.5× → 2× → 1×. */
+    fun cycleSpeed() {
+        val next = when (_state.value.speed) {
+            1f -> 1.5f
+            1.5f -> 2f
+            else -> 1f
+        }
+        player?.let { p ->
+            runCatching {
+                val playing = p.isPlaying
+                p.playbackParams = p.playbackParams.setSpeed(next)
+                // Setting the speed starts a paused player; keep it paused.
+                if (!playing) p.pause()
+            }
+        }
+        _state.value = _state.value.copy(speed = next)
     }
 
     /** Moves the playhead. [fraction] is 0..1 of the note's length. */
@@ -110,8 +133,9 @@ object VoicePlayer {
     }
 
     fun stop() {
+        val speed = _state.value.speed
         release()
-        _state.value = State()
+        _state.value = State(speed = speed)
     }
 
     private fun release() {

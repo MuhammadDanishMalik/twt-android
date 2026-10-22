@@ -72,7 +72,7 @@ private val bottomBarItems = listOf(
  * change is what makes revocation take effect immediately.
  */
 /** How far the blur reaches up behind the floating tab bar. */
-private val BottomBlurHeight = 150.dp
+private val BottomBlurHeight = 210.dp
 
 @Composable
 fun RootScreen(
@@ -179,13 +179,13 @@ fun RootScreen(
                     .hazeBlur(
                         HazeInput.Sources(haze),
                         HazeBlurStyle {
-                            blurRadius(22.dp)
+                            blurRadius(36.dp)
                             backgroundColor(Color.Black)
-                            colorEffects(listOf(HazeColorEffect.tint(Color.Black.copy(alpha = 0.28f))))
+                            colorEffects(listOf(HazeColorEffect.tint(Color.Black.copy(alpha = 0.38f))))
                             progressive(HazeProgressive.verticalGradient(startIntensity = 0f, endIntensity = 1f))
                         }
                     )
-                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f))))
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.35f), Color.Black.copy(alpha = 0.7f))))
             )
         }
 

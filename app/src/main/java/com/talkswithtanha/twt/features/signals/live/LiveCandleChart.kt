@@ -399,15 +399,21 @@ private fun DrawScope.drawChart(
                 if (d.label.isNotBlank()) pill(measurer, d.label, Offset((a.x + b.x) / 2f, (a.y + b.y) / 2f - 12.dp.toPx()), c, filled = false)
             }
             LiveDrawing.Kind.VIDEO -> {
-                // A round badge on a short stem above the candle; tapped, it plays.
+                // A squircle to the left of the candle on a short stem, so the
+                // candles after it stay in view; tapped, it plays.
                 val p = Offset(xOfTime(d.t1 ?: 0), y(d.p1))
-                val r = 16.dp.toPx()
-                val center = Offset(p.x, (p.y - 30.dp.toPx()).coerceAtLeast(r + 2f))
-                drawLine(c, p, Offset(center.x, center.y + r), 2.dp.toPx())
-                drawCircle(c.copy(alpha = 0.35f), 4.dp.toPx() + 3.dp.toPx(), p)
+                val half = 19.dp.toPx()
+                val gap = 12.dp.toPx()
+                val left = p.x - gap - half * 2 >= 0f
+                val center = Offset(
+                    if (left) p.x - gap - half else p.x + gap + half,
+                    p.y.coerceIn(half + 2f, plotH - half - 2f)
+                )
+                drawLine(c, p, Offset(if (left) center.x + half else center.x - half, center.y), 2.dp.toPx())
+                drawCircle(c.copy(alpha = 0.35f), 7.dp.toPx(), p)
                 drawCircle(c, 4.dp.toPx(), p)
-                drawCircle(Color(0xFF111111), r, center)
-                drawCircle(c, r, center, style = Stroke(2.5.dp.toPx()))
+                drawPath(squircle(center, half), c)
+                drawPath(squircle(center, half - 2.5.dp.toPx()), Color(0xFF111111))
                 val tri = androidx.compose.ui.graphics.Path().apply {
                     moveTo(center.x - 4.dp.toPx(), center.y - 6.dp.toPx())
                     lineTo(center.x + 6.dp.toPx(), center.y)
@@ -415,7 +421,6 @@ private fun DrawScope.drawChart(
                     close()
                 }
                 drawPath(tri, Color.White)
-                if (d.label.isNotBlank()) pill(measurer, d.label, Offset(center.x + r + 6.dp.toPx(), center.y), c, filled = false)
                 if (p.x in 0f..plotW) videoTargets += center to d
             }
             LiveDrawing.Kind.NOTE -> {
@@ -443,6 +448,17 @@ private fun DrawScope.drawChart(
     axisTag(measurer, String.format(Locale.US, "%.${decimals}f", last.c), ly, plotW, lc)
 
     drawLine(Color.White.copy(alpha = 0.08f), Offset(plotW, 0f), Offset(plotW, size.height), 1f)
+}
+
+/** A superellipse around [c] — the iOS app-icon shape the website's video notes use. */
+private fun squircle(c: Offset, half: Float) = androidx.compose.ui.graphics.Path().apply {
+    val k = half * 0.76f // how far the corner handles reach; 0.76 gives the soft iOS corner
+    moveTo(c.x, c.y - half)
+    cubicTo(c.x + k, c.y - half, c.x + half, c.y - k, c.x + half, c.y)
+    cubicTo(c.x + half, c.y + k, c.x + k, c.y + half, c.x, c.y + half)
+    cubicTo(c.x - k, c.y + half, c.x - half, c.y + k, c.x - half, c.y)
+    cubicTo(c.x - half, c.y - k, c.x - k, c.y - half, c.x, c.y - half)
+    close()
 }
 
 private fun niceStep(raw: Double): Double {

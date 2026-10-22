@@ -3,11 +3,16 @@ package com.talkswithtanha.twt.features.signals.live
 import android.widget.MediaController
 import android.widget.VideoView
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -49,14 +54,21 @@ fun VideoNotePlayer(note: LiveDrawing, onClose: () -> Unit) {
 
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(
-            Modifier
-                .padding(horizontal = 18.dp)
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .background(Color(0xFF0B0B0C))
-                .border(2.dp, accent, RoundedCornerShape(20.dp))
+            Modifier.fillMaxWidth().padding(horizontal = 36.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black), contentAlignment = Alignment.Center) {
+            // The same squircle as the website's video notes, in the note's colour.
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .clip(SquircleShape)
+                    .background(accent)
+                    .padding(3.dp)
+                    .clip(SquircleShape)
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
                 AndroidView(
                     factory = { context ->
                         VideoView(context).apply {
@@ -74,42 +86,58 @@ fun VideoNotePlayer(note: LiveDrawing, onClose: () -> Unit) {
                         }
                     },
                     onRelease = { it.stopPlayback() },
-                    modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)
+                    modifier = Modifier.fillMaxSize()
                 )
                 when {
                     failed -> Text("The video could not play.", color = IosColors.TextSecondary, fontSize = 13.sp, fontFamily = WebFonts.Body)
                     !ready -> LoadingLabel("Loading video")
                 }
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(
+                Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xE60B0B0C))
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f, fill = false)) {
+                    Text(
+                        note.label.ifBlank { "Tanha on this candle" },
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = WebFonts.Body
+                    )
+                    note.dur?.let {
+                        Text("%d:%02d".format(it / 60, it % 60), color = IosColors.TextSecondary, fontSize = 12.sp, fontFamily = WebFonts.Mono)
+                    }
+                }
+                Spacer(Modifier.width(14.dp))
                 Box(
                     Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(10.dp)
-                        .size(32.dp)
+                        .size(30.dp)
                         .clip(RoundedCornerShape(50))
-                        .background(Color.Black.copy(alpha = 0.55f))
+                        .background(Color.White.copy(alpha = 0.12f))
                         .bouncyClick(onClick = onClose),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Filled.Close, contentDescription = "Close", tint = Color.White, modifier = Modifier.size(16.dp))
-                }
-            }
-            Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
-                Text(
-                    note.label.ifBlank { "Tanha on this candle" },
-                    color = Color.White,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = WebFonts.Body
-                )
-                note.dur?.let {
-                    Text(
-                        "%d:%02d".format(it / 60, it % 60),
-                        color = IosColors.TextSecondary,
-                        fontSize = 12.sp,
-                        fontFamily = WebFonts.Mono
-                    )
+                    Icon(Icons.Filled.Close, contentDescription = "Close", tint = Color.White, modifier = Modifier.size(15.dp))
                 }
             }
         }
     }
+}
+
+/** A superellipse: the iOS app-icon shape. */
+private val SquircleShape = GenericShape { size, _ ->
+    val cx = size.width / 2f
+    val cy = size.height / 2f
+    val k = 0.76f
+    moveTo(cx, 0f)
+    cubicTo(cx + cx * k, 0f, size.width, cy - cy * k, size.width, cy)
+    cubicTo(size.width, cy + cy * k, cx + cx * k, size.height, cx, size.height)
+    cubicTo(cx - cx * k, size.height, 0f, cy + cy * k, 0f, cy)
+    cubicTo(0f, cy - cy * k, cx - cx * k, 0f, cx, 0f)
+    close()
 }

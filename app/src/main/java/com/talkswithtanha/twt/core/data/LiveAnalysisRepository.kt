@@ -24,9 +24,13 @@ data class LiveDrawing(
     /** Unix seconds. */
     val t1: Long? = null,
     val t2: Long? = null,
-    val label: String = ""
+    val label: String = "",
+    /** Video notes: the clip (mp4), its first frame, its length in seconds. */
+    val url: String? = null,
+    val thumb: String? = null,
+    val dur: Int? = null
 ) {
-    enum class Kind { LEVEL, ZONE, TREND, NOTE }
+    enum class Kind { LEVEL, ZONE, TREND, NOTE, VIDEO }
 }
 
 data class LiveAnalysis(
@@ -65,6 +69,7 @@ class LiveAnalysisRepository @Inject constructor(
                 "zone" -> LiveDrawing.Kind.ZONE
                 "trend" -> LiveDrawing.Kind.TREND
                 "note" -> LiveDrawing.Kind.NOTE
+                "video" -> LiveDrawing.Kind.VIDEO
                 else -> return@mapNotNull null
             }
             LiveDrawing(
@@ -75,7 +80,10 @@ class LiveAnalysisRepository @Inject constructor(
                 p2 = (m["p2"] as? Number)?.toDouble(),
                 t1 = (m["t1"] as? Number)?.toLong(),
                 t2 = (m["t2"] as? Number)?.toLong(),
-                label = m["label"] as? String ?: ""
+                label = m["label"] as? String ?: "",
+                url = m["url"] as? String,
+                thumb = m["thumb"] as? String,
+                dur = (m["dur"] as? Number)?.toInt()
             )
         }
         return LiveAnalysis(

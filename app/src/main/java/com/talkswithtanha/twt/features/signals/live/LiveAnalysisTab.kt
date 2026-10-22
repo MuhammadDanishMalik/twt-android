@@ -112,6 +112,7 @@ private val KIND_LABEL = mapOf(
     LiveDrawing.Kind.ZONE to "Zone",
     LiveDrawing.Kind.TREND to "Trend line",
     LiveDrawing.Kind.NOTE to "Note",
+    LiveDrawing.Kind.VIDEO to "Video note",
 )
 
 /**

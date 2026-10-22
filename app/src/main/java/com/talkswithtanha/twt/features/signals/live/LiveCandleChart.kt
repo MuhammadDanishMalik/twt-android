@@ -95,6 +95,10 @@ fun LiveCandleChart(
     lines: List<ChartLine> = emptyList(),
     onQuote: (LiveApi.Quote) -> Unit = {}
 ) {
+    // Where each video note was drawn on the last frame, for taps to find.
+    val videoTargets = remember { mutableListOf<Pair<Offset, LiveDrawing>>() }
+    var playing by remember { mutableStateOf<LiveDrawing?>(null) }
+    val tapRadius = with(androidx.compose.ui.platform.LocalDensity.current) { 30.dp.toPx() }
     var bars by remember(instrument.key, timeframe) { mutableStateOf<List<LiveApi.Bar>>(emptyList()) }
     var decimals by remember(instrument.key) { mutableStateOf(instrument.decimals) }
     var failed by remember(instrument.key, timeframe) { mutableStateOf(false) }
@@ -165,7 +169,7 @@ fun LiveCandleChart(
                     .fillMaxSize()
                     .pointerInput(bars.size) {
                         awaitEachGesture {
-                            awaitFirstDown(requireUnconsumed = false)
+                            val down = awaitFirstDown(requireUnconsumed = false)
                             var mode = 0 // 0 undecided, 1 pan, 2 zoom, -1 leave it to the page
                             var travelled = Offset.Zero
                             var lastSpan = 0f
@@ -195,12 +199,22 @@ fun LiveCandleChart(
                                     }
                                 }
                             } while (event.changes.any { it.pressed })
+                            // A tap, not a pan: did it land on a video note?
+                            if (mode == 0) {
+                                videoTargets
+                                    .minByOrNull { (it.first - down.position).getDistance() }
+                                    ?.takeIf { (it.first - down.position).getDistance() < tapRadius }
+                                    ?.let { playing = it.second }
+                            }
                         }
                     }
             ) {
-                drawChart(bars, decimals, visible, offset, timeframe, drawings, lines, measurer)
+                videoTargets.clear()
+                drawChart(bars, decimals, visible, offset, timeframe, drawings, lines, measurer, videoTargets)
             }
         }
+
+        playing?.let { note -> VideoNotePlayer(note) { playing = null } }
 
         if (closed && bars.isNotEmpty()) {
             Text(
@@ -249,7 +263,8 @@ private fun DrawScope.drawChart(
     tf: LiveApi.Timeframe,
     drawings: List<LiveDrawing>,
     lines: List<ChartLine>,
-    measurer: TextMeasurer
+    measurer: TextMeasurer,
+    videoTargets: MutableList<Pair<Offset, LiveDrawing>>
 ) {
     val up = IosColors.BuyGreen
     val down = IosColors.SellRed
@@ -382,6 +397,26 @@ private fun DrawScope.drawChart(
                 val b = Offset(xOfTime(d.t2 ?: 0), y(d.p2 ?: d.p1))
                 drawLine(c, a, b, 2.dp.toPx(), StrokeCap.Round)
                 if (d.label.isNotBlank()) pill(measurer, d.label, Offset((a.x + b.x) / 2f, (a.y + b.y) / 2f - 12.dp.toPx()), c, filled = false)
+            }
+            LiveDrawing.Kind.VIDEO -> {
+                // A round badge on a short stem above the candle; tapped, it plays.
+                val p = Offset(xOfTime(d.t1 ?: 0), y(d.p1))
+                val r = 16.dp.toPx()
+                val center = Offset(p.x, (p.y - 30.dp.toPx()).coerceAtLeast(r + 2f))
+                drawLine(c, p, Offset(center.x, center.y + r), 2.dp.toPx())
+                drawCircle(c.copy(alpha = 0.35f), 4.dp.toPx() + 3.dp.toPx(), p)
+                drawCircle(c, 4.dp.toPx(), p)
+                drawCircle(Color(0xFF111111), r, center)
+                drawCircle(c, r, center, style = Stroke(2.5.dp.toPx()))
+                val tri = androidx.compose.ui.graphics.Path().apply {
+                    moveTo(center.x - 4.dp.toPx(), center.y - 6.dp.toPx())
+                    lineTo(center.x + 6.dp.toPx(), center.y)
+                    lineTo(center.x - 4.dp.toPx(), center.y + 6.dp.toPx())
+                    close()
+                }
+                drawPath(tri, Color.White)
+                if (d.label.isNotBlank()) pill(measurer, d.label, Offset(center.x + r + 6.dp.toPx(), center.y), c, filled = false)
+                if (p.x in 0f..plotW) videoTargets += center to d
             }
             LiveDrawing.Kind.NOTE -> {
                 val p = Offset(xOfTime(d.t1 ?: 0), y(d.p1))

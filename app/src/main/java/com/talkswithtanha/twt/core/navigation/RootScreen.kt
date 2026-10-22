@@ -1,5 +1,17 @@
 package com.talkswithtanha.twt.core.navigation
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.HazeProgressive
+import dev.chrisbanes.haze.blur.HazeBlurStyle
+import dev.chrisbanes.haze.blur.HazeColorEffect
+import dev.chrisbanes.haze.blur.hazeBlur
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -59,6 +71,9 @@ private val bottomBarItems = listOf(
  * until they next launched. Watching [RootViewModel.gate] and *navigating* on
  * change is what makes revocation take effect immediately.
  */
+/** How far the blur reaches up behind the floating tab bar. */
+private val BottomBlurHeight = 150.dp
+
 @Composable
 fun RootScreen(
     pendingSignalId: String? = null,
@@ -135,14 +150,47 @@ fun RootScreen(
         viewModel.acknowledgeKickedOut()
     }
 
+    val haze = rememberHazeState()
+    val showsBar = currentRoute in AppRoute.bottomBarRoutes
+
     TwtScreen {
         AppNavHost(
             navController = navController,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .hazeSource(haze)
         )
 
+        // What scrolls under the floating tab bar melts into it rather than
+        // meeting a hard edge: blurred more the lower it goes, and darkened a
+        // little, the way Instagram's bar sits over the feed. Every tab gets
+        // it from here, so no screen has to remember to draw its own.
+        // Decorative only — no pointer input, so taps reach the content below.
         AnimatedVisibility(
-            visible = currentRoute in AppRoute.bottomBarRoutes,
+            visible = showsBar,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(BottomBlurHeight)
+                    .hazeBlur(
+                        HazeInput.Sources(haze),
+                        HazeBlurStyle {
+                            blurRadius(22.dp)
+                            backgroundColor(Color.Black)
+                            colorEffects(listOf(HazeColorEffect.tint(Color.Black.copy(alpha = 0.28f))))
+                            progressive(HazeProgressive.verticalGradient(startIntensity = 0f, endIntensity = 1f))
+                        }
+                    )
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f))))
+            )
+        }
+
+        AnimatedVisibility(
+            visible = showsBar,
             enter = fadeIn() + slideInVertically { it },
             exit = fadeOut() + slideOutVertically { it },
             modifier = Modifier.align(Alignment.BottomCenter)

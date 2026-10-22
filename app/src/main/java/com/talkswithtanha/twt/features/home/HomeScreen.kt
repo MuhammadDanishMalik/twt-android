@@ -323,25 +323,7 @@ fun HomeScreen(
                 )
             }
         }
-        // The matching scrim at the bottom, drawn *over* the feed.
-        //
-        // Behind the list it did nothing: the photograph is already black down
-        // there and the cards scroll in front of it. The cards are the point —
-        // the floating tab bar sits over the feed, and one sliding under it hit
-        // a hard edge. Now it fades out first, the way the top scrim gives the
-        // clock something to sit on. Decorative only: no pointer input, so taps
-        // still reach the tab bar and the feed beneath it.
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(BottomScrimHeight)
-                .align(Alignment.BottomCenter)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.92f))
-                    )
-                )
-        )
+        // The fade into the floating tab bar is drawn by RootScreen, over every tab.
 
     }
 }

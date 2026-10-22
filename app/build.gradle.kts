@@ -177,6 +177,9 @@ dependencies {
 
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    // Progressive blur under the floating tab bar.
+    implementation(libs.haze)
+    implementation(libs.haze.blur)
     // Declared rather than leaned on as a Coil transitive: the Cloudinary
     // uploader posts multipart bodies with it directly.
     implementation(libs.okhttp)

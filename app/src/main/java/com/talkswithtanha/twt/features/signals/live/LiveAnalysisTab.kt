@@ -6,6 +6,17 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -113,6 +124,7 @@ fun LiveAnalysisTab(
     viewModel: LiveAnalysisViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val focus = LocalFocusManager.current
     var chosen by rememberSaveable { mutableStateOf<String?>(null) }
     var tfKey by rememberSaveable { mutableStateOf<String?>(null) }
     var shownTrade by rememberSaveable { mutableStateOf<String?>(null) }
@@ -131,7 +143,9 @@ fun LiveAnalysisTab(
     val analysis = state.analyses.firstOrNull { it.key == instrument.key }
     val tf = tfKey?.let { LiveApi.Timeframe.of(it) } ?: analysis?.timeframe ?: LiveApi.Timeframe.M15
     val liveKeys = state.analyses.map { it.key }.toSet()
-    val markets = LiveApi.INSTRUMENTS.sortedByDescending { it.key in liveKeys }
+    var query by rememberSaveable { mutableStateOf("") }
+    // Live markets first while browsing; best match first while searching.
+    val markets = if (query.isBlank()) LiveApi.INSTRUMENTS.sortedByDescending { it.key in liveKeys } else LiveApi.search(query)
 
     val openTrades = signals.filter { !it.isAnalysis && it.status.isOngoing && LiveApi.find(it.pair)?.key == instrument.key }
     val trade = openTrades.firstOrNull { it.id == shownTrade }
@@ -143,6 +157,59 @@ fun LiveAnalysisTab(
             .padding(bottom = 120.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        Row(
+            Modifier
+                .padding(horizontal = 16.dp)
+                .padding(top = 6.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(IosColors.CardSurface)
+                .border(1.dp, IosColors.Rim, RoundedCornerShape(14.dp))
+                .padding(horizontal = 14.dp, vertical = 11.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Filled.Search, contentDescription = null, tint = IosColors.TextSecondary, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(10.dp))
+            Box(Modifier.weight(1f)) {
+                if (query.isEmpty()) {
+                    Text("Search: XAU, EURUSD, gold, Dow, oil…", color = Color.White.copy(alpha = 0.3f), fontSize = 14.sp, fontFamily = WebFonts.Body)
+                }
+                BasicTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    singleLine = true,
+                    textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 14.sp, fontFamily = WebFonts.Body),
+                    cursorBrush = SolidColor(IosColors.BuyGreen),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search, capitalization = KeyboardCapitalization.Characters),
+                    keyboardActions = KeyboardActions(onSearch = {
+                        LiveApi.search(query).firstOrNull()?.let { chosen = it.key; tfKey = null; shownTrade = null; quote = null }
+                        query = ""
+                        focus.clearFocus()
+                    }),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            if (query.isNotEmpty()) {
+                Text(
+                    "${markets.size}",
+                    color = IosColors.TextSecondary,
+                    fontSize = 12.sp,
+                    fontFamily = WebFonts.Body,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = "Clear search",
+                    tint = IosColors.TextSecondary,
+                    modifier = Modifier.padding(start = 8.dp).size(18.dp).bouncyClick { query = "" }
+                )
+            }
+        }
+
+        if (query.isNotEmpty() && markets.isEmpty()) {
+            Text("No market matches \"$query\".", color = IosColors.TextSecondary, fontSize = 13.sp, fontFamily = WebFonts.Body, modifier = Modifier.padding(horizontal = 16.dp))
+        }
+
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -157,6 +224,8 @@ fun LiveAnalysisTab(
                         .border(1.dp, if (on) IosColors.BuyGreen.copy(alpha = 0.6f) else IosColors.Rim, RoundedCornerShape(50))
                         .bouncyClick {
                             chosen = m.key
+                            query = ""
+                            focus.clearFocus()
                             tfKey = null
                             shownTrade = null
                             quote = null

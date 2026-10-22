@@ -1,5 +1,8 @@
 package com.talkswithtanha.twt.features.signals
 
+import com.talkswithtanha.twt.core.data.LiveApi
+import com.talkswithtanha.twt.features.signals.live.LiveCandleChart
+import com.talkswithtanha.twt.features.signals.live.chartLines
 import com.talkswithtanha.twt.core.images.Cloudinary
 import com.talkswithtanha.twt.core.designsystem.edgeShine
 import com.talkswithtanha.twt.core.designsystem.WebFonts
@@ -209,6 +212,21 @@ fun SignalDetailScreen(
             }
 
             Reveal(1) { SignalMilestoneTrack(signal) }
+
+            // The trade on the live chart, with its own entry, stop and targets.
+            val live = LiveApi.find(signal.pair)
+            if (live != null && signal.status.isOngoing && !signal.isAnalysis) {
+                Reveal(2) {
+                    DetailCard(title = "Live chart") {
+                        LiveCandleChart(
+                            instrument = live,
+                            timeframe = LiveApi.Timeframe.M15,
+                            height = 300.dp,
+                            lines = signal.chartLines()
+                        )
+                    }
+                }
+            }
 
             val teamImages = signal.teamImages
             var viewing by remember { mutableStateOf<Int?>(null) }

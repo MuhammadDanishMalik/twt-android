@@ -59,6 +59,7 @@ import com.talkswithtanha.twt.core.designsystem.components.SignalCardSkeleton
 import com.talkswithtanha.twt.core.designsystem.staggeredAppear
 import com.talkswithtanha.twt.core.model.SignalAsset
 import com.talkswithtanha.twt.core.model.Signal
+import com.talkswithtanha.twt.features.signals.live.LiveAnalysisTab
 
 /**
  * The Signals tab: a live ticker across the top, then the trades in three
@@ -124,7 +125,7 @@ fun SignalsScreen(
             .statusBarsPadding()
     ) {
         SegmentedControl(
-            options = listOf("Trades", "Analysis"),
+            options = listOf("Trades", "Live", "Analysis"),
             selectedIndex = tab,
             onSelect = { tab = it },
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
@@ -146,6 +147,8 @@ fun SignalsScreen(
             label = "signalsTab"
         ) { selected ->
             if (selected == 1) {
+                LiveAnalysisTab(signals = state.signals)
+            } else if (selected == 2) {
                 AnalysisTab(
                     isLoading = state.isLoading,
                     signals = analysed,

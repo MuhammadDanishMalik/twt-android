@@ -109,6 +109,8 @@ class FirebaseDealRepository @Inject constructor(
             F.LOCKED_RATE_PAISA to deal.lockedRatePaisa,
             // Pinned by the rules. Sending anything else here is refused.
             F.STATUS to DealStatus.AWAITING_PAYMENT.stored,
+            // Which desk sold it; the TWT desk until other dealers exist.
+            "sellerId" to "twt",
             F.CREATED_AT to FieldValue.serverTimestamp(),
             F.EVENTS to listOf(
                 eventData(DealStatus.AWAITING_PAYMENT, "Deal opened")

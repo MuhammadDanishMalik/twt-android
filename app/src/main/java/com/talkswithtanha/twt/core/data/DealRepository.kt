@@ -4,6 +4,7 @@ import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.Query
 import com.talkswithtanha.twt.core.firebase.FirestorePaths.Collection
 import com.talkswithtanha.twt.core.firebase.FirestorePaths.DealField as F
@@ -12,7 +13,10 @@ import com.talkswithtanha.twt.core.model.DealEvent
 import com.talkswithtanha.twt.core.model.DealSide
 import com.talkswithtanha.twt.core.model.DealStatus
 import com.talkswithtanha.twt.core.model.PaymentAccount
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import java.util.Date
@@ -31,17 +35,29 @@ interface DealRepository {
      * allowed to make.
      */
     suspend fun markPaymentSent(dealId: String, reference: String)
+
+    /** Where the member wants their side sent, once the desk has confirmed their payment. */
+    suspend fun setReceivingAccount(dealId: String, account: PaymentAccount)
+
+    /** Backing out, before anything has moved. */
+    suspend fun cancelDeal(dealId: String)
+
+    /**
+     * Whether the member's deals are coming from the server or only from the
+     * phone's cache. Deal screens say "Reconnecting…" and hold back money
+     * buttons while it is false, so nothing can be sent twice later.
+     */
+    fun observeConnection(userId: String): Flow<Boolean>
 }
 
 /**
  * The `deals` collection.
  *
- * Deliberately smaller than the iOS repository, which also has `cancelDeal`,
- * `raiseDispute` and `setReceivingAccount`. Those move a deal to `cancelled`,
- * `disputed` and `releasing`, and the security rules allow a member exactly one
- * transition — `awaitingPayment` to `paymentSent`. The other three are refused
- * server-side for anybody who is not staff, so they are not offered here; a
- * member who needs one asks in their thread, and Tanha does it from the panel.
+ * A member makes three moves, and the rules allow exactly these: reporting
+ * their payment (`awaitingPayment` → `paymentSent`, and not after `payBy`),
+ * giving the account to be paid into (`paymentApproved` → `releasing`), and
+ * backing out before paying (`awaitingPayment` → `cancelled`). Raising a
+ * dispute stays with the desk.
  */
 @Singleton
 class FirebaseDealRepository @Inject constructor(
@@ -63,6 +79,19 @@ class FirebaseDealRepository @Inject constructor(
                     )
                 }
             }
+
+    override fun observeConnection(userId: String): Flow<Boolean> = callbackFlow {
+        val registration = deals
+            .whereEqualTo(F.USER_ID, userId)
+            .orderBy(F.CREATED_AT, Query.Direction.DESCENDING)
+            .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
+                when {
+                    error != null -> trySend(false)
+                    snapshot != null -> trySend(!snapshot.metadata.isFromCache)
+                }
+            }
+        awaitClose { registration.remove() }
+    }.distinctUntilChanged()
 
     override suspend fun createDeal(deal: Deal): String {
         val reference = deals.document()
@@ -101,6 +130,27 @@ class FirebaseDealRepository @Inject constructor(
                 F.EVENTS to FieldValue.arrayUnion(
                     eventData(DealStatus.PAYMENT_SENT, "Payment reported — ref $reference")
                 )
+            )
+        ).await()
+    }
+
+    override suspend fun setReceivingAccount(dealId: String, account: PaymentAccount) {
+        deals.document(dealId).update(
+            mapOf(
+                F.STATUS to DealStatus.RELEASING.stored,
+                F.RECEIVING_ACCOUNT to accountData(account),
+                F.EVENTS to FieldValue.arrayUnion(
+                    eventData(DealStatus.RELEASING, "Receiving account added — ${account.method}")
+                )
+            )
+        ).await()
+    }
+
+    override suspend fun cancelDeal(dealId: String) {
+        deals.document(dealId).update(
+            mapOf(
+                F.STATUS to DealStatus.CANCELLED.stored,
+                F.EVENTS to FieldValue.arrayUnion(eventData(DealStatus.CANCELLED, "Cancelled by the member"))
             )
         ).await()
     }
@@ -164,7 +214,11 @@ internal fun dealFrom(document: DocumentSnapshot): Deal? {
                 )
             }
             .sortedBy { it.timestamp },
-        createdAt = document.getTimestamp(F.CREATED_AT)?.toDate() ?: Date()
+        createdAt = document.getTimestamp(F.CREATED_AT)?.toDate() ?: Date(),
+        payBy = document.getTimestamp("payBy")?.toDate(),
+        deskBy = document.getTimestamp("deskBy")?.toDate(),
+        deskByFor = document.getString("deskByFor")?.let { DealStatus.from(it) },
+        cancelReason = document.get("cancelReason").asNonBlankString()
     )
 }
 

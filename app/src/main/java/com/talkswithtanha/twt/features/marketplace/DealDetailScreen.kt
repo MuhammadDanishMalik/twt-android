@@ -35,7 +35,9 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.outlined.Chat
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -68,6 +70,8 @@ import com.talkswithtanha.twt.core.designsystem.Motion
 import com.talkswithtanha.twt.core.designsystem.staggeredAppear
 import com.talkswithtanha.twt.core.model.Deal
 import com.talkswithtanha.twt.core.model.DealStatus
+import com.talkswithtanha.twt.core.model.Turn
+import com.talkswithtanha.twt.core.model.progress
 import com.talkswithtanha.twt.core.model.ExchangeRate
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -98,11 +102,21 @@ fun DealDetailScreen(
     val clipboard = LocalClipboardManager.current
     val haptics = LocalHapticFeedback.current
     var confirming by remember { mutableStateOf(false) }
+    var addingAccount by remember { mutableStateOf(false) }
+    var askCancel by remember { mutableStateOf(false) }
 
     val deal = state.deal
 
     LaunchedEffect(state.error) {
         if (state.error != null) Haptics.failure(haptics)
+    }
+
+    // The sheets close when the server says the deal moved on, not when the
+    // button is tapped: success is the snapshot, never the request.
+    LaunchedEffect(deal?.status) {
+        if (deal?.status != DealStatus.AWAITING_PAYMENT) confirming = false
+        if (deal?.status != DealStatus.PAYMENT_APPROVED) addingAccount = false
+        if (deal?.status?.isTerminal == true) Haptics.success(haptics)
     }
 
     Column(
@@ -168,8 +182,21 @@ fun DealDetailScreen(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            item { StatusHero(deal, Modifier.staggeredAppear(0)) }
-            item { StepTrack(deal.status, Modifier.staggeredAppear(1)) }
+            val progress = deal.progress()
+            if (!state.online) item { ReconnectingBar() }
+            if (progress.turn != Turn.CLOSED) item { DealStepper(progress, Modifier.staggeredAppear(0)) }
+            item {
+                if (deal.status == DealStatus.COMPLETED) {
+                    FundsSentCard(
+                        amount = deal.receiveLabel(),
+                        to = deal.receivingAccount?.method ?: "account",
+                        onFeedback = onOpenChat,
+                        modifier = Modifier.staggeredAppear(1)
+                    )
+                } else {
+                    TurnCard(progress, state.sound, Modifier.staggeredAppear(1))
+                }
+            }
 
             // Only while there is a payment to make. Past that it is history,
             // and leaving it at the top implies there is still something to do.
@@ -200,17 +227,27 @@ fun DealDetailScreen(
                 }
             }
 
-            item { FooterActions(deal, onOpenChat) }
+            item { FooterActions(deal, onOpenChat, onCancel = { askCancel = true }) }
         }
 
-        // ── The one move this app can make ───────────────────────────────
+        // ── The member's move, when it is their turn ─────────────────────
         if (deal.status.memberCanReportPayment) {
             Box(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                 ConfirmButton(
-                    label = "I have sent the payment",
-                    enabled = !state.reportingPayment,
+                    label = "I have paid",
+                    enabled = state.busy == null && state.online,
                     loading = state.reportingPayment,
                     onClick = { confirming = true }
+                )
+            }
+        }
+        if (deal.status == DealStatus.PAYMENT_APPROVED) {
+            Box(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                ConfirmButton(
+                    label = "Add where to receive ${deal.receiveLabel()}",
+                    enabled = state.busy == null && state.online,
+                    loading = state.busy == DealAction.ACCOUNT,
+                    onClick = { addingAccount = true }
                 )
             }
         }
@@ -232,154 +269,40 @@ fun DealDetailScreen(
         ConfirmPaymentSheet(
             deal = deal,
             isSubmitting = state.reportingPayment,
-            onDismiss = { confirming = false },
-            onConfirm = { transactionId ->
-                viewModel.reportPayment(transactionId)
+            error = state.error,
+            onDismiss = {
                 confirming = false
-            }
+                viewModel.clearError()
+            },
+            onConfirm = { transactionId -> viewModel.reportPayment(transactionId) }
         )
     }
-}
 
-/** What is happening right now, in a sentence. */
-@Composable
-private fun StatusHero(deal: Deal, modifier: Modifier = Modifier) {
-    Column(
-        modifier
-            .fillMaxWidth()
-            .padding(vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = deal.status.title,
-            color = Color.White,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = deal.status.detail(deal.side),
-            color = Color.White.copy(alpha = 0.5f),
-            fontSize = 14.sp,
-            lineHeight = 20.sp,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 24.dp)
+    if (addingAccount) {
+        ReceiveAccountSheet(
+            isSubmitting = state.busy == DealAction.ACCOUNT,
+            error = state.error,
+            onDismiss = {
+                addingAccount = false
+                viewModel.clearError()
+            },
+            onSave = viewModel::setReceivingAccount
         )
     }
-}
 
-/**
- * Payment, Approval, Account, Release, Done.
- *
- * A deal that went sideways has no position on this track, so cancelled and
- * disputed show their own line instead of a dot stranded between two steps.
- */
-@Composable
-private fun StepTrack(status: DealStatus, modifier: Modifier = Modifier) {
-    val step = status.stepIndex
-
-    if (step == null) {
-        Row(
-            modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(IosColors.Warning.copy(alpha = 0.10f))
-                .padding(14.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                Icons.Outlined.Flag,
-                contentDescription = null,
-                tint = IosColors.Warning,
-                modifier = Modifier.size(16.dp)
-            )
-            Text(
-                text = status.title,
-                color = IosColors.Warning,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-        return
-    }
-
-    Row(
-        modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(Surface)
-            .padding(vertical = 14.dp, horizontal = 10.dp),
-        verticalAlignment = Alignment.Top
-    ) {
-        DealStatus.happyPath.forEachIndexed { index, label ->
-            val done = index < step
-            val current = index == step
-
-            Column(
-                Modifier.weight(1f),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    // The connector sits behind the dot and stops at the last
-                    // step, so the track does not trail off the right edge.
-                    if (index != DealStatus.happyPath.lastIndex) {
-                        Box(
-                            Modifier
-                                .padding(start = 44.dp)
-                                .width(44.dp)
-                                .height(2.dp)
-                                .background(
-                                    if (done) IosColors.BuyGreen
-                                    else Color.White.copy(alpha = 0.12f)
-                                )
-                        )
-                    }
-                    StepDot(done = done, current = current)
-                }
-                Spacer(Modifier.height(7.dp))
-                Text(
-                    text = label,
-                    color = when {
-                        current -> Color.White
-                        done -> Color.White.copy(alpha = 0.6f)
-                        else -> Color.White.copy(alpha = 0.3f)
-                    },
-                    fontSize = 9.sp,
-                    fontWeight = if (current) FontWeight.SemiBold else FontWeight.Normal,
-                    maxLines = 1
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun StepDot(done: Boolean, current: Boolean) {
-    val fill by animateColorAsState(
-        targetValue = when {
-            done -> IosColors.BuyGreen
-            current -> Color.White
-            else -> Color.White.copy(alpha = 0.14f)
-        },
-        animationSpec = Motion.gentle(),
-        label = "dot"
-    )
-    Box(
-        Modifier
-            .size(if (current) 18.dp else 16.dp)
-            .clip(CircleShape)
-            .background(fill),
-        contentAlignment = Alignment.Center
-    ) {
-        if (done) {
-            Icon(
-                Icons.Filled.Check,
-                contentDescription = null,
-                tint = Color.Black,
-                modifier = Modifier.size(10.dp)
-            )
-        }
+    if (askCancel) {
+        AlertDialog(
+            onDismissRequest = { askCancel = false },
+            title = { Text("Cancel this deal?") },
+            text = { Text("Nothing has moved yet, so nothing needs to be returned.") },
+            confirmButton = {
+                TextButton(enabled = state.online, onClick = {
+                    askCancel = false
+                    viewModel.cancel()
+                }) { Text("Cancel deal", color = IosColors.SellRed) }
+            },
+            dismissButton = { TextButton(onClick = { askCancel = false }) { Text("Keep it") } }
+        )
     }
 }
 
@@ -606,16 +529,15 @@ private fun ActivityTimeline(deal: Deal) {
 }
 
 @Composable
-private fun FooterActions(deal: Deal, onOpenChat: () -> Unit) {
+private fun FooterActions(deal: Deal, onOpenChat: () -> Unit, onCancel: () -> Unit) {
     val haptics = LocalHapticFeedback.current
     Row(
         Modifier.fillMaxWidth().padding(top = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Cancelling is Tanha's to do — the rules refuse it from a client — so
-        // this opens the conversation rather than pretending to a power the app
-        // does not have and failing silently.
-        if (deal.status.isActive) {
+        // A member may back out only before paying — the rules allow exactly
+        // that. After it, cancelling is a conversation with the desk.
+        if (deal.status == DealStatus.AWAITING_PAYMENT) {
             FooterAction(
                 icon = Icons.Outlined.Close,
                 label = "Cancel deal",
@@ -623,7 +545,7 @@ private fun FooterActions(deal: Deal, onOpenChat: () -> Unit) {
                 modifier = Modifier.weight(1f)
             ) {
                 Haptics.tap(haptics)
-                onOpenChat()
+                onCancel()
             }
         }
         FooterAction(
@@ -676,6 +598,7 @@ private fun FooterAction(
 private fun ConfirmPaymentSheet(
     deal: Deal,
     isSubmitting: Boolean,
+    error: String?,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit
 ) {
@@ -822,10 +745,15 @@ private fun ConfirmPaymentSheet(
                 )
             }
 
+            error?.let {
+                Spacer(Modifier.height(12.dp))
+                Text(it, color = IosColors.SellRed, fontSize = 13.sp, lineHeight = 18.sp)
+            }
+
             Spacer(Modifier.weight(1f))
 
             ConfirmButton(
-                label = "I have sent the payment",
+                label = "I have paid",
                 // The id is the whole point of the sheet, so it is required:
                 // a report with nothing to match against lands on Tanha as a
                 // claim he has to chase.

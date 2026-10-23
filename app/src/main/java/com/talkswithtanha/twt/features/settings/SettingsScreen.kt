@@ -90,6 +90,7 @@ fun SettingsScreen(
     var confirmSignOut by remember { mutableStateOf(false) }
     val blocked by viewModel.blocked.collectAsStateWithLifecycle()
     var showBlocked by remember { mutableStateOf(false) }
+    var showDealAlerts by remember { mutableStateOf(false) }
     var notificationsOn by remember { mutableStateOf(NotificationPermission.isGranted(context)) }
     val askForNotifications = rememberNotificationPermissionRequest { granted ->
         notificationsOn = granted
@@ -115,6 +116,8 @@ fun SettingsScreen(
             .statusBarsPadding()
     ) {
         SheetHeader("Settings", onClose)
+
+        if (showDealAlerts) DealAlertsScreen(onClose = { showDealAlerts = false })
 
         if (showBlocked) {
             androidx.compose.material3.AlertDialog(
@@ -282,6 +285,14 @@ fun SettingsScreen(
                         onClick = {
                             if (notificationsOn) openSystemSettings() else askForNotifications()
                         }
+                    )
+                    SettingsDivider()
+                    SettingsRow(
+                        title = "Exchange alerts & security",
+                        subtitle = "Anti-phishing code, email and push",
+                        icon = Icons.Filled.Security,
+                        tint = IosColors.SettingsIcon.Deals,
+                        onClick = { showDealAlerts = true }
                     )
                     SettingsDivider()
                     SettingsRow(

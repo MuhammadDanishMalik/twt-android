@@ -556,11 +556,17 @@ internal fun ConfirmButton(
             label = "confirm"
         ) { busy ->
             if (busy) {
-                CircularProgressIndicator(
-                    color = Color.White,
-                    strokeWidth = 2.dp,
-                    modifier = Modifier.size(20.dp)
-                )
+                // Words as well as the spinner: a money button that only spins
+                // reads as frozen, and this one is waiting on the server.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(text = "Processing…", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
             } else {
                 Text(
                     text = label,

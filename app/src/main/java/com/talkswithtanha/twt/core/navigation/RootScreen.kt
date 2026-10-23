@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.core.navigation
 
+import com.talkswithtanha.twt.features.marketplace.DealPulseOverlay
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -78,6 +79,8 @@ private val BottomBlurHeight = 210.dp
 fun RootScreen(
     pendingSignalId: String? = null,
     onPendingSignalHandled: () -> Unit = {},
+    pendingDealId: String? = null,
+    onPendingDealHandled: () -> Unit = {},
     navController: NavHostController = rememberNavController(),
     viewModel: RootViewModel = hiltViewModel()
 ) {
@@ -142,6 +145,14 @@ fun RootScreen(
         onPendingSignalHandled()
     }
 
+    // A deal push, held for the gate the same way.
+    LaunchedEffect(pendingDealId, gate) {
+        val dealId = pendingDealId ?: return@LaunchedEffect
+        if (gate != RootViewModel.Gate.Allowed) return@LaunchedEffect
+        navController.navigate(AppRoute.DealDetail.of(dealId)) { launchSingleTop = true }
+        onPendingDealHandled()
+    }
+
     LaunchedEffect(wasKicked) {
         if (!wasKicked) return@LaunchedEffect
         snackbars.showSnackbar(
@@ -199,6 +210,18 @@ fun RootScreen(
                 items = bottomBarItems,
                 currentRoute = currentRoute,
                 onNavigate = { route -> navController.navigateToTab(route) }
+            )
+        }
+
+        // Open deals and their changes, over every screen once let in.
+        if (gate == RootViewModel.Gate.Allowed) {
+            DealPulseOverlay(
+                currentRoute = currentRoute,
+                currentDealId = backStackEntry?.arguments?.getString(AppRoute.DealDetail.ARG)
+                    ?.takeIf { currentRoute == AppRoute.DealDetail.route },
+                pillBottom = if (showsBar) 104.dp else 28.dp,
+                onOpenDeal = { navController.navigate(AppRoute.DealDetail.of(it)) { launchSingleTop = true } },
+                onOpenDeals = { navController.navigate(AppRoute.MyDeals.route) { launchSingleTop = true } }
             )
         }
 

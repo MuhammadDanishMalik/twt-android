@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.talkswithtanha.twt.core.data.DealRepository
+import com.talkswithtanha.twt.core.data.PrefsRepository
 import com.talkswithtanha.twt.core.data.ExchangeRateRepository
 import com.talkswithtanha.twt.core.data.MarketplaceConfigRepository
 import com.talkswithtanha.twt.core.data.Snapshot
@@ -150,55 +151,89 @@ class NewDealViewModel @Inject constructor(
 
 data class DealDetailUiState(
     val deal: Deal? = null,
-    val reportingPayment: Boolean = false,
-    val error: String? = null
-)
+    /** Which money action is waiting on the server, if any. */
+    val busy: DealAction? = null,
+    val error: String? = null,
+    /** False while the deal is only coming from the phone's cache. */
+    val online: Boolean = true,
+    val sound: Boolean = true
+) {
+    /** Kept for the sheet, which only cares about the payment report. */
+    val reportingPayment: Boolean get() = busy == DealAction.REPORT
+}
+
+enum class DealAction { REPORT, ACCOUNT, CANCEL }
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class DealDetailViewModel @Inject constructor(
     private val dealRepository: DealRepository,
     session: SessionRepository,
+    prefs: PrefsRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     private val dealId: String = checkNotNull(savedStateHandle[AppRoute.DealDetail.ARG])
 
     private val _error = MutableStateFlow<String?>(null)
-    private val _reporting = MutableStateFlow(false)
+    private val _busy = MutableStateFlow<DealAction?>(null)
+
+    private val user = session.currentUser
 
     val state: StateFlow<DealDetailUiState> = kotlinx.coroutines.flow.combine(
-        session.currentUser.flatMapLatest { user ->
-            if (user == null) flowOf(emptyList())
-            else dealRepository.observeDeals(user.id).map { (it as? Snapshot.Data)?.value.orEmpty() }
+        user.flatMapLatest { u ->
+            if (u == null) flowOf(emptyList())
+            else dealRepository.observeDeals(u.id).map { (it as? Snapshot.Data)?.value.orEmpty() }
         },
-        _reporting,
+        user.flatMapLatest { u -> if (u == null) flowOf(true) else dealRepository.observeConnection(u.id) },
+        user.flatMapLatest { u -> if (u == null) flowOf(true) else prefs.observe(u.id).map { it.sound } },
+        _busy,
         _error
-    ) { deals, reporting, error ->
+    ) { deals, online, sound, busy, error ->
         DealDetailUiState(
             deal = deals.firstOrNull { it.id == dealId },
-            reportingPayment = reporting,
-            error = error
+            busy = busy,
+            error = error,
+            online = online,
+            sound = sound
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DealDetailUiState())
 
     /**
-     * The member declaring they have paid.
-     *
-     * The only transition this app can make: the rules refuse anything else
-     * from a client, and approving a payment or releasing funds are Tanha's.
+     * The member declaring they have paid. The screen moves on when the
+     * server's snapshot says so, never on this call returning.
      */
-    fun reportPayment(reference: String) {
-        if (_reporting.value) return
-        _reporting.value = true
+    fun reportPayment(reference: String) = run(DealAction.REPORT) {
+        dealRepository.markPaymentSent(dealId, reference.trim())
+    }
+
+    fun setReceivingAccount(account: PaymentAccount) = run(DealAction.ACCOUNT) {
+        dealRepository.setReceivingAccount(dealId, account)
+    }
+
+    fun cancel() = run(DealAction.CANCEL) { dealRepository.cancelDeal(dealId) }
+
+    fun clearError() {
+        _error.value = null
+    }
+
+    private fun run(action: DealAction, block: suspend () -> Unit) {
+        if (_busy.value != null || !state.value.online) return
+        _busy.value = action
+        _error.value = null
         viewModelScope.launch {
             try {
-                dealRepository.markPaymentSent(dealId, reference.trim())
-                _error.value = null
+                block()
             } catch (e: Exception) {
-                _error.value = "Could not report the payment. Try again, or tell Tanha in your chat."
+                val payBy = state.value.deal?.payBy
+                _error.value = when {
+                    action == DealAction.REPORT && payBy != null && payBy.time < System.currentTimeMillis() ->
+                        "This deal already expired, so it could not be marked paid. Nothing moved. " +
+                            "If you did pay, message the desk with your transaction id."
+                    else -> "That did not reach TWT. Check your connection and tap again. It is only recorded once."
+                }
             } finally {
-                _reporting.value = false
+                _busy.value = null
             }
         }
     }

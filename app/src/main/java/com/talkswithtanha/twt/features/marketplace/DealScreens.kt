@@ -1,5 +1,8 @@
 package com.talkswithtanha.twt.features.marketplace
 
+import com.talkswithtanha.twt.core.model.Turn
+import com.talkswithtanha.twt.core.model.clockText
+import com.talkswithtanha.twt.core.model.progress
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -77,7 +80,14 @@ fun MyDealsScreen(
     onNewDeal: () -> Unit,
     viewModel: DealsViewModel = hiltViewModel()
 ) {
-    val deals by viewModel.deals.collectAsStateWithLifecycle()
+    val all by viewModel.deals.collectAsStateWithLifecycle()
+    // Open deals first, the member's own clock soonest; then history, newest first.
+    val deals = remember(all) {
+        all.sortedBy { d ->
+            if (d.status.isTerminal) Long.MAX_VALUE
+            else d.progress().let { p -> if (p.turn == Turn.YOU) p.deadline?.time ?: (Long.MAX_VALUE - 3) else Long.MAX_VALUE - 2 }
+        }
+    }
 
     Column(
         Modifier
@@ -162,6 +172,18 @@ private fun DealRow(deal: Deal, modifier: Modifier = Modifier, onClick: () -> Un
                 color = IosColors.TextSecondary,
                 fontSize = 13.sp
             )
+            if (!deal.status.isTerminal) {
+                val p = deal.progress()
+                val now = rememberNow()
+                val left = p.deadline?.time?.minus(now)
+                Text(
+                    text = (if (p.turn == Turn.YOU) "Your turn" else if (p.turn == Turn.REVIEW) "Under review" else "Desk’s turn") +
+                        " · ${p.short}" + if (p.turn == Turn.YOU && left != null) " ${clockText(left)}" else "",
+                    color = if (p.turn == Turn.YOU) IosColors.BuyGreen else IosColors.TextSecondary,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
         StatusPill(deal.status)
     }

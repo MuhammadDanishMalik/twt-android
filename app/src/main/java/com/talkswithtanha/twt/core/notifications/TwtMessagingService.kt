@@ -67,14 +67,17 @@ class TwtMessagingService : FirebaseMessagingService() {
         // `signalFollows`, so anything arriving with those kinds is already
         // meant for this person.
         val channel = when (data[KEY_KIND]) {
-            KIND_STATUS, KIND_UPDATED -> NotificationChannels.SIGNAL_ALERTS
+            // A deal is somebody's money moving: as prominent as a stop loss.
+            KIND_STATUS, KIND_UPDATED, KIND_DEAL -> NotificationChannels.SIGNAL_ALERTS
             else -> NotificationChannels.GENERAL
         }
 
-        post(channel, title, body, signalId)
+        // A desk alert names somebody else's deal, which the member deal screen
+        // cannot read; staff open it from the admin area instead.
+        post(channel, title, body, signalId, data[KEY_DEAL_ID].takeIf { data["desk"] != "1" })
     }
 
-    private fun post(channel: String, title: String, body: String, signalId: String?) {
+    private fun post(channel: String, title: String, body: String, signalId: String?, dealId: String? = null) {
         if (!canPost()) return
 
         val intent = Intent(this, MainActivity::class.java).apply {
@@ -82,10 +85,11 @@ class TwtMessagingService : FirebaseMessagingService() {
             // The same key the system tray puts on the intent when it handles
             // one of these itself, so a tap opens the signal either way.
             signalId?.let { putExtra(KEY_SIGNAL_ID, it) }
+            dealId?.let { putExtra(KEY_DEAL_ID, it) }
         }
         val pending = PendingIntent.getActivity(
             this,
-            (signalId ?: title).hashCode(),
+            (signalId ?: dealId ?: title).hashCode(),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -110,7 +114,7 @@ class TwtMessagingService : FirebaseMessagingService() {
         // between the two, and the throw would land on FCM's delivery thread.
         try {
             NotificationManagerCompat.from(this)
-                .notify((signalId ?: title).hashCode(), notification)
+                .notify((signalId ?: dealId ?: title).hashCode(), notification)
         } catch (e: SecurityException) {
             Log.i(TAG, "Notifications are not permitted; dropping this push", e)
         }
@@ -127,6 +131,8 @@ class TwtMessagingService : FirebaseMessagingService() {
         /** The keys `send-push.ts` writes. Changing either side breaks both. */
         const val KEY_SIGNAL_ID = "signalId"
         const val KEY_KIND = "kind"
+        const val KEY_DEAL_ID = "dealId"
+        const val KIND_DEAL = "deal"
         const val KEY_TITLE = "title"
         const val KEY_BODY = "body"
 

@@ -26,7 +26,14 @@ data class Deal(
     val receivingAccount: PaymentAccount? = null,
     val paymentReference: String? = null,
     val events: List<DealEvent> = emptyList(),
-    val createdAt: Date = Date()
+    val createdAt: Date = Date(),
+    /** When an unpaid deal cancels itself. Stamped by the server; null on deals from before. */
+    val payBy: Date? = null,
+    /** When the desk's current turn is due, and which turn that is. */
+    val deskBy: Date? = null,
+    val deskByFor: DealStatus? = null,
+    /** "timeout" when the server closed it for not being paid in time. */
+    val cancelReason: String? = null
 ) {
     /** What the member pays, in the currency they pay in. */
     val payTotalMinor: Long

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The website's round TWT logo, inset so the letters stay inside the 66dp safe
-  zone every launcher mask keeps. The logo's own dark disc runs to the mask edge
-  and blends into ic_launcher_background, which is the same #161616.
+  The TWT wordmark on its own, sized to sit inside the 66dp safe zone every
+  launcher mask keeps (58% of the 108dp canvas). The dark background comes from
+  ic_launcher_background.
 -->
-<inset xmlns:android="http://schemas.android.com/apk/res/android"
-    android:drawable="@drawable/twt_logo"
-    android:inset="25dp" />
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/ic_launcher_mark"
+    android:gravity="fill" />

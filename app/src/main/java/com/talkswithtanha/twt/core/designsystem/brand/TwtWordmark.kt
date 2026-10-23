@@ -1,5 +1,12 @@
 package com.talkswithtanha.twt.core.designsystem.brand
 
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -120,19 +127,23 @@ fun TwtWordmark(
         androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     }
 
-    Canvas(modifier) {
-        val letters = TwtLetterforms.path(size.width, size.height)
-        clipPath(letters) {
-            drawRect(brush = twtHolographicBrush(size, drift + tiltShift))
-            // A soft gloss along the top edge of every stroke. The source
-            // letters read as frosted and slightly domed; without this they go
-            // flat, like a gradient pasted into a text box.
-            drawRect(
-                brush = Brush.verticalGradient(
-                    listOf(Color.White.copy(alpha = 0.35f), Color.Transparent),
-                    endY = size.height * 0.5f
-                )
-            )
-        }
+    // The new TWT logo: its letters take the foil, its green stroke stays brand green.
+    val letters = ImageBitmap.imageResource(com.talkswithtanha.twt.R.drawable.twt_letters)
+    val stroke = ImageBitmap.imageResource(com.talkswithtanha.twt.R.drawable.twt_slash)
+
+    Canvas(modifier.graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }) {
+        val dst = IntSize(size.width.toInt(), size.height.toInt())
+        drawImage(letters, dstSize = dst, filterQuality = FilterQuality.High)
+        // The foil, kept to the letters' own pixels.
+        drawRect(brush = twtHolographicBrush(size, drift + tiltShift), blendMode = BlendMode.SrcIn)
+        // A soft gloss along the top, so the letters read as frosted rather than flat.
+        drawRect(
+            brush = Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.35f), Color.Transparent), endY = size.height * 0.5f),
+            blendMode = BlendMode.SrcAtop
+        )
+        drawImage(stroke, dstSize = dst, filterQuality = FilterQuality.High)
     }
 }
+
+/** Width over height of the new TWT wordmark. */
+const val TWT_WORDMARK_ASPECT = 4.342f

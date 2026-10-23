@@ -208,8 +208,8 @@ fun TwtAccessCard(
 
             TwtWordmark(
                 modifier = Modifier
-                    .height(44.dp)
-                    .width(44.dp * com.talkswithtanha.twt.core.designsystem.brand.TwtLetterforms.ASPECT_RATIO)
+                    .height(34.dp)
+                    .width(34.dp * com.talkswithtanha.twt.core.designsystem.brand.TWT_WORDMARK_ASPECT)
                     // A touch of depth against the surface, so the foil sits
                     // *on* the card rather than being printed flat into it.
                     .graphicsLayer {

@@ -167,32 +167,12 @@ fun OnboardingScreen(
                     .padding(horizontal = 20.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // The TWT GLOBAL lockup: it carries the name, so no type beside it.
                 Image(
-                    painterResource(R.drawable.twt_logo),
-                    contentDescription = "TWT",
-                    modifier = Modifier.size(34.dp).clip(CircleShape)
+                    painterResource(R.drawable.twt_global),
+                    contentDescription = "TWT Global",
+                    modifier = Modifier.height(30.dp)
                 )
-                Spacer(Modifier.width(10.dp))
-                Column {
-                    Text(
-                        "TWT Global",
-                        style = TextStyle(
-                            fontFamily = WebFonts.Display,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            color = WebColors.Text
-                        )
-                    )
-                    Text(
-                        "TALKS WITH TANHA",
-                        style = TextStyle(
-                            fontFamily = WebFonts.Mono,
-                            fontSize = 9.sp,
-                            letterSpacing = 0.14.em,
-                            color = WebColors.Text3
-                        )
-                    )
-                }
                 Spacer(Modifier.weight(1f))
                 Text(
                     "Log in",

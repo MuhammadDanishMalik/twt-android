@@ -94,12 +94,10 @@ fun AuthScreen(
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Image(
-                painterResource(R.drawable.twt_logo),
-                contentDescription = "TWT",
-                modifier = Modifier.size(40.dp).clip(CircleShape)
+                painterResource(R.drawable.twt_global),
+                contentDescription = "TWT Global",
+                modifier = Modifier.height(34.dp)
             )
-            Spacer(Modifier.width(10.dp))
-            Text("TWT Global", style = WebType.h3.copy(fontSize = 18.sp))
         }
 
         Spacer(Modifier.height(32.dp))

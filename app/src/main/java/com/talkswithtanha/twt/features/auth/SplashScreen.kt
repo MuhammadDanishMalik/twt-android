@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -64,24 +65,18 @@ fun SplashScreen() {
             verticalArrangement = Arrangement.Center
         ) {
             Image(
-                painter = painterResource(R.drawable.twt_logo),
-                contentDescription = "TWT",
+                painter = painterResource(R.drawable.twt_global),
+                contentDescription = "TWT Global",
                 modifier = Modifier
-                    .size(104.dp)
+                    .width(220.dp)
                     .graphicsLayer {
-                        val s = 0.6f + 0.4f * pop.value
+                        val s = 0.8f + 0.2f * pop.value
                         scaleX = s
                         scaleY = s
-                        rotationZ = (1f - pop.value) * -12f
+                        // Slides in along the logo's own slant.
+                        translationX = (1f - pop.value) * -40f
                         alpha = pop.value.coerceIn(0f, 1f)
                     }
-                    .shadow(
-                        elevation = (24 * glow).dp,
-                        shape = CircleShape,
-                        ambientColor = WebColors.Brand,
-                        spotColor = WebColors.Brand
-                    )
-                    .clip(CircleShape)
             )
             Spacer(Modifier.height(20.dp))
             Text(

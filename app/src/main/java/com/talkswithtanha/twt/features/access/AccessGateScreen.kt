@@ -215,12 +215,10 @@ private fun TopBar(onSignOut: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Image(
-            painterResource(R.drawable.twt_logo),
-            contentDescription = "TWT",
-            modifier = Modifier.size(32.dp).clip(CircleShape)
+            painterResource(R.drawable.twt_global),
+            contentDescription = "TWT Global",
+            modifier = Modifier.height(28.dp)
         )
-        Spacer(Modifier.width(10.dp))
-        Text("TWT Global", style = WebType.h3.copy(fontSize = 17.sp))
         Spacer(Modifier.weight(1f))
         Text(
             "Sign out",

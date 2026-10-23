@@ -28,7 +28,7 @@ data class DealProgress(
 ) {
     companion object {
         val STEPS = listOf("Deal opened", "Payment", "Release", "Completed")
-        const val PAY_MINUTES = 15
+        const val PAY_MINUTES = 30
         const val DESK_MINUTES = 30
     }
 }
@@ -80,7 +80,7 @@ fun Deal.progress(): DealProgress {
         )
         DealStatus.CANCELLED -> DealProgress(
             0, false, Turn.CLOSED,
-            if (cancelReason == "timeout") "Not paid within ${DealProgress.PAY_MINUTES} minutes, so the deal closed itself"
+            if (cancelReason == "timeout") "Expired, not paid in time, so the deal closed itself"
             else "This deal was cancelled",
             if (cancelReason == "timeout") "Nothing moved. If you already paid, message the desk with your transaction id."
             else "Nothing moved. You can open a new deal at any time.",

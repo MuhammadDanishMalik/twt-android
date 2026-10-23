@@ -157,15 +157,21 @@ class FirebaseMarketplaceConfigRepository @Inject constructor(
     private val db: FirebaseFirestore
 ) : MarketplaceConfigRepository {
 
+    // The desk's accounts live on `config/exchangeRate`, beside the rate —
+    // the one list the panel's Rates & accounts page edits and the website and
+    // iPhone read. This used to read `config/marketplace`, which nothing
+    // writes, so Android deals opened with no account to pay into.
     override fun observeAccounts(): Flow<List<PaymentAccount>> =
         db.collection(Collection.CONFIG)
-            .document(Document.MARKETPLACE)
+            .document(Document.EXCHANGE_RATE)
             .snapshotFlow()
             .map { snapshot ->
                 val document = (snapshot as? Snapshot.Data)?.value ?: return@map emptyList()
                 (document.get(M.ACCOUNTS) as? List<*>)
                     .orEmpty()
                     .filterIsInstance<Map<*, *>>()
+                    // Switched off in the panel: kept on file, never offered.
+                    .filter { raw -> raw["isActive"] != false }
                     .mapNotNull { raw ->
                         val number = raw[M.ACCOUNT_NUMBER].asNonBlankString()
                             ?: return@mapNotNull null

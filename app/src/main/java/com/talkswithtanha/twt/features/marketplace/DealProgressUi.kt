@@ -221,7 +221,7 @@ private fun Countdown(deadline: Date, words: (String) -> String, alarm: Boolean,
         }
     }
 
-    val span = if (alarm) 15 * 60_000f else 30 * 60_000f
+    val span = 30 * 60_000f
     val share = (left / span).coerceIn(0f, 1f)
     val color = when {
         left <= 120_000 -> IosColors.SellRed

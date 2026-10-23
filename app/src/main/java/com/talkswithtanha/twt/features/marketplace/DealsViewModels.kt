@@ -102,6 +102,27 @@ class NewDealViewModel @Inject constructor(
         }
         if (_state.value.isSubmitting) return
 
+        // The desk's own limits, checked here so the member hears why; the
+        // security rules refuse the same deals regardless.
+        val refusal = when {
+            !currentRate.isAcceptingDeals -> "The desk is closed for new deals right now. Your open deals are unaffected."
+            accounts.value.isEmpty() -> "The desk has no payment account set up yet, so a deal cannot be opened. Message Tanha."
+            else -> {
+                val pkrPaisa = cents * currentRate.paisaFor(_state.value.side) / 100
+                val min = currentRate.minAmountPaisa
+                val max = currentRate.maxAmountPaisa
+                when {
+                    min != null && pkrPaisa < min -> "The smallest deal the desk takes is ${"%,d".format(min / 100)} PKR."
+                    max != null && pkrPaisa > max -> "The largest deal the desk takes is ${"%,d".format(max / 100)} PKR."
+                    else -> null
+                }
+            }
+        }
+        if (refusal != null) {
+            _state.update { it.copy(error = refusal) }
+            return
+        }
+
         _state.update { it.copy(isSubmitting = true, error = null) }
 
         viewModelScope.launch {

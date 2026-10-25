@@ -1,5 +1,7 @@
 package com.talkswithtanha.twt.core.navigation
 
+import com.talkswithtanha.twt.features.access.LocalOpenUnlock
+import com.talkswithtanha.twt.features.access.ProGate
 import com.talkswithtanha.twt.features.membership.IbRenewalScreen
 import com.talkswithtanha.twt.features.academy.LessonPlayerScreen
 import android.content.Intent
@@ -92,6 +94,9 @@ fun AppNavHost(
     SharedTransitionLayout(modifier = modifier) {
         val sharedScope = this
 
+        androidx.compose.runtime.CompositionLocalProvider(
+            LocalOpenUnlock provides { navController.navigate(AppRoute.AccessGate.route) { launchSingleTop = true } }
+        ) {
         NavHost(
             navController = navController,
             startDestination = AppRoute.Splash.route
@@ -154,7 +159,7 @@ fun AppNavHost(
             // and the gate moves the stack on to the access-code screen.
             screen(sharedScope, AppRoute.ProfileSetup.route) { ProfileSetupScreen() }
 
-            screen(sharedScope, AppRoute.AccessGate.route) { AccessGateScreen() }
+            screen(sharedScope, AppRoute.AccessGate.route) { AccessGateScreen(onClose = { navController.popBackStack() }) }
 
             // Expired: the gate's own screen, no way back into the app until
             // the team accepts. From the reminder: closable, back to where
@@ -218,13 +223,23 @@ fun AppNavHost(
                     defaultValue = "false"
                 }
             )
-        ) {
-            ChatRoomScreen(
-                onBack = { navController.popBackStack() },
-                onOpenLesson = { videoId, title, start ->
-                    navController.navigate(AppRoute.Lesson.of(videoId, title, start))
-                }
-            )
+        ) { entry ->
+            val roomId = entry.arguments?.getString(AppRoute.ChatRoom.ARG).orEmpty()
+            if (roomId.startsWith("support_")) {
+                ChatRoomScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenLesson = { videoId, title, start ->
+                        navController.navigate(AppRoute.Lesson.of(videoId, title, start))
+                    }
+                )
+            } else ProGate("The member rooms", "Talk trades with Tanha and the other members, live.") {
+                ChatRoomScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenLesson = { videoId, title, start ->
+                        navController.navigate(AppRoute.Lesson.of(videoId, title, start))
+                    }
+                )
+            }
         }
 
             screen(sharedScope, AppRoute.Academy.route) {
@@ -251,18 +266,20 @@ fun AppNavHost(
         }
 
             screen(sharedScope, AppRoute.Marketplace.route) {
-            MarketplaceScreen(
-                onBack = { navController.popBackStack() },
-                onOpenWhatsApp = ::openUrl,
-                onNewDeal = { navController.navigate(AppRoute.NewDeal.route) },
-                onMyDeals = { navController.navigate(AppRoute.MyDeals.route) },
-                onOpenDeal = { navController.navigate(AppRoute.DealDetail.of(it)) },
-                // The seller thread, not the support one: this is a
-                // conversation about an amount and a rate.
-                onOpenSellerChat = {
-                    navController.navigate(AppRoute.ChatRoom.of(it, seller = true))
-                }
-            )
+            ProGate("The exchange desk", "Buy and sell USDT with the TWT desk at a locked rate.") {
+                MarketplaceScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenWhatsApp = ::openUrl,
+                    onNewDeal = { navController.navigate(AppRoute.NewDeal.route) },
+                    onMyDeals = { navController.navigate(AppRoute.MyDeals.route) },
+                    onOpenDeal = { navController.navigate(AppRoute.DealDetail.of(it)) },
+                    // The seller thread, not the support one: this is a
+                    // conversation about an amount and a rate.
+                    onOpenSellerChat = {
+                        navController.navigate(AppRoute.ChatRoom.of(it, seller = true))
+                    }
+                )
+            }
         }
 
         // ── Settings family ──────────────────────────────────────────────
@@ -294,14 +311,16 @@ fun AppNavHost(
 
             // ── The feed ─────────────────────────────────────────────────
             screen(sharedScope, AppRoute.Feed.route) {
-                FeedScreen(
-                    onOpenPost = { navController.navigate(AppRoute.FeedPost.of(it)) },
-                    onOpenSignal = { navController.navigate(AppRoute.SignalDetail.of(it)) },
-                    onOpenChats = { navController.navigate(AppRoute.ChatList.route) },
-                    onCompose = { navController.navigate(AppRoute.NewFeedPost.route) },
-                    // "Ask" on a setup opens the member's own thread with the desk.
-                    onAsk = { uid -> navController.navigate(AppRoute.ChatRoom.of(com.talkswithtanha.twt.core.firebase.FirestorePaths.ChatRoom.support(uid))) }
-                )
+                ProGate("The feed", "Tanha's setups, notes and voice updates as he posts them, with the trades they lead to.") {
+                    FeedScreen(
+                        onOpenPost = { navController.navigate(AppRoute.FeedPost.of(it)) },
+                        onOpenSignal = { navController.navigate(AppRoute.SignalDetail.of(it)) },
+                        onOpenChats = { navController.navigate(AppRoute.ChatList.route) },
+                        onCompose = { navController.navigate(AppRoute.NewFeedPost.route) },
+                        // "Ask" on a setup opens the member's own thread with the desk.
+                        onAsk = { uid -> navController.navigate(AppRoute.ChatRoom.of(com.talkswithtanha.twt.core.firebase.FirestorePaths.ChatRoom.support(uid))) }
+                    )
+                }
             }
 
             sheetRoute(
@@ -394,31 +413,37 @@ fun AppNavHost(
         }
 
             sheetRoute(sharedScope, AppRoute.MySignals.route) {
-            MySignalsScreen(
-                onClose = { navController.popBackStack() },
-                onRecord = { navController.navigate(AppRoute.RecordResult.of(it.signalId)) }
-            )
+            ProGate("Your journal", "Follow live trades and record what you made on each.") {
+                MySignalsScreen(
+                    onClose = { navController.popBackStack() },
+                    onRecord = { navController.navigate(AppRoute.RecordResult.of(it.signalId)) }
+                )
+            }
         }
 
             sheetRoute(sharedScope, AppRoute.MyDeals.route) {
-            MyDealsScreen(
-                onClose = { navController.popBackStack() },
-                onOpenDeal = { navController.navigate(AppRoute.DealDetail.of(it)) },
-                onNewDeal = { navController.navigate(AppRoute.NewDeal.route) }
-            )
+            ProGate("The exchange desk", "Buy and sell USDT with the TWT desk at a locked rate.") {
+                MyDealsScreen(
+                    onClose = { navController.popBackStack() },
+                    onOpenDeal = { navController.navigate(AppRoute.DealDetail.of(it)) },
+                    onNewDeal = { navController.navigate(AppRoute.NewDeal.route) }
+                )
+            }
         }
 
             sheetRoute(sharedScope, AppRoute.NewDeal.route) {
-            NewDealScreen(
-                onClose = { navController.popBackStack() },
-                onOpened = { dealId ->
-                    // Straight into the deal, and the form is left behind: a
-                    // member who backs out of the detail should not land on a
-                    // filled-in form that would open a second deal.
-                    navController.popBackStack()
-                    navController.navigate(AppRoute.DealDetail.of(dealId))
-                }
-            )
+            ProGate("The exchange desk", "Buy and sell USDT with the TWT desk at a locked rate.") {
+                NewDealScreen(
+                    onClose = { navController.popBackStack() },
+                    onOpened = { dealId ->
+                        // Straight into the deal, and the form is left behind: a
+                        // member who backs out of the detail should not land on a
+                        // filled-in form that would open a second deal.
+                        navController.popBackStack()
+                        navController.navigate(AppRoute.DealDetail.of(dealId))
+                    }
+                )
+            }
         }
 
             sheetRoute(
@@ -426,10 +451,12 @@ fun AppNavHost(
             route = AppRoute.DealDetail.route,
             arguments = listOf(navArgument(AppRoute.DealDetail.ARG) { type = NavType.StringType })
         ) {
-            DealDetailScreen(
-                onClose = { navController.popBackStack() },
-                onOpenChat = { navController.navigateToTab(AppRoute.ChatList.route) }
-            )
+            ProGate("The exchange desk", "Buy and sell USDT with the TWT desk at a locked rate.") {
+                DealDetailScreen(
+                    onClose = { navController.popBackStack() },
+                    onOpenChat = { navController.navigateToTab(AppRoute.ChatList.route) }
+                )
+            }
         }
 
             sheetRoute(sharedScope, AppRoute.Appearance.route) {
@@ -479,6 +506,7 @@ fun AppNavHost(
                         .background(IosColors.Background)
                 )
             }
+        }
         }
         }
     }

@@ -1,5 +1,7 @@
 package com.talkswithtanha.twt.features.signals
 
+import com.talkswithtanha.twt.features.access.ProLockCard
+import com.talkswithtanha.twt.features.access.rememberIsPro
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -73,6 +75,9 @@ fun SignalsScreen(
     viewModel: SignalsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    // Free members see the analysis and the results; live trades and live
+    // analysis are what a code opens.
+    val isPro = rememberIsPro() != false
 
     // Which market. Held as the enum's name rather than the enum itself so it
     // survives process death, which rememberSaveable cannot do for an enum
@@ -147,7 +152,13 @@ fun SignalsScreen(
             label = "signalsTab"
         ) { selected ->
             if (selected == 1) {
-                LiveAnalysisTab(signals = state.signals)
+                if (isPro) LiveAnalysisTab(signals = state.signals)
+                else Box(Modifier.fillMaxSize().padding(16.dp)) {
+                    ProLockCard(
+                        feature = "Live analysis",
+                        blurb = "Tanha's live chart, levels and video notes as he draws them."
+                    )
+                }
             } else if (selected == 2) {
                 AnalysisTab(
                     isLoading = state.isLoading,
@@ -176,7 +187,7 @@ fun SignalsScreen(
             item {
                 SectionLabel(
                     title = "Active Trades",
-                    subtitle = "${active.size} signals running",
+                    subtitle = if (isPro) "${active.size} signals running" else "For Pro members",
                     icon = Icons.Filled.ShowChart
                 )
             }
@@ -184,6 +195,14 @@ fun SignalsScreen(
             when {
                 // A skeleton of the real card, so the row is the right size
                 // from the first frame and nothing jumps when data lands.
+                !isPro -> item {
+                    ProLockCard(
+                        feature = "Live trades",
+                        blurb = "Entry, stop and targets the moment Tanha posts them, and an alert as they move. The results below are open to everyone.",
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+
                 state.isLoading -> items(2) { index ->
                     SignalCardSkeleton(
                         Modifier

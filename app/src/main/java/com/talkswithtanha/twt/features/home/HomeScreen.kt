@@ -1,5 +1,7 @@
 package com.talkswithtanha.twt.features.home
 
+import com.talkswithtanha.twt.features.access.ProLockCard
+import com.talkswithtanha.twt.features.access.rememberIsPro
 import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -157,6 +159,7 @@ fun HomeScreen(
                 )
         )
 
+        val isPro = rememberIsPro()
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -208,6 +211,19 @@ fun HomeScreen(
                 }
             }
 
+
+            // Free members: what a code opens, and the way to it.
+            if (isPro == false) {
+                item {
+                    StaggeredAppear(2) {
+                        ProLockCard(
+                            feature = "Unlock the live calls",
+                            blurb = "You're on the free plan: analysis, results, markets and the academy are open. Live trades, the feed and the member rooms need an access code.",
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
+                }
+            }
 
             item {
                 StaggeredAppear(2) {

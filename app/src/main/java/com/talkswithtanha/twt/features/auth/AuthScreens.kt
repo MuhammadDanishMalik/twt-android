@@ -226,52 +226,6 @@ fun AuthScreen(
             }
         }
 
-        if (mode == AuthMode.SignUp) {
-            Spacer(Modifier.height(28.dp))
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(
-                                WebColors.Brand.copy(alpha = 0.09f),
-                                WebColors.Brand.copy(alpha = 0.03f)
-                            )
-                        )
-                    )
-                    .padding(14.dp)
-            ) {
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(WebColors.Brand)
-                        )
-                        Spacer(Modifier.size(8.dp))
-                        Text(
-                            text = "Invite only",
-                            color = WebColors.Brand,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        // Said before they sign up rather than after, because a
-                        // member who reaches the access gate expecting signals
-                        // is a member who feels they were sold something.
-                        text = "Creating an account is free. You'll need an access " +
-                            "code from Tanha to see the signals.",
-                        color = Color.White.copy(alpha = 0.5f),
-                        fontSize = 13.sp,
-                        lineHeight = 18.sp
-                    )
-                }
-            }
-        }
 
         Spacer(Modifier.height(40.dp))
     }

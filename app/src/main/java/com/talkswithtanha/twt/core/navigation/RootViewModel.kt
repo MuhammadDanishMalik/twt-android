@@ -87,14 +87,10 @@ class RootViewModel @Inject constructor(
                 // than signed out.
                 user?.ibRenewalNeeded == true -> Gate.IbRenewal
 
-                // A code that has run out signs this device out; a member who
-                // has simply not redeemed one yet goes to the gate. Both have
-                // `hasAppAccess == false`, so testing that alone would throw
-                // every new member off the app in the seconds between signing
-                // up and redeeming.
-                user?.accessExpired == true -> Gate.AccessExpired
-
-                else -> Gate.NeedsAccessCode
+                // Free, as on the website: into the app with the Pro parts
+                // locked (see ProGate), whether they never had a code or theirs
+                // ran out. The code screen is one tap away from every lock.
+                else -> Gate.Allowed
             }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Gate.Undecided)

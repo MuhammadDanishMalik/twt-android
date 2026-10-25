@@ -11,6 +11,8 @@ import com.talkswithtanha.twt.core.model.SignalStatus
 import com.talkswithtanha.twt.core.model.SignalType
 import com.talkswithtanha.twt.core.model.TradeStyle
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import java.util.Date
@@ -32,7 +34,8 @@ interface SignalRepository {
  */
 @Singleton
 class FirebaseSignalRepository @Inject constructor(
-    private val db: FirebaseFirestore
+    private val db: FirebaseFirestore,
+    private val session: com.talkswithtanha.twt.core.session.SessionRepository
 ) : SignalRepository {
 
     private val signals get() = db.collection(Collection.SIGNALS)
@@ -52,15 +55,57 @@ class FirebaseSignalRepository @Inject constructor(
         .orderBy(F.TIMESTAMP, Query.Direction.DESCENDING)
         .limit(limit)
 
+    /**
+     * Every published signal for a Pro member or staff. A free member may only
+     * read analysis posts and settled results — a query for everything is
+     * refused outright, not filtered — so for them it is those two queries,
+     * merged newest first, as on the website (signals-repo.ts).
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     override fun observeSignals(limit: Long): Flow<Snapshot<List<Signal>>> =
-        publishedQuery(limit).snapshotFlow().map { snapshot ->
-            when (snapshot) {
-                is Snapshot.Failed -> snapshot
-                is Snapshot.Data -> Snapshot.Data(
-                    snapshot.value.documents.mapNotNull { map(it) }
-                )
+        session.currentUser
+            .map { user -> user == null || user.hasAppAccess || user.isStaff }
+            .distinctUntilChanged()
+            .flatMapLatest { full ->
+                if (full) {
+                    publishedQuery(limit).snapshotFlow().map { snapshot -> snapshot.toSignals() }
+                } else {
+                    val analysis = signals
+                        .whereEqualTo(F.IS_PUBLISHED, true)
+                        .whereEqualTo(F.IS_ANALYSIS, true)
+                        .orderBy(F.TIMESTAMP, Query.Direction.DESCENDING)
+                        .limit(limit)
+                        .snapshotFlow()
+                    val settled = signals
+                        .whereEqualTo(F.IS_PUBLISHED, true)
+                        .whereIn(F.STATUS, SETTLED_STATUSES)
+                        .orderBy(F.TIMESTAMP, Query.Direction.DESCENDING)
+                        .limit(limit)
+                        .snapshotFlow()
+                    kotlinx.coroutines.flow.combine(analysis, settled) { a, b ->
+                        val left = a.toSignals()
+                        val right = b.toSignals()
+                        when {
+                            left is Snapshot.Data && right is Snapshot.Data ->
+                                Snapshot.Data((left.value + right.value).distinctBy { it.id }.sortedByDescending { it.timestamp })
+                            left is Snapshot.Data -> left
+                            right is Snapshot.Data -> right
+                            else -> left
+                        }
+                    }
+                }
             }
+
+    private fun Snapshot<com.google.firebase.firestore.QuerySnapshot>.toSignals(): Snapshot<List<Signal>> =
+        when (this) {
+            is Snapshot.Failed -> this
+            is Snapshot.Data -> Snapshot.Data(value.documents.mapNotNull { map(it) })
         }
+
+    private companion object {
+        /** The results a free member may read: the same list as the rules. */
+        val SETTLED_STATUSES = listOf("TP1 HIT", "TP2 HIT", "CLOSED ✓", "CLOSED ✗")
+    }
 
     override fun observeSignal(id: String): Flow<Snapshot<Signal?>> =
         signals.document(id).snapshotFlow().map { snapshot ->

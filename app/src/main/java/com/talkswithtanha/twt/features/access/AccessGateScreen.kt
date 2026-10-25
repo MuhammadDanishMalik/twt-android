@@ -110,7 +110,11 @@ private const val SAMPLE_CODE = "TWT-4H2K-9XQP"
  * neutral support email for people whose code does not work.
  */
 @Composable
-fun AccessGateScreen(viewModel: AccessGateViewModel = hiltViewModel()) {
+fun AccessGateScreen(
+    /** Set when opened from a lock inside the app: a close button instead of Sign out. */
+    onClose: (() -> Unit)? = null,
+    viewModel: AccessGateViewModel = hiltViewModel()
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val support by viewModel.support.collectAsStateWithLifecycle()
     val user by viewModel.user.collectAsStateWithLifecycle()
@@ -128,7 +132,17 @@ fun AccessGateScreen(viewModel: AccessGateViewModel = hiltViewModel()) {
     }
 
     LaunchedEffect(state.error) { if (state.error != null) Haptics.failure(haptics) }
-    LaunchedEffect(state.redeemed) { if (state.redeemed) Haptics.success(haptics) }
+    LaunchedEffect(state.redeemed) {
+        if (state.redeemed) {
+            Haptics.success(haptics)
+            // Opened from a lock: the badge opens, then back to what they
+            // were trying to use, which is now unlocked.
+            if (onClose != null) {
+                kotlinx.coroutines.delay(1400)
+                onClose()
+            }
+        }
+    }
 
     WebBackdrop {
         BoxWithConstraints(
@@ -148,7 +162,7 @@ fun AccessGateScreen(viewModel: AccessGateViewModel = hiltViewModel()) {
                     .padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                TopBar(onSignOut = viewModel::signOut)
+                TopBar(onSignOut = viewModel::signOut, onClose = onClose)
 
                 Column {
                     RiseIn { LockBadge(unlocked = state.redeemed) }
@@ -209,7 +223,7 @@ fun AccessGateScreen(viewModel: AccessGateViewModel = hiltViewModel()) {
 }
 
 @Composable
-private fun TopBar(onSignOut: () -> Unit) {
+private fun TopBar(onSignOut: () -> Unit, onClose: (() -> Unit)? = null) {
     Row(
         Modifier.padding(top = 12.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -221,11 +235,11 @@ private fun TopBar(onSignOut: () -> Unit) {
         )
         Spacer(Modifier.weight(1f))
         Text(
-            "Sign out",
+            if (onClose != null) "Not now" else "Sign out",
             style = WebType.small.copy(fontWeight = FontWeight.Medium),
             modifier = Modifier
                 .clip(CircleShape)
-                .clickable(onClick = onSignOut)
+                .clickable(onClick = onClose ?: onSignOut)
                 .padding(horizontal = 10.dp, vertical = 8.dp)
         )
     }

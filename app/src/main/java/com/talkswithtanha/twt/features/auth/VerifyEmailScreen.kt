@@ -1,6 +1,5 @@
 package com.talkswithtanha.twt.features.auth
 
-import kotlinx.coroutines.delay
 import com.talkswithtanha.twt.core.designsystem.readableWidth
 import com.talkswithtanha.twt.core.designsystem.WebColors
 import androidx.activity.compose.BackHandler
@@ -67,11 +66,11 @@ fun VerifyEmailScreen(
     // The two outcomes that matter on this screen, felt rather than read. A
     // member watching the keyboard rather than the screen still knows.
     LaunchedEffect(state.isDone) {
-        if (state.isDone) {
+        // With a code, the field plays its success sequence and moves on
+        // when it ends (onSuccessFinished below); with a link there is no
+        // field, so this is the moment.
+        if (state.isDone && state.method == VerifyMethod.LINK) {
             Haptics.success(haptics)
-            // Long enough to see the boxes close into the tick; the next
-            // screen then arrives as the end of the same motion.
-            if (state.method == VerifyMethod.CODE) delay(950)
             onVerified()
         }
     }
@@ -86,6 +85,11 @@ fun VerifyEmailScreen(
         onPauseOrDispose {}
     }
     val isLink = state.method == VerifyMethod.LINK
+
+    if (!isLink) {
+        CodeVerifySheet(state, viewModel, onVerified)
+        return
+    }
 
     Column(
         Modifier
@@ -201,5 +205,57 @@ fun VerifyEmailScreen(
         )
 
         Spacer(Modifier.height(40.dp))
+    }
+}
+
+/**
+ * Verifying by code: the dark sheet with the animated field. The field auto
+ * verifies at the last digit, plays its trace while the server checks, and
+ * hands over to the next screen when its success sequence ends.
+ */
+@Composable
+private fun CodeVerifySheet(state: EmailCodeUiState, viewModel: VerifyEmailViewModel, onVerified: () -> Unit) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(WebColors.Ink)
+            .safeDrawingPadding()
+            .imePadding()
+    ) {
+        Box(
+            Modifier
+                .padding(start = 24.dp, top = 8.dp)
+                .size(38.dp)
+                .clip(CircleShape)
+                .background(AuthSurface)
+                .clickable { viewModel.abandon() },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White, modifier = Modifier.size(18.dp))
+        }
+
+        OtpSheet(Modifier.align(Alignment.BottomCenter)) {
+            GlowOtpField(
+                state = state.otp,
+                code = state.code,
+                length = CODE_LENGTH,
+                onCodeChange = viewModel::onCodeChange,
+                onCodeComplete = { viewModel.submit() },
+                onResend = viewModel::send,
+                resendSeconds = state.secondsUntilResend,
+                subtitle = "We've sent a $CODE_LENGTH digit code to ${viewModel.email ?: "your email"}. It'll auto verify once entered.",
+                onSuccessFinished = onVerified
+            )
+            // A send that failed (not a wrong code) has its own line.
+            AuthError(state.error)
+            Spacer(Modifier.height(14.dp))
+            Text(
+                text = "Wrong address? Sign out and start again.",
+                color = Color.White.copy(alpha = 0.45f),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.clickable { viewModel.abandon() }
+            )
+        }
     }
 }

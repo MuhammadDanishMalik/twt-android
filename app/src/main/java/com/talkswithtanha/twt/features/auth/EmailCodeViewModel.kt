@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.auth
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.talkswithtanha.twt.core.session.ApiResult
@@ -28,6 +29,20 @@ private const val RESEND_SECONDS = 60
  * repeated sends on its own, so a longer wait here only slows honest members.
  */
 private const val LINK_RESEND_SECONDS = 30
+private const val KEY_CODE = "code"
+
+/**
+ * The server says "That code is not right. 3 attempts left." The field says
+ * it the way the member thinks of it, and keeps the count when there is one.
+ */
+private fun friendlyCodeError(server: String?): String {
+    val message = server.orEmpty()
+    if (message.startsWith("That code is not right")) {
+        val left = message.removePrefix("That code is not right.").trim()
+        return "That code didn't match. Try again." + if (left.isNotEmpty()) " $left" else ""
+    }
+    return message.ifBlank { "That code didn't match. Try again." }
+}
 
 /**
  * How an address gets confirmed in this build.
@@ -47,8 +62,21 @@ data class EmailCodeUiState(
     val error: String? = null,
     val notice: String? = null,
     val secondsUntilResend: Int = 0,
-    val isDone: Boolean = false
+    val isDone: Boolean = false,
+    /** A code the server refused, as distinct from a send that failed. */
+    val codeError: String? = null,
+    /** Counts refusals, so the same message twice still shakes twice. */
+    val codeAttempt: Int = 0
 ) {
+    /** What the animated code field shows. */
+    val otp: OtpUiState
+        get() = when {
+            isDone -> OtpUiState.Success
+            isSubmitting -> OtpUiState.Verifying
+            codeError != null -> OtpUiState.Error(codeError, codeAttempt)
+            else -> OtpUiState.Idle
+        }
+
     val canSubmit: Boolean
         get() = !isSubmitting && (method == VerifyMethod.LINK || code.length == CODE_LENGTH)
     val canResend: Boolean get() = secondsUntilResend == 0 && !isSending && !isSubmitting
@@ -65,12 +93,15 @@ data class EmailCodeUiState(
 @HiltViewModel
 class VerifyEmailViewModel @Inject constructor(
     private val api: AuthApi,
-    private val auth: AuthService
+    private val auth: AuthService,
+    private val saved: SavedStateHandle
 ) : ViewModel() {
 
     private val method = if (api.isConfigured) VerifyMethod.CODE else VerifyMethod.LINK
 
-    private val _state = MutableStateFlow(EmailCodeUiState(method = method))
+    // The typed code is kept in the saved state, so a rotation or the
+    // system reclaiming the app does not throw away half a code.
+    private val _state = MutableStateFlow(EmailCodeUiState(method = method, code = saved[KEY_CODE] ?: ""))
     val state: StateFlow<EmailCodeUiState> = _state.asStateFlow()
 
     /** The address the email went to, for the "we sent it to…" line. */
@@ -86,10 +117,13 @@ class VerifyEmailViewModel @Inject constructor(
 
     fun onCodeChange(value: String) {
         val digits = value.filter { it.isDigit() }.take(CODE_LENGTH)
-        _state.update { it.copy(code = digits, error = null) }
-        // Six digits can only mean one thing, so asking them to press a button
-        // as well is a step that exists for the app's benefit, not theirs.
-        if (digits.length == CODE_LENGTH) submit()
+        saved[KEY_CODE] = digits
+        _state.update {
+            // A refused code stays on screen while the field clears itself;
+            // the first new digit is what puts it away.
+            val typing = digits.length > it.code.length
+            it.copy(code = digits, error = null, codeError = if (typing) null else it.codeError)
+        }
     }
 
     fun send() = send(onArrival = false)
@@ -121,9 +155,12 @@ class VerifyEmailViewModel @Inject constructor(
                     _state.update { it.copy(isSending = false, isDone = true) }
                     return
                 }
+                saved[KEY_CODE] = ""
                 _state.update {
                     it.copy(
                         isSending = false,
+                        code = "",
+                        codeError = null,
                         notice = "Code sent to ${auth.currentEmail ?: "your inbox"}. Check Spam if it isn't there in a minute."
                     )
                 }
@@ -167,7 +204,7 @@ class VerifyEmailViewModel @Inject constructor(
     fun submit() {
         val current = _state.value
         if (!current.canSubmit) return
-        _state.update { it.copy(isSubmitting = true, error = null) }
+        _state.update { it.copy(isSubmitting = true, error = null, codeError = null) }
 
         viewModelScope.launch {
             when (method) {
@@ -201,9 +238,9 @@ class VerifyEmailViewModel @Inject constructor(
                 _state.update { it.copy(isSubmitting = false, isDone = true) }
             }
             is ApiResult.Failed -> _state.update {
-                // Cleared, because a rejected code is never worth resending
-                // and leaving it there invites exactly that.
-                it.copy(isSubmitting = false, error = result.message, code = "")
+                // The field shakes, then clears the digits itself, right to
+                // left; a rejected code is never worth resending.
+                it.copy(isSubmitting = false, codeError = friendlyCodeError(result.message), codeAttempt = it.codeAttempt + 1)
             }
         }
     }

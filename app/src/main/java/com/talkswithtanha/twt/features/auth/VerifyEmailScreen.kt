@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.auth
 
+import kotlinx.coroutines.delay
 import com.talkswithtanha.twt.core.designsystem.readableWidth
 import com.talkswithtanha.twt.core.designsystem.WebColors
 import androidx.activity.compose.BackHandler
@@ -68,6 +69,9 @@ fun VerifyEmailScreen(
     LaunchedEffect(state.isDone) {
         if (state.isDone) {
             Haptics.success(haptics)
+            // Long enough to see the boxes close into the tick; the next
+            // screen then arrives as the end of the same motion.
+            if (state.method == VerifyMethod.CODE) delay(950)
             onVerified()
         }
     }
@@ -143,7 +147,14 @@ fun VerifyEmailScreen(
             CodeInput(
                 code = state.code,
                 length = CODE_LENGTH,
-                enabled = !state.isSubmitting,
+                enabled = !state.isSubmitting && !state.isDone,
+                phase = when {
+                    state.isDone -> CodePhase.VERIFIED
+                    state.isSubmitting -> CodePhase.CHECKING
+                    state.error != null -> CodePhase.WRONG
+                    state.isSending && state.code.isEmpty() -> CodePhase.WAITING
+                    else -> CodePhase.IDLE
+                },
                 onCodeChange = viewModel::onCodeChange,
                 modifier = Modifier.fillMaxWidth()
             )

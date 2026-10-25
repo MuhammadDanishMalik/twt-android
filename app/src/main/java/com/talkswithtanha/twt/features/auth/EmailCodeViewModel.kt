@@ -303,8 +303,11 @@ class ResetPasswordViewModel @Inject constructor(
     fun onEmailChange(value: String) =
         _state.update { it.copy(email = value.trim(), error = null) }
 
-    fun onCodeChange(value: String) =
+    fun onCodeChange(value: String) {
         _state.update { it.copy(code = value.filter(Char::isDigit).take(CODE_LENGTH), error = null) }
+        // Six digits, typed or pasted, carry straight on to the new password.
+        if (_state.value.stage == ResetStage.CODE && _state.value.code.length == CODE_LENGTH) continueToPassword()
+    }
 
     fun onPasswordChange(value: String) =
         _state.update { it.copy(password = value, error = null) }

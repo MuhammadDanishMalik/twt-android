@@ -1,5 +1,22 @@
 package com.talkswithtanha.twt.features.auth
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.scaleIn
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.talkswithtanha.twt.core.designsystem.pressFlood
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -185,6 +202,23 @@ internal fun AuthError(message: String?, modifier: Modifier = Modifier) {
     }
 }
 
+/** Where a code entry stands, which decides how the boxes look and move. */
+internal enum class CodePhase {
+    /** Typing. */
+    IDLE,
+    /** The code is on its way: the empty boxes shimmer. */
+    WAITING,
+    /** The server is checking it: a shimmer sweeps across the digits. */
+    CHECKING,
+    /** Accepted: the boxes close into one green bar with a tick. */
+    VERIFIED,
+    /** Refused: the boxes shake once. */
+    WRONG
+}
+
+/** Six digits on their own, as a mail app copies a code: not part of a longer number. */
+private val CopiedCode = Regex("(?<!\\d)\\d{6}(?!\\d)")
+
 /**
  * Six boxes that hold one code.
  *
@@ -194,6 +228,12 @@ internal fun AuthError(message: String?, modifier: Modifier = Modifier) {
  * There is one real input underneath, transparent and full-bleed: six separate
  * fields mean six focus targets, backspace that jumps the wrong way, and a
  * paste that only fills the first box.
+ *
+ * A code copied in the mail app is filled in by itself the moment the member
+ * comes back — read when the window regains focus, because Android only lets
+ * the app in front read the clipboard. And the boxes say what is happening:
+ * they shimmer while the code travels or is checked, shake when it is wrong,
+ * and close into one bar with a tick when it is right.
  */
 @Composable
 internal fun CodeInput(
@@ -201,11 +241,15 @@ internal fun CodeInput(
     length: Int,
     enabled: Boolean,
     modifier: Modifier = Modifier,
+    phase: CodePhase = CodePhase.IDLE,
     onCodeChange: (String) -> Unit
 ) {
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val haptics = LocalHapticFeedback.current
+    val clipboard = LocalClipboardManager.current
+    val windowInfo = LocalWindowInfo.current
+    val merged = phase == CodePhase.VERIFIED
 
     // The keyboard comes up on arrival. This screen has exactly one job and
     // making somebody tap to start it is a step for nobody's benefit.
@@ -214,7 +258,40 @@ internal fun CodeInput(
         keyboard?.show()
     }
 
-    Box(modifier) {
+    // Auto-paste. Each copied code is tried once: a wrong one that was
+    // cleared must not keep coming back every time the window refocuses.
+    var lastPasted by remember { mutableStateOf<String?>(null) }
+    val latestCode by rememberUpdatedState(code)
+    val latestEnabled by rememberUpdatedState(enabled)
+    LaunchedEffect(Unit) {
+        snapshotFlow { windowInfo.isWindowFocused }.collect { focused ->
+            if (!focused || !latestEnabled || latestCode.isNotEmpty()) return@collect
+            val copied = runCatching { clipboard.getText()?.text }.getOrNull() ?: return@collect
+            val found = CopiedCode.find(copied)?.value?.take(length) ?: return@collect
+            if (found.length != length || found == lastPasted) return@collect
+            lastPasted = found
+            Haptics.success(haptics)
+            onCodeChange(found)
+        }
+    }
+
+    // One shake per refusal.
+    val shake = remember { Animatable(0f) }
+    LaunchedEffect(phase) {
+        if (phase != CodePhase.WRONG) return@LaunchedEffect
+        for (x in listOf(14f, -12f, 9f, -6f, 3f, 0f)) shake.animateTo(x, tween(55))
+    }
+
+    val shimmer = rememberInfiniteTransition(label = "shimmer")
+    val sweep by shimmer.animateFloat(
+        initialValue = -0.6f,
+        targetValue = 1.6f,
+        animationSpec = infiniteRepeatable(tween(1100, easing = LinearEasing), RepeatMode.Restart),
+        label = "sweep"
+    )
+    val gap by animateDpAsState(if (merged) 0.dp else 8.dp, spring(dampingRatio = 0.7f, stiffness = 300f), label = "gap")
+
+    Box(modifier.graphicsLayer { translationX = shake.value.dp.toPx() }) {
         BasicTextField(
             value = code,
             onValueChange = { next ->
@@ -223,7 +300,7 @@ internal fun CodeInput(
                 if (next.length > code.length) Haptics.key(haptics)
                 onCodeChange(next)
             },
-            enabled = enabled,
+            enabled = enabled && !merged,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
             // Transparent, not hidden: a field with no size cannot hold focus
             // and the keyboard closes itself.
@@ -236,45 +313,113 @@ internal fun CodeInput(
         )
 
         Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            Modifier.fillMaxWidth().semantics(mergeDescendants = true) {
+                contentDescription = when (phase) {
+                    CodePhase.VERIFIED -> "Code verified"
+                    CodePhase.CHECKING -> "Checking the code"
+                    else -> "Code, ${code.length} of $length digits entered"
+                }
+            },
+            horizontalArrangement = Arrangement.spacedBy(gap)
         ) {
             repeat(length) { index ->
                 val character = code.getOrNull(index)
                 // The next empty box is marked, so it is obvious where the
                 // typing is going without a blinking caret to chase.
-                val isNext = index == code.length
-                CodeCell(character, isNext && enabled, Modifier.weight(1f))
+                val isNext = index == code.length && enabled && phase == CodePhase.IDLE
+                val shimmering = phase == CodePhase.CHECKING || (phase == CodePhase.WAITING && character == null)
+                CodeCell(
+                    character = character,
+                    isNext = isNext,
+                    merged = merged,
+                    first = index == 0,
+                    last = index == length - 1,
+                    wrong = phase == CodePhase.WRONG,
+                    // Each box a beat behind the one before, so the light runs
+                    // along the row rather than flashing all six at once.
+                    shimmer = if (shimmering) sweep - index * 0.18f else null,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        // The tick, over the closed bar.
+        AnimatedVisibility(
+            visible = merged,
+            enter = fadeIn(tween(200, delayMillis = 180)) + scaleIn(spring(dampingRatio = 0.45f, stiffness = 400f), initialScale = 0.3f),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.Center)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(
+                    Modifier.size(30.dp).clip(CircleShape).background(WebColors.OnBrand),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Filled.Check, contentDescription = null, tint = WebColors.Brand, modifier = Modifier.size(20.dp))
+                }
+                Text("Verified", color = WebColors.OnBrand, fontSize = 17.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
 }
 
 @Composable
-private fun CodeCell(character: Char?, isNext: Boolean, modifier: Modifier = Modifier) {
+private fun CodeCell(
+    character: Char?,
+    isNext: Boolean,
+    merged: Boolean,
+    first: Boolean,
+    last: Boolean,
+    wrong: Boolean,
+    shimmer: Float?,
+    modifier: Modifier = Modifier
+) {
     val borderAlpha by animateFloatAsState(
-        targetValue = if (isNext) 0.55f else 0.10f,
+        targetValue = if (merged) 0f else if (isNext || wrong) 0.55f else 0.10f,
         animationSpec = Motion.quick(),
         label = "border"
     )
+    // The inside corners square off as the boxes meet, so six become one bar.
+    val inner by animateDpAsState(if (merged) 0.dp else 13.dp, spring(dampingRatio = 0.8f, stiffness = 300f), label = "corner")
+    val fill by animateColorAsState(if (merged) WebColors.Brand else AuthSurface, tween(320), label = "fill")
+    val digitAlpha by animateFloatAsState(if (merged) 0f else 1f, tween(160), label = "digit")
+    val shape = RoundedCornerShape(
+        topStart = if (first) 13.dp else inner,
+        bottomStart = if (first) 13.dp else inner,
+        topEnd = if (last) 13.dp else inner,
+        bottomEnd = if (last) 13.dp else inner
+    )
+    val borderColor = when {
+        wrong -> IosColors.SellRed.copy(alpha = borderAlpha)
+        isNext -> WebColors.Brand.copy(alpha = borderAlpha)
+        else -> Color.White.copy(alpha = borderAlpha)
+    }
 
     Box(
         modifier
             .height(58.dp)
-            .clip(RoundedCornerShape(13.dp))
-            .background(AuthSurface)
-            .border(
-                width = if (isNext) 1.5.dp else 1.dp,
-                color = if (isNext) WebColors.Brand.copy(alpha = borderAlpha)
-                else Color.White.copy(alpha = borderAlpha),
-                shape = RoundedCornerShape(13.dp)
-            ),
+            .clip(shape)
+            .background(fill)
+            .border(width = if (isNext) 1.5.dp else 1.dp, color = borderColor, shape = shape)
+            .drawWithContent {
+                drawContent()
+                if (shimmer != null) {
+                    val x = shimmer * size.width * 2f
+                    drawRect(
+                        Brush.linearGradient(
+                            listOf(Color.Transparent, Color.White.copy(alpha = 0.16f), Color.Transparent),
+                            start = Offset(x - size.width * 0.6f, 0f),
+                            end = Offset(x + size.width * 0.6f, size.height)
+                        )
+                    )
+                }
+            },
         contentAlignment = Alignment.Center
     ) {
         if (character != null) {
             Text(
                 text = character.toString(),
-                color = Color.White,
+                color = Color.White.copy(alpha = digitAlpha),
                 fontSize = 24.sp,
                 fontWeight = FontWeight.SemiBold
             )

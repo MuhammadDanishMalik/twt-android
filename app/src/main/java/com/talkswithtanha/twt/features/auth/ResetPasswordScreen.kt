@@ -182,6 +182,13 @@ private fun CodeStep(state: ResetUiState, viewModel: ResetPasswordViewModel) {
             code = state.code,
             length = CODE_LENGTH,
             enabled = !state.isSubmitting,
+            // Not checked until the new password is set, so no tick here —
+            // just a shake when the
+            // server later sends the member back with a wrong one.
+            phase = when {
+                state.error != null -> CodePhase.WRONG
+                else -> CodePhase.IDLE
+            },
             onCodeChange = viewModel::onCodeChange,
             modifier = Modifier.fillMaxWidth()
         )

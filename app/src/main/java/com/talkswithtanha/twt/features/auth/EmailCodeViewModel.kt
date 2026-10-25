@@ -232,9 +232,10 @@ class VerifyEmailViewModel @Inject constructor(
         }
         when (val result = api.verifyEmail(token, code)) {
             is ApiResult.Ok -> {
-                // The Admin SDK set the flag; this phone's cached user has
-                // no idea until it asks again.
-                auth.reload()
+                // Verified on the server. The phone is not told yet: reloading
+                // flips the app's gate, which replaces this screen at once, and
+                // the member would never see the tick or the Done button. That
+                // happens in finish(), when they tap Done.
                 _state.update { it.copy(isSubmitting = false, isDone = true) }
             }
             is ApiResult.Failed -> _state.update {
@@ -243,6 +244,16 @@ class VerifyEmailViewModel @Inject constructor(
                 it.copy(isSubmitting = false, codeError = friendlyCodeError(result.message), codeAttempt = it.codeAttempt + 1)
             }
         }
+    }
+
+    /**
+     * Done, after the success animation: now the phone learns the address is
+     * verified, and the gate carries on to the next screen. If the reload
+     * fails the server still holds the verification, so the next launch
+     * walks straight through.
+     */
+    fun finish() {
+        viewModelScope.launch { auth.reload() }
     }
 
     /**

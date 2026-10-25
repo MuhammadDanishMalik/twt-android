@@ -49,6 +49,9 @@ data class ProfileSetupUiState(
     val stepIndex: Int get() = steps.indexOf(step).coerceAtLeast(0)
     val isLastStep: Boolean get() = step == steps.last()
 
+    /** Everything but the name can wait: a member with a name may skip the rest. */
+    val canSkip: Boolean get() = !isSaving && !isUploadingPhoto && fullName.isNotBlank()
+
     val canContinue: Boolean
         get() = !isSaving && !isUploadingPhoto && when (step) {
             SetupStep.ABOUT -> fullName.isNotBlank() && country.length == 2
@@ -147,6 +150,21 @@ class ProfileSetupViewModel @Inject constructor(
             return
         }
         _state.update { it.copy(step = it.steps[it.stepIndex + 1]) }
+    }
+
+    /**
+     * Skips the remaining questions and saves what is there. The name is the
+     * one thing that cannot be skipped — it is how Tanha and the chat know who
+     * somebody is — so without one this goes back to it and says so.
+     */
+    fun skip() {
+        val current = _state.value
+        if (current.isSaving || current.isUploadingPhoto) return
+        if (current.fullName.isBlank()) {
+            _state.update { it.copy(step = SetupStep.ABOUT, error = "Add your name to carry on. It's the one thing we need.") }
+            return
+        }
+        save()
     }
 
     /** False when there is no earlier step, so the screen knows to let back through. */

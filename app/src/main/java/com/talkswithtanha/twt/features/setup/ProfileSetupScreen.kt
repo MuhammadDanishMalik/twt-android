@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.setup
 
+import androidx.compose.ui.text.style.TextAlign
 import com.talkswithtanha.twt.core.designsystem.readableWidth
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.runtime.mutableIntStateOf
@@ -235,6 +236,22 @@ fun ProfileSetupScreen(viewModel: ProfileSetupViewModel = hiltViewModel()) {
                     enabled = state.canContinue,
                     loading = state.isSaving,
                     icon = Icons.AutoMirrored.Filled.ArrowForward
+                )
+                // The questions can wait; the name cannot. Shown on every
+                // step, live once there is a name.
+                Text(
+                    if (state.fullName.isBlank()) "Add your name to skip the rest" else "Skip for now",
+                    style = WebType.small.copy(
+                        fontWeight = FontWeight.Medium,
+                        color = if (state.canSkip) WebColors.Text else WebColors.Text.copy(alpha = 0.35f)
+                    ),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 6.dp)
+                        .clip(CircleShape)
+                        .clickable(enabled = !state.isSaving, onClick = viewModel::skip)
+                        .padding(vertical = 10.dp)
                 )
             }
         }

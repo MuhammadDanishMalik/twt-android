@@ -87,7 +87,7 @@ fun VerifyEmailScreen(
     val isLink = state.method == VerifyMethod.LINK
 
     if (!isLink) {
-        CodeVerifySheet(state, viewModel, onVerified)
+        CodeVerifySheet(state, viewModel)
         return
     }
 
@@ -211,10 +211,10 @@ fun VerifyEmailScreen(
 /**
  * Verifying by code: the dark sheet with the animated field. The field auto
  * verifies at the last digit, plays its trace while the server checks, and
- * hands over to the next screen when its success sequence ends.
+ * on success turns into a Done button that carries on to the next screen.
  */
 @Composable
-private fun CodeVerifySheet(state: EmailCodeUiState, viewModel: VerifyEmailViewModel, onVerified: () -> Unit) {
+private fun CodeVerifySheet(state: EmailCodeUiState, viewModel: VerifyEmailViewModel) {
     Box(
         Modifier
             .fillMaxSize()
@@ -244,7 +244,7 @@ private fun CodeVerifySheet(state: EmailCodeUiState, viewModel: VerifyEmailViewM
                 onResend = viewModel::send,
                 resendSeconds = state.secondsUntilResend,
                 subtitle = "We've sent a $CODE_LENGTH digit code to ${viewModel.email ?: "your email"}. It'll auto verify once entered.",
-                onSuccessFinished = onVerified
+                onDone = viewModel::finish
             )
             // A send that failed (not a wrong code) has its own line.
             AuthError(state.error)

@@ -36,6 +36,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -177,7 +180,8 @@ fun OtpSheet(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
  *   rotation and process death.
  * @param resendSeconds seconds until Resend is allowed; the view model counts
  *   it down, 0 means it is live now.
- * @param onSuccessFinished called once, 700ms after the success sequence ends.
+ * @param onDone called when the member taps the Done button the verified box
+ *   turns into at the end of the success sequence.
  */
 @Composable
 fun GlowOtpField(
@@ -193,7 +197,8 @@ fun GlowOtpField(
     title: String = "Let's verify your email",
     subtitle: String = "We've sent a $length digit code to your email. It'll auto verify once entered.",
     successTitle: String = "Verified successfully",
-    onSuccessFinished: () -> Unit = {},
+    doneLabel: String = "Done",
+    onDone: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -215,7 +220,6 @@ fun GlowOtpField(
     val latestCode by rememberUpdatedState(code)
     val latestState by rememberUpdatedState(state)
     val latestOnChange by rememberUpdatedState(onCodeChange)
-    val latestOnFinished by rememberUpdatedState(onSuccessFinished)
 
     val inputEnabled = state is OtpUiState.Idle || (state is OtpUiState.Error && code.isEmpty())
 
@@ -301,6 +305,9 @@ fun GlowOtpField(
     val errorMix = remember { Animatable(0f) }
     val shake = remember { Animatable(0f) }
     var finishedSuccess by remember { mutableStateOf(false) }
+    // The verified box growing into the Done button, 0 → 1.
+    val toButton = remember { Animatable(0f) }
+    var doneTapped by remember { mutableStateOf(false) }
 
     LaunchedEffect(state) {
         when (state) {
@@ -335,7 +342,7 @@ fun GlowOtpField(
                 breathe.snapTo(1f)
                 if (inspection) {
                     // Previews show the end frame.
-                    listOf(full, fill, headerOut, digitsOut, merge, check, successIn).forEach { it.snapTo(1f) }
+                    listOf(full, fill, headerOut, digitsOut, merge, check, successIn, toButton).forEach { it.snapTo(1f) }
                     bgGlow.snapTo(0.18f)
                     return@LaunchedEffect
                 }
@@ -371,8 +378,10 @@ fun GlowOtpField(
                 }
                 haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                 finishedSuccess = true
-                delay(700)
-                latestOnFinished()
+                // A beat on the tick, then the box opens out into the button
+                // that carries on — the member moves on when they choose to.
+                delay(if (reducedMotion) 0 else 450)
+                if (reducedMotion) toButton.snapTo(1f) else toButton.animateTo(1f, spring(dampingRatio = 0.72f, stiffness = 260f))
             }
             is OtpUiState.Error -> {
                 cometOn = false
@@ -506,7 +515,10 @@ fun GlowOtpField(
                     Modifier
                         .width(rowWidth + 48.dp)
                         .height(box + 48.dp)
-                        .graphicsLayer { translationX = shake.value.dp.toPx() }
+                        .graphicsLayer {
+                            translationX = shake.value.dp.toPx()
+                            alpha = 1f - toButton.value
+                        }
                         .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, enabled = inputEnabled) {
                             runCatching { focusRequester.requestFocus() }
                             keyboard?.show()
@@ -622,6 +634,46 @@ fun GlowOtpField(
                                 center = c + Offset(cos(angle) * dist, sin(angle) * dist)
                             )
                         }
+                    }
+                }
+
+                // The verified box opening out into the Done button: same
+                // place, same light, growing to the row's width and turning
+                // solid as the tick gives way to the word.
+                val t = toButton.value
+                if (t > 0f) {
+                    val buttonWidth = maxOf(rowWidth, 220.dp)
+                    val w = box + (buttonWidth - box) * t
+                    val h = box + (52.dp - box) * t
+                    val corner = 14.dp + (26.dp - 14.dp) * t
+                    val shape = RoundedCornerShape(corner)
+                    Box(
+                        Modifier
+                            .width(w)
+                            .height(h)
+                            .clip(shape)
+                            .background(lerp(accent.copy(alpha = 0.25f).compositeOver(BoxFill), accent, t))
+                            .clickable(enabled = t > 0.9f && !doneTapped) {
+                                doneTapped = true
+                                haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                                onDone()
+                            }
+                            .semantics { contentDescription = doneLabel },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Filled.Check,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = (1f - t * 1.6f).coerceIn(0f, 1f)),
+                            modifier = Modifier.size(26.dp)
+                        )
+                        Text(
+                            doneLabel,
+                            color = WebColors.OnBrand.copy(alpha = ((t - 0.4f) / 0.6f).coerceIn(0f, 1f)),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
                     }
                 }
             }

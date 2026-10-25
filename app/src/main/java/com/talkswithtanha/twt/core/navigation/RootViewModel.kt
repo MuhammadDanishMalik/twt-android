@@ -41,6 +41,9 @@ class RootViewModel @Inject constructor(
 
         /** Had a code, and it ran out. This device is signed out — see RootScreen. */
         AccessExpired,
+
+        /** An IB member whose month ended: renew with an IB analytics screenshot. */
+        IbRenewal,
         Allowed
     }
 
@@ -78,6 +81,11 @@ class RootViewModel @Inject constructor(
                 // once. Members who already have access never see it — it is
                 // for getting to know new people, not a toll on existing ones.
                 user?.profileSetupAt == null -> Gate.NeedsProfileSetup
+
+                // IB members renew by showing their IB analytics, not by
+                // paying, so a lapsed one is asked for the screenshot rather
+                // than signed out.
+                user?.ibRenewalNeeded == true -> Gate.IbRenewal
 
                 // A code that has run out signs this device out; a member who
                 // has simply not redeemed one yet goes to the gate. Both have

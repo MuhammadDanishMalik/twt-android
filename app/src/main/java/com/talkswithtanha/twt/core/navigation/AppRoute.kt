@@ -25,6 +25,11 @@ sealed class AppRoute(val route: String) {
     data object ProfileSetup : AppRoute("profileSetup")
     data object AccessGate : AppRoute("accessGate")
 
+    /** IB members renewing their month; [expired] decides whether they can leave. */
+    data object IbRenewal : AppRoute("ibRenewal?expired={expired}") {
+        fun of(expired: Boolean) = "ibRenewal?expired=$expired"
+    }
+
     // ── Bottom bar ───────────────────────────────────────────────────────
     data object Home : AppRoute("home")
     data object Signals : AppRoute("signals")

@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.core.navigation
 
+import com.talkswithtanha.twt.features.membership.IbRenewalScreen
 import com.talkswithtanha.twt.features.academy.LessonPlayerScreen
 import android.content.Intent
 import androidx.compose.animation.slideInVertically
@@ -154,6 +155,20 @@ fun AppNavHost(
             screen(sharedScope, AppRoute.ProfileSetup.route) { ProfileSetupScreen() }
 
             screen(sharedScope, AppRoute.AccessGate.route) { AccessGateScreen() }
+
+            // Expired: the gate's own screen, no way back into the app until
+            // the team accepts. From the reminder: closable, back to where
+            // they were.
+            screen(
+                sharedScope,
+                AppRoute.IbRenewal.route,
+                arguments = listOf(androidx.navigation.navArgument("expired") { defaultValue = "false" })
+            ) { entry ->
+                IbRenewalScreen(
+                    expired = entry.arguments?.getString("expired") == "true",
+                    onClose = { navController.popBackStack() }
+                )
+            }
 
         // ── Bottom bar ───────────────────────────────────────────────────
             screen(sharedScope, AppRoute.Home.route) {

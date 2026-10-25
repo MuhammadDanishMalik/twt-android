@@ -101,6 +101,22 @@ data class User(
     val accessExpired: Boolean
         get() = accessCode != null && membershipExpiresAt?.before(Date()) == true
 
+    /**
+     * Joined through Tanha's IB link, by their own answer in profile setup.
+     * Their month renews by showing the IB analytics, not by paying — see
+     * IbRenewalScreen.
+     */
+    val isIbMember: Boolean get() = tradingProfile?.ibStatus == IbStatus.YES
+
+    /** An IB member whose month ends within three days: time to renew. */
+    val ibRenewalDueSoon: Boolean
+        get() = isIbMember && hasAppAccess && membershipExpiresAt != null &&
+            membershipExpiresAt.time - System.currentTimeMillis() < 3L * 24 * 3600 * 1000
+
+    /** An IB member whose month has ended: renewal stands between them and the app. */
+    val ibRenewalNeeded: Boolean
+        get() = isIbMember && !hasAppAccess && membershipExpiresAt != null
+
     val isStaff: Boolean get() = role == UserRole.OWNER || role == UserRole.ADMIN
 
     /**

@@ -1,5 +1,7 @@
 package com.talkswithtanha.twt.core.navigation
 
+import com.talkswithtanha.twt.features.membership.IbRenewalReminder
+import androidx.compose.foundation.layout.statusBarsPadding
 import com.talkswithtanha.twt.features.marketplace.DealPulseOverlay
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -102,6 +104,7 @@ fun RootScreen(
             RootViewModel.Gate.NeedsEmailVerification -> AppRoute.VerifyEmail.route
             RootViewModel.Gate.NeedsProfileSetup -> AppRoute.ProfileSetup.route
             RootViewModel.Gate.NeedsAccessCode -> AppRoute.AccessGate.route
+            RootViewModel.Gate.IbRenewal -> AppRoute.IbRenewal.of(expired = true)
             // Signed out first, then sent to the front door with a reason.
             RootViewModel.Gate.AccessExpired -> {
                 viewModel.signOutForExpiredAccess()
@@ -222,6 +225,14 @@ fun RootScreen(
                 pillBottom = if (showsBar) 104.dp else 28.dp,
                 onOpenDeal = { navController.navigate(AppRoute.DealDetail.of(it)) { launchSingleTop = true } },
                 onOpenDeals = { navController.navigate(AppRoute.MyDeals.route) { launchSingleTop = true } }
+            )
+        }
+
+        // An IB member's last three days: renew from here.
+        if (gate == RootViewModel.Gate.Allowed && showsBar) {
+            IbRenewalReminder(
+                onOpen = { navController.navigate(AppRoute.IbRenewal.of(expired = false)) { launchSingleTop = true } },
+                modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding()
             )
         }
 

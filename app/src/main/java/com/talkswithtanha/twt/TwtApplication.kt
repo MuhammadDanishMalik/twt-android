@@ -41,6 +41,7 @@ class TwtApplication : Application() {
         fun pushTokens(): PushTokenRegistrar
         fun followedSignals(): FollowedSignalTracker
         fun activity(): ActivityTracker
+        fun marketAlerts(): com.talkswithtanha.twt.core.notifications.MarketAlerts
     }
 
     override fun onCreate() {
@@ -74,6 +75,9 @@ class TwtApplication : Application() {
         entryPoint.followedSignals().start()
         // Time in the app and the member's activity timeline, for the admin panel.
         entryPoint.activity().start()
+        // Session opens and COT reports: subscribe this device to the topics
+        // the member has left on (both, by default).
+        entryPoint.marketAlerts().start()
     }
 
     private companion object {

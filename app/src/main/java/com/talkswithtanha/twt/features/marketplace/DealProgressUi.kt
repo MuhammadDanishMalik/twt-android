@@ -1,7 +1,5 @@
 package com.talkswithtanha.twt.features.marketplace
 
-import android.media.AudioManager
-import android.media.ToneGenerator
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -205,6 +203,7 @@ fun TurnCard(progress: DealProgress, sound: Boolean, modifier: Modifier = Modifi
 private fun Countdown(deadline: Date, words: (String) -> String, alarm: Boolean, sound: Boolean) {
     val now = rememberNow()
     val view = LocalView.current
+    val sounds = com.talkswithtanha.twt.core.sound.rememberAppSounds()
     val left = deadline.time - now
     val urgent = alarm && left in 1..120_000
     var warnedFor by rememberSaveable { mutableLongStateOf(0L) }
@@ -213,12 +212,7 @@ private fun Countdown(deadline: Date, words: (String) -> String, alarm: Boolean,
         if (!urgent || !sound || warnedFor == deadline.time) return@LaunchedEffect
         warnedFor = deadline.time
         view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-        runCatching {
-            val tone = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 35)
-            tone.startTone(ToneGenerator.TONE_PROP_BEEP, 180)
-            delay(400)
-            tone.release()
-        }
+        sounds.play(com.talkswithtanha.twt.core.sound.AppSounds.Sound.ALERT)
     }
 
     val span = 30 * 60_000f

@@ -25,6 +25,9 @@ object NotificationChannels {
     /** New signals published, and community replies. */
     const val GENERAL = "general"
 
+    /** Market sessions opening and the weekly COT report. */
+    const val MARKET_UPDATES = "market_updates"
+
     fun register(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService<NotificationManager>() ?: return
@@ -57,6 +60,16 @@ object NotificationChannels {
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
                 description = "New signals from Tanha, and replies in the community."
+            }
+        )
+
+        manager.createNotificationChannel(
+            NotificationChannel(
+                MARKET_UPDATES,
+                "Market sessions and reports",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "Sydney, Tokyo, London and New York opening, and the weekly COT report."
             }
         )
     }

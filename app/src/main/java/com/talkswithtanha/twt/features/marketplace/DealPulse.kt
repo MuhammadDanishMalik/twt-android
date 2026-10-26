@@ -1,7 +1,5 @@
 package com.talkswithtanha.twt.features.marketplace
 
-import android.media.AudioManager
-import android.media.ToneGenerator
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -80,7 +78,8 @@ data class DealNews(val dealId: String, val title: String, val body: String, val
 class DealPulseViewModel @Inject constructor(
     session: SessionRepository,
     deals: DealRepository,
-    prefs: PrefsRepository
+    prefs: PrefsRepository,
+    private val sounds: com.talkswithtanha.twt.core.sound.AppSounds
 ) : ViewModel() {
 
     private val mine: StateFlow<List<Deal>> = session.currentUser
@@ -116,7 +115,7 @@ class DealPulseViewModel @Inject constructor(
                     known[deal.id] = deal.status
                     if (before == null || before == deal.status) continue
                     _news.value = DealNews(deal.id, "Deal ${deal.reference}", words(deal), System.currentTimeMillis())
-                    if (sound.value) chime()
+                    sounds.play(soundFor(deal.status))
                 }
             }
         }
@@ -136,16 +135,12 @@ class DealPulseViewModel @Inject constructor(
         DealStatus.AWAITING_PAYMENT -> "Deal opened."
     }
 
-    /** Two quiet beeps on the notification stream. A missed tone is fine. */
-    private fun chime() {
-        viewModelScope.launch {
-            runCatching {
-                val tone = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 30)
-                tone.startTone(ToneGenerator.TONE_PROP_ACK, 160)
-                delay(400)
-                tone.release()
-            }
-        }
+    /** The member's turn is important; money arriving is success; a stop is an alert. */
+    private fun soundFor(status: DealStatus) = when (status) {
+        DealStatus.PAYMENT_APPROVED -> com.talkswithtanha.twt.core.sound.AppSounds.Sound.IMPORTANT
+        DealStatus.COMPLETED -> com.talkswithtanha.twt.core.sound.AppSounds.Sound.SUCCESS
+        DealStatus.CANCELLED, DealStatus.DISPUTED -> com.talkswithtanha.twt.core.sound.AppSounds.Sound.ALERT
+        else -> com.talkswithtanha.twt.core.sound.AppSounds.Sound.MESSAGE
     }
 }
 

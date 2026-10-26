@@ -120,6 +120,7 @@ fun AccessGateScreen(
     val user by viewModel.user.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
+    val sounds = com.talkswithtanha.twt.core.sound.rememberAppSounds()
 
     fun open(url: String) {
         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) }
@@ -135,6 +136,7 @@ fun AccessGateScreen(
     LaunchedEffect(state.redeemed) {
         if (state.redeemed) {
             Haptics.success(haptics)
+            sounds.play(com.talkswithtanha.twt.core.sound.AppSounds.Sound.SUCCESS)
             // Opened from a lock: the badge opens, then back to what they
             // were trying to use, which is now unlocked.
             if (onClose != null) {

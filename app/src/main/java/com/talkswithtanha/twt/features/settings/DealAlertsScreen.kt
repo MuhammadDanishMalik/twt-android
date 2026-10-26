@@ -62,7 +62,8 @@ import javax.inject.Inject
 @HiltViewModel
 class DealAlertsViewModel @Inject constructor(
     private val session: SessionRepository,
-    private val prefs: PrefsRepository
+    private val prefs: PrefsRepository,
+    val marketAlerts: com.talkswithtanha.twt.core.notifications.MarketAlerts
 ) : ViewModel() {
 
     val live: StateFlow<NotificationPrefs?> = session.currentUser
@@ -109,7 +110,7 @@ fun DealAlertsScreen(onClose: () -> Unit, viewModel: DealAlertsViewModel = hiltV
 
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(Modifier.fillMaxSize().background(IosColors.Background).statusBarsPadding().imePadding()) {
-            SheetHeader("Exchange alerts", onClose)
+            SheetHeader("Alerts & sounds", onClose)
             Column(
                 Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -156,9 +157,33 @@ fun DealAlertsScreen(onClose: () -> Unit, viewModel: DealAlertsViewModel = hiltV
                     color = IosColors.TextSecondary,
                     fontSize = 12.5.sp
                 )
+                SettingsSectionHeader("Market alerts")
+                val market by viewModel.marketAlerts.choices.collectAsStateWithLifecycle()
                 SettingsCard {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Sounds and the two-minute buzz on deals", color = Color.White, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                        Column(Modifier.weight(1f)) {
+                            Text("Market sessions opening", color = Color.White, fontSize = 15.sp)
+                            Text("Sydney, Tokyo, London and New York", color = IosColors.TextSecondary, fontSize = 12.sp)
+                        }
+                        Switch(market.sessions, viewModel.marketAlerts::setSessions, colors = SwitchDefaults.colors(checkedTrackColor = IosColors.BuyGreen))
+                    }
+                    SettingsDivider()
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("COT report out", color = Color.White, fontSize = 15.sp)
+                            Text("Every Friday, how the funds are positioned", color = IosColors.TextSecondary, fontSize = 12.sp)
+                        }
+                        Switch(market.cot, viewModel.marketAlerts::setCot, colors = SwitchDefaults.colors(checkedTrackColor = IosColors.BuyGreen))
+                    }
+                }
+
+                SettingsSectionHeader("Sounds")
+                SettingsCard {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("In-app sounds", color = Color.White, fontSize = 15.sp)
+                            Text("New signals, deals, chat replies and alerts while the app is open", color = IosColors.TextSecondary, fontSize = 12.sp)
+                        }
                         Switch(prefs.sound, { edit = prefs.copy(sound = it) }, colors = SwitchDefaults.colors(checkedTrackColor = IosColors.BuyGreen))
                     }
                 }

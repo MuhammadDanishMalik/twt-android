@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.core.notifications
 
+import com.talkswithtanha.twt.core.sound.AppSounds.Sound
 import android.Manifest
 import android.app.PendingIntent
 import android.content.Intent
@@ -42,6 +43,7 @@ class TwtMessagingService : FirebaseMessagingService() {
 
     @Inject lateinit var session: SessionRepository
     @Inject lateinit var scope: CoroutineScope
+    @Inject lateinit var sounds: com.talkswithtanha.twt.core.sound.AppSounds
 
     /**
      * Fires when FCM mints a token: first launch, an app data clear, a restore
@@ -66,18 +68,39 @@ class TwtMessagingService : FirebaseMessagingService() {
         // edit is only ever sent to the members the fan-out found in
         // `signalFollows`, so anything arriving with those kinds is already
         // meant for this person.
-        val channel = when (data[KEY_KIND]) {
-            // A deal is somebody's money moving: as prominent as a stop loss.
-            KIND_STATUS, KIND_UPDATED, KIND_DEAL -> NotificationChannels.SIGNAL_ALERTS
+        val kind = data[KEY_KIND]
+        val channel = when (kind) {
+            // A deal is somebody's money moving, and a new signal is the thing
+            // members are here for: both as prominent as a stop loss.
+            KIND_STATUS, KIND_UPDATED, KIND_DEAL, KIND_PUBLISHED -> NotificationChannels.SIGNAL_ALERTS
+            KIND_SESSION, KIND_COT -> NotificationChannels.MARKET_UPDATES
             else -> NotificationChannels.GENERAL
         }
 
+        // With the app open, the app's own sound plays and the notification
+        // goes into the shade silently — one sound per event, never two.
+        val foreground = sounds.isForeground
+        if (foreground) sounds.play(soundFor(kind, data["status"]))
+
         // A desk alert names somebody else's deal, which the member deal screen
         // cannot read; staff open it from the admin area instead.
-        post(channel, title, body, signalId, data[KEY_DEAL_ID].takeIf { data["desk"] != "1" })
+        post(channel, title, body, signalId, data[KEY_DEAL_ID].takeIf { data["desk"] != "1" }, silent = foreground)
     }
 
-    private fun post(channel: String, title: String, body: String, signalId: String?, dealId: String? = null) {
+    /** Which of the four app sounds an incoming push deserves. */
+    private fun soundFor(kind: String?, status: String?): Sound {
+        return when (kind) {
+            KIND_PUBLISHED, KIND_DEAL, KIND_COT -> Sound.IMPORTANT
+            KIND_STATUS -> when {
+                status == null -> Sound.IMPORTANT
+                status.contains("✗") || status.contains("SL", ignoreCase = true) -> Sound.ALERT
+                else -> Sound.SUCCESS
+            }
+            else -> Sound.MESSAGE
+        }
+    }
+
+    private fun post(channel: String, title: String, body: String, signalId: String?, dealId: String? = null, silent: Boolean = false) {
         if (!canPost()) return
 
         val intent = Intent(this, MainActivity::class.java).apply {
@@ -100,6 +123,7 @@ class TwtMessagingService : FirebaseMessagingService() {
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setAutoCancel(true)
+            .setSilent(silent)
             .setPriority(
                 if (channel == NotificationChannels.SIGNAL_ALERTS) {
                     NotificationCompat.PRIORITY_HIGH
@@ -133,6 +157,9 @@ class TwtMessagingService : FirebaseMessagingService() {
         const val KEY_KIND = "kind"
         const val KEY_DEAL_ID = "dealId"
         const val KIND_DEAL = "deal"
+        const val KIND_PUBLISHED = "published"
+        const val KIND_SESSION = "session"
+        const val KIND_COT = "cot"
         const val KEY_TITLE = "title"
         const val KEY_BODY = "body"
 

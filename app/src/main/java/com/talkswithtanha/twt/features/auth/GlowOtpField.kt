@@ -210,6 +210,7 @@ fun GlowOtpField(
     val scope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
     val measurer = rememberTextMeasurer()
+    val sounds = com.talkswithtanha.twt.core.sound.rememberAppSounds()
 
     // System animations off means motion off here too: no trace, no merge,
     // no sparks, just a crossfade to the tick.
@@ -377,6 +378,7 @@ fun GlowOtpField(
                     bgGlow.animateTo(0.18f, tween(300))
                 }
                 haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                sounds.play(com.talkswithtanha.twt.core.sound.AppSounds.Sound.SUCCESS)
                 finishedSuccess = true
                 // A beat on the tick, then the box opens out into the button
                 // that carries on — the member moves on when they choose to.
@@ -388,6 +390,7 @@ fun GlowOtpField(
                 breathe.snapTo(1f)
                 trace.snapTo(0f)
                 haptics.performHapticFeedback(HapticFeedbackType.Reject)
+                sounds.play(com.talkswithtanha.twt.core.sound.AppSounds.Sound.ALERT)
                 coroutineScope {
                     launch { errorMix.animateTo(1f, tween(200)) }
                     launch {

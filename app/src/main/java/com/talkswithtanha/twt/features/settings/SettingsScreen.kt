@@ -288,8 +288,8 @@ fun SettingsScreen(
                     )
                     SettingsDivider()
                     SettingsRow(
-                        title = "Exchange alerts & security",
-                        subtitle = "Anti-phishing code, email and push",
+                        title = "Alerts, sounds & security",
+                        subtitle = "Market alerts, sounds, deal alerts, anti-phishing code",
                         icon = Icons.Filled.Security,
                         tint = IosColors.SettingsIcon.Deals,
                         onClick = { showDealAlerts = true }

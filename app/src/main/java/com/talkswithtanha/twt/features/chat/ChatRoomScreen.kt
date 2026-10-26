@@ -127,6 +127,17 @@ fun ChatRoomScreen(
     // Stick to the newest message. Keyed on the count rather than the list, so
     // an edit or a reaction on an old message does not yank the view to the
     // bottom while somebody is reading history.
+    val sounds = com.talkswithtanha.twt.core.sound.rememberAppSounds()
+    var heardUpTo by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(state.messages.lastOrNull()?.id) {
+        val last = state.messages.lastOrNull() ?: return@LaunchedEffect
+        // The first load is history; after it, a new message from somebody
+        // else is worth a sound.
+        if (heardUpTo != null && last.id != heardUpTo && !last.isCurrentUser) {
+            sounds.play(com.talkswithtanha.twt.core.sound.AppSounds.Sound.MESSAGE)
+        }
+        heardUpTo = last.id
+    }
     LaunchedEffect(state.messages.size) {
         if (state.messages.isNotEmpty()) {
             listState.animateScrollToItem(state.messages.lastIndex)

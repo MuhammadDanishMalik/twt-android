@@ -181,6 +181,14 @@ fun IbRenewalScreen(
         if (uri != null) viewModel.onPicked(context, uri)
     }
     val latest = state.latest
+    val sounds = com.talkswithtanha.twt.core.sound.rememberAppSounds()
+    var lastStatus by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<IbRenewal.Status?>(null) }
+    androidx.compose.runtime.LaunchedEffect(latest?.status) {
+        val now = latest?.status
+        if (lastStatus == IbRenewal.Status.PENDING && now == IbRenewal.Status.APPROVED) sounds.play(com.talkswithtanha.twt.core.sound.AppSounds.Sound.SUCCESS)
+        if (lastStatus == IbRenewal.Status.PENDING && now == IbRenewal.Status.DECLINED) sounds.play(com.talkswithtanha.twt.core.sound.AppSounds.Sound.ALERT)
+        lastStatus = now
+    }
     // What to show: the request under review, the one declined (until they
     // choose to start over), or the form.
     val stage = when {

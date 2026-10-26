@@ -327,16 +327,29 @@ fun ReceiveAccountSheet(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 RECEIVE_METHODS.forEach { m ->
                     val on = m == method
-                    Text(
-                        m.substringBefore(" ("),
-                        color = if (on) Color.Black else Color.White,
-                        fontSize = 12.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(if (on) IosColors.BuyGreen else Field)
-                            .clickable { method = m }.padding(vertical = 11.dp).semantics { contentDescription = m },
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
+                    // The method's own mark above its name; the picked one
+                    // ringed in green rather than filled, so the logo stays legible.
+                    Column(
+                        Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (on) IosColors.BuyGreen.copy(alpha = 0.14f) else Field)
+                            .border(1.5.dp, if (on) IosColors.BuyGreen else Color.Transparent, RoundedCornerShape(12.dp))
+                            .clickable { method = m }
+                            .padding(vertical = 10.dp)
+                            .semantics(mergeDescendants = true) { contentDescription = m },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        com.talkswithtanha.twt.core.designsystem.components.PaymentMethodIcon(m, size = 30.dp)
+                        Text(
+                            m.substringBefore(" (").replace("Bank Transfer", "Bank"),
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(20.dp))

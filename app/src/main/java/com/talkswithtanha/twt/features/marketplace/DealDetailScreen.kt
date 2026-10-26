@@ -327,7 +327,10 @@ private fun PayIntoCard(
     val account = deal.sellerAccount ?: return
 
     Column(modifier.fillMaxWidth()) {
-        SectionLabel("SEND TO ${account.method.uppercase().ifBlank { "THE SELLER" }}")
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            com.talkswithtanha.twt.core.designsystem.components.PaymentMethodIcon(account.method, size = 20.dp)
+            SectionLabel("SEND TO ${account.method.uppercase().ifBlank { "THE SELLER" }}")
+        }
         Spacer(Modifier.height(8.dp))
         Column(
             Modifier

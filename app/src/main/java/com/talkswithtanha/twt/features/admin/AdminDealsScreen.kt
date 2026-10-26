@@ -227,11 +227,14 @@ private fun DealCard(deal: Deal, isWorking: Boolean, onAction: (PendingDealActio
             Text("Their payment ref: $it", color = IosColors.TextSecondary, fontSize = 12.sp)
         }
         deal.receivingAccount?.let {
-            Text(
-                text = "Send to: ${it.accountTitle} · ${it.accountNumber} (${it.method})",
-                color = IosColors.TextSecondary,
-                fontSize = 12.sp
-            )
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                com.talkswithtanha.twt.core.designsystem.components.PaymentMethodIcon(it.method, size = 20.dp)
+                Text(
+                    text = "Send to: ${it.accountTitle} · ${it.accountNumber} (${it.method})",
+                    color = IosColors.TextSecondary,
+                    fontSize = 12.sp
+                )
+            }
         }
 
         Row(

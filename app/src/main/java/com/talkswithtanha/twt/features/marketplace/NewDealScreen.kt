@@ -453,24 +453,7 @@ private fun AccountRow(account: PaymentAccount, selected: Boolean, onClick: () -
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Box(
-            Modifier
-                .size(24.dp)
-                .clip(RoundedCornerShape(7.dp))
-                .background(Color.White.copy(alpha = 0.07f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                if (account.method.contains("bank", ignoreCase = true)) {
-                    Icons.Filled.AccountBalance
-                } else {
-                    Icons.Filled.Smartphone
-                },
-                contentDescription = null,
-                tint = Color.White.copy(alpha = 0.6f),
-                modifier = Modifier.size(13.dp)
-            )
-        }
+        com.talkswithtanha.twt.core.designsystem.components.PaymentMethodIcon(account.method, size = 32.dp)
         Column(Modifier.weight(1f)) {
             Text(
                 text = account.method.ifBlank { "Account" },

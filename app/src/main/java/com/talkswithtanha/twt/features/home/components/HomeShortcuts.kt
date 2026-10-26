@@ -72,6 +72,12 @@ import com.talkswithtanha.twt.core.designsystem.IosColors
 import kotlinx.coroutines.delay
 import kotlin.math.abs
 
+/**
+ * The live-session and academy cards. Off for now: the home shows only the
+ * exchange. Turn back on to bring both back.
+ */
+private const val SHOW_MEDIA_SHORTCUTS = false
+
 /** How the three home entries are laid out. A member's choice, in Appearance. */
 enum class HomeShortcutsLayout(val title: String, val subtitle: String) {
     /** All three, one under the other. Everything visible at once. */
@@ -102,7 +108,8 @@ fun HomeShortcuts(
     // out of the Play build (see MARKETPLACE_ENABLED), and the deck and list
     // both work with the two that remain.
     val cards: List<@Composable () -> Unit> = listOfNotNull(
-        {
+        if (SHOW_MEDIA_SHORTCUTS) {
+            {
             HomeEntryCard(
                 icon = Icons.Filled.PlayArrow,
                 eyebrow = "LIVE NOW",
@@ -112,7 +119,8 @@ fun HomeShortcuts(
                 isLive = true,
                 onClick = onWatchLive
             )
-        },
+            }
+        } else null,
         if (com.talkswithtanha.twt.BuildConfig.MARKETPLACE_ENABLED) {
             {
                 HomeEntryCard(
@@ -125,7 +133,8 @@ fun HomeShortcuts(
                 )
             }
         } else null,
-        {
+        if (SHOW_MEDIA_SHORTCUTS) {
+            {
             HomeEntryCard(
                 icon = Icons.Outlined.School,
                 eyebrow = "ACADEMY",
@@ -134,8 +143,10 @@ fun HomeShortcuts(
                 actionTitle = "Open",
                 onClick = onOpenAcademy
             )
-        }
+            }
+        } else null
     )
+    if (cards.isEmpty()) return
 
     // Switching in Appearance folds the list into the deck and back out,
     // rather than the section jumping between two shapes.
@@ -155,7 +166,9 @@ fun HomeShortcuts(
                 cards.forEach { it() }
             }
 
-            HomeShortcutsLayout.STACK -> ShortcutDeck(cards, modifier)
+            HomeShortcutsLayout.STACK -> if (cards.size == 1) {
+                Box(modifier.fillMaxWidth()) { cards.single()() }
+            } else ShortcutDeck(cards, modifier)
         }
     }
 }

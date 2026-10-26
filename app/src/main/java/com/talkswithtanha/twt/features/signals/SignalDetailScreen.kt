@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.signals
 
+import com.talkswithtanha.twt.core.model.liveProgress
 import com.talkswithtanha.twt.core.data.LiveApi
 import com.talkswithtanha.twt.features.signals.live.LiveCandleChart
 import com.talkswithtanha.twt.features.signals.live.chartLines
@@ -215,15 +216,49 @@ fun SignalDetailScreen(
 
             // The trade on the live chart, with its own entry, stop and targets.
             val live = LiveApi.find(signal.pair)
-            if (live != null && signal.status.isOngoing && !signal.isAnalysis) {
+            if (live != null && !signal.isAnalysis) {
+                var now by remember { mutableStateOf<Double?>(null) }
                 Reveal(2) {
-                    DetailCard(title = "Live chart") {
+                    DetailCard(title = if (signal.status.isOngoing) "Live chart" else "Chart") {
                         LiveCandleChart(
                             instrument = live,
                             timeframe = LiveApi.Timeframe.M15,
                             height = 300.dp,
-                            lines = signal.chartLines()
+                            lines = signal.chartLines(),
+                            onQuote = { now = it.price }
                         )
+                        // Where the trade stands against the price right now:
+                        // the same numbers the followed-trade notification shows.
+                        val p = now?.let { signal.liveProgress(it) }
+                        if (p != null && now != null) {
+                            Spacer(Modifier.height(10.dp))
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text(
+                                        "Now ${"%.${live.decimals}f".format(now)}",
+                                        color = Color.White,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        if (p.toGo > 0) "${"%.1f".format(p.toGo)} ${p.unit} to ${p.nextLabel}" else "${p.nextLabel} reached",
+                                        color = IosColors.BuyGreen,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                                Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(Color.White.copy(alpha = 0.1f))) {
+                                    Box(Modifier.fillMaxWidth(p.fraction.toFloat()).height(6.dp).clip(RoundedCornerShape(3.dp)).background(IosColors.BuyGreen))
+                                }
+                                p.toStop?.let {
+                                    Text(
+                                        "${"%.1f".format(it)} ${p.unit} from the stop",
+                                        color = Color.White.copy(alpha = 0.45f),
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

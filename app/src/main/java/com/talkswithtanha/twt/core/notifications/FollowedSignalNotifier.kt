@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.core.notifications
 
+import com.talkswithtanha.twt.core.model.liveProgress
 import android.Manifest
 import android.app.PendingIntent
 import android.content.Context
@@ -46,10 +47,14 @@ class FollowedSignalNotifier @Inject constructor(
      * The notification id is derived from the signal id so an update replaces
      * the card in place rather than stacking a second one behind it.
      */
-    fun show(signal: Signal, follow: SignalFollow) {
+    /**
+     * [now] is the live price when the tracker has one: the bar then fills
+     * between targets as price moves, and the line says how far is left.
+     */
+    fun show(signal: Signal, follow: SignalFollow, now: Double? = null) {
         if (!canPost()) return
 
-        val progress = TradeProgress.of(signal)
+        val progress = TradeProgress.of(signal, now)
         val ongoing = signal.status.isOngoing
         val builder = NotificationCompat.Builder(context, NotificationChannels.FOLLOWED_SIGNAL)
             .setSmallIcon(R.drawable.ic_stat_signal)
@@ -57,7 +62,7 @@ class FollowedSignalNotifier @Inject constructor(
                 if (ongoing) "Following ${signal.pair} · ${signal.type.stored}"
                 else "${signal.pair} · ${signal.type.stored} · ${signal.status.stored}"
             )
-            .setContentText(progress.headline(signal))
+            .setContentText(progress.live ?: progress.headline(signal))
             .setSubText(progress.stepLabel)
             .setOngoing(ongoing)
             .setOnlyAlertOnce(true)
@@ -227,7 +232,9 @@ internal class TradeProgress private constructor(
     val color: Int,
     val stepLabel: String,
     val segments: List<NotificationCompat.ProgressStyle.Segment>,
-    val points: List<NotificationCompat.ProgressStyle.Point>
+    val points: List<NotificationCompat.ProgressStyle.Point>,
+    /** "Now 2,410.50 · 18 pips to TP1 · 42 above the stop", when a live price is known. */
+    val live: String? = null
 ) {
     fun headline(signal: Signal): String {
         val next = signal.takeProfits.firstOrNull { !it.isHit }
@@ -256,7 +263,8 @@ internal class TradeProgress private constructor(
         private const val RED = 0xFFF04D4D.toInt()
         private const val TRACK = 0xFF5A5A5A.toInt()
 
-        fun of(signal: Signal): TradeProgress {
+        fun of(signal: Signal, now: Double? = null): TradeProgress {
+            val moving = now?.let { signal.liveProgress(it) }
             val tps = signal.takeProfits
             val steps = tps.size.coerceAtLeast(1)
             val max = steps * STEP
@@ -266,7 +274,8 @@ internal class TradeProgress private constructor(
                 SignalStatus.WON -> max to GREEN
                 // Hit targets fill their step; a live trade shows a sliver so
                 // the track reads as started rather than empty.
-                else -> (hit * STEP).coerceAtLeast(STEP / 8) to GREEN
+                // Between targets the live price fills the current step.
+                else -> (hit * STEP + ((moving?.fraction ?: 0.0) * STEP).toInt()).coerceAtLeast(STEP / 8) to GREEN
             }
             val label = when (signal.status) {
                 SignalStatus.LOST -> "Stopped out"
@@ -282,7 +291,13 @@ internal class TradeProgress private constructor(
                 NotificationCompat.ProgressStyle.Point((i + 1) * STEP)
                     .setColor(if (tp.isHit) GREEN else TRACK)
             }
-            return TradeProgress(max, value.coerceAtMost(max), color, label, segments, points)
+            val live = moving?.let { m ->
+                val decimals = com.talkswithtanha.twt.core.data.LiveApi.find(signal.pair)?.decimals ?: 2
+                "Now ${"%.${decimals}f".format(now)} · " +
+                    (if (m.toGo > 0) "${"%.1f".format(m.toGo)} ${m.unit} to ${m.nextLabel}" else "${m.nextLabel} reached") +
+                    (m.toStop?.let { " · ${"%.1f".format(it)} from the stop" } ?: "")
+            }
+            return TradeProgress(max, value.coerceAtMost(max), color, label, segments, points, live)
         }
     }
 }

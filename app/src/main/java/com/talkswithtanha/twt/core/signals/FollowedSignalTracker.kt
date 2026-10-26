@@ -112,6 +112,13 @@ class FollowedSignalTracker @Inject constructor(
             }
         }
 
+        scope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(60_000)
+                if (watchedUserId != null) runCatching { refreshPrices() }
+            }
+        }
+
         // The reconciliation loop. Every time either the follow list or the
         // signals feed changes, look for followed trades whose status moved.
         scope.launch {
@@ -283,7 +290,31 @@ class FollowedSignalTracker @Inject constructor(
      * records the status without announcing it. Without that, every relaunch
      * re-announces every result the member has already been told about.
      */
+    /** The last pass's inputs, for the price refresh to reuse. */
+    @Volatile private var lastPass: Pair<List<SignalFollow>, List<Signal>>? = null
+    /** The latest price per signal, so a repost between refreshes keeps it. */
+    private val prices = java.util.concurrent.ConcurrentHashMap<String, Double>()
+
+    /**
+     * Every minute, the live price of each followed trade still running, so
+     * its card's bar and "pips to TP1" move with the market. Only while the
+     * app's process is alive — a closed app is told about results by push.
+     */
+    private suspend fun refreshPrices() {
+        val (follows, signals) = lastPass ?: return
+        val byId = signals.associateBy { it.id }
+        for (follow in follows.filter { it.isActive }) {
+            val signal = byId[follow.signalId] ?: continue
+            if (!signal.status.isOngoing || signal.isAnalysis) continue
+            val inst = com.talkswithtanha.twt.core.data.LiveApi.find(signal.pair) ?: continue
+            val quote = runCatching { com.talkswithtanha.twt.core.data.LiveApi.quote(inst.key) }.getOrNull() ?: continue
+            prices[signal.id] = quote.price
+            notifier.show(signal, follow, quote.price)
+        }
+    }
+
     private suspend fun reconcile(follows: List<SignalFollow>, signals: List<Signal>) {
+        lastPass = follows to signals
         if (watchedUserId == null || follows.isEmpty()) return
 
         val byId = signals.associateBy { it.id }
@@ -313,7 +344,7 @@ class FollowedSignalTracker @Inject constructor(
             // `onlyAlertOnce` -- so the card is simply asserted on every pass
             // for anything still running, which also restores it after a reboot.
             when {
-                signal.status.isOngoing -> notifier.show(signal, follow)
+                signal.status.isOngoing -> notifier.show(signal, follow, prices[signal.id])
 
                 // Finished. Replace the pinned card with a dismissible one
                 // carrying the result, but only on the pass that saw it finish

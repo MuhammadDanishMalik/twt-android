@@ -3,7 +3,10 @@
   Debug builds only. Lets the app reach twt-admin running on this computer over
   plain http (adminApiBase=http://10.0.2.2:3000 from the emulator, or the Mac's
   LAN address from a phone). Release builds keep Android's default: https only.
+  DealCardPreview draws a sample deal card from adb, without signing in.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:usesCleartextTraffic="true" />
+    <application android:usesCleartextTraffic="true">
+        <receiver android:name="com.talkswithtanha.twt.debug.DealCardPreview" android:exported="true" />
+    </application>
 </manifest>

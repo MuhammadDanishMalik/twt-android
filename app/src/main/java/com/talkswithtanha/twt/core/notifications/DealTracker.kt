@@ -104,7 +104,7 @@ class DealTracker @Inject constructor(
         drawn.clear()
     }
 
-    private fun show(deal: Deal) {
+    internal fun show(deal: Deal) {
         if (!canPost()) return
         val p = deal.progress()
         val step = deal.status.stepIndex

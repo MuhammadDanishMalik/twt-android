@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Verified
@@ -121,6 +122,30 @@ fun DealDetailScreen(
 
     // The sheets close when the server says the deal moved on, not when the
     // button is tapped: success is the snapshot, never the request.
+    // The live card in the shade needs notifications. A member with a deal
+    // open has every reason to say yes, so this is where it is asked; the
+    // card is drawn as soon as they do.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var notificationsOn by remember {
+        mutableStateOf(com.talkswithtanha.twt.core.notifications.NotificationPermission.isGranted(context))
+    }
+    val askForNotifications = com.talkswithtanha.twt.core.notifications.rememberNotificationPermissionRequest { granted ->
+        notificationsOn = granted
+        if (granted) viewModel.refreshDealCard()
+    }
+    val dealOpen = deal != null && !deal.status.isTerminal
+    LaunchedEffect(dealOpen) {
+        if (!dealOpen) return@LaunchedEffect
+        if (notificationsOn) viewModel.refreshDealCard() else askForNotifications()
+    }
+    // Back from system settings with it switched on.
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+        val granted = com.talkswithtanha.twt.core.notifications.NotificationPermission.isGranted(context)
+        if (granted && !notificationsOn) viewModel.refreshDealCard()
+        notificationsOn = granted
+        onPauseOrDispose { }
+    }
+
     // A step that happens while the deal is on screen gets its moment; the
     // status the screen opened on is history and does not.
     var lastStatus by remember { mutableStateOf<DealStatus?>(null) }
@@ -233,6 +258,9 @@ fun DealDetailScreen(
                 }
             }
 
+            if (dealOpen && !notificationsOn) {
+                item { NotificationsNudge(onTurnOn = askForNotifications, modifier = Modifier.staggeredAppear(3)) }
+            }
             item { SummaryCard(deal, Modifier.staggeredAppear(3)) }
             if (deal.paymentProofUrl != null || deal.releaseProofUrl != null) {
                 item { ProofsCard(deal, Modifier.staggeredAppear(3)) }
@@ -956,5 +984,27 @@ private fun ProofsCard(deal: Deal, modifier: Modifier = Modifier) {
             Spacer(Modifier.height(8.dp))
             Text("Desk's transfer reference: $it", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
         }
+    }
+}
+
+/** Shown while notifications are off: without them there is no live card. */
+@Composable
+private fun NotificationsNudge(onTurnOn: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(IosColors.BuyGreen.copy(alpha = 0.10f))
+            .clickable(onClick = onTurnOn)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Icon(Icons.Outlined.NotificationsActive, contentDescription = null, tint = IosColors.BuyGreen, modifier = Modifier.size(22.dp))
+        Column(Modifier.weight(1f)) {
+            Text("Follow this deal from your lock screen", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text("Turn on notifications to see each step live.", color = Color.White.copy(alpha = 0.6f), fontSize = 12.5.sp)
+        }
+        Text("Turn on", color = IosColors.BuyGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
     }
 }

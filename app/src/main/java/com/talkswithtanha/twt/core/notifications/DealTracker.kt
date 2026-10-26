@@ -44,12 +44,16 @@ class DealTracker @Inject constructor(
     private val session: SessionRepository,
     private val deals: DealRepository
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    // One at a time: the listener and refresh() both reconcile.
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default.limitedParallelism(1))
     private val manager = NotificationManagerCompat.from(context)
     private var started = false
 
     /** Status last drawn per deal, so an unchanged snapshot does not repost. */
     private val drawn = mutableMapOf<String, DealStatus>()
+
+    /** The latest deals, for [refresh]. */
+    private var last: List<Deal> = emptyList()
 
     fun start() {
         if (started) return
@@ -64,7 +68,23 @@ class DealTracker @Inject constructor(
         }
     }
 
+    /**
+     * Draws every open deal's card again: after the member turns notifications
+     * on, and whenever a deal screen opens, so a card swiped away or never
+     * posted comes back.
+     */
+    fun refresh() {
+        scope.launch {
+            drawn.clear()
+            reconcile(last)
+        }
+    }
+
     private fun reconcile(list: List<Deal>) {
+        last = list
+        // Nothing can be posted: draw nothing and remember nothing, so the
+        // cards appear the moment permission is given.
+        if (!canPost()) return
         for (deal in list) {
             val before = drawn[deal.id]
             if (before == deal.status) continue

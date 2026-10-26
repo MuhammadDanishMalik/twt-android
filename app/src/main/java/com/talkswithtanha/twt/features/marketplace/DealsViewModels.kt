@@ -192,10 +192,14 @@ class DealDetailViewModel @Inject constructor(
     session: SessionRepository,
     prefs: PrefsRepository,
     marketplaceConfig: com.talkswithtanha.twt.core.data.MarketplaceConfigRepository,
+    private val dealTracker: com.talkswithtanha.twt.core.notifications.DealTracker,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     private val dealId: String = checkNotNull(savedStateHandle[AppRoute.DealDetail.ARG])
+
+    /** Puts this deal's card back in the shade. */
+    fun refreshDealCard() = dealTracker.refresh()
 
     /** Who the member is dealing with: photo, name and badge from the panel. */
     val seller: StateFlow<com.talkswithtanha.twt.core.model.MarketplaceSeller> = marketplaceConfig.observeSeller()

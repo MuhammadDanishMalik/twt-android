@@ -25,6 +25,9 @@ object NotificationChannels {
     /** New signals published, and community replies. */
     const val GENERAL = "general"
 
+    /** The live card for an open deal: silent, the deal watcher's push buzzes. */
+    const val DEAL_PROGRESS = "deal_progress"
+
     /** Market sessions opening and the weekly COT report. */
     const val MARKET_UPDATES = "market_updates"
 
@@ -60,6 +63,17 @@ object NotificationChannels {
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
                 description = "New signals from Tanha, and replies in the community."
+            }
+        )
+
+        manager.createNotificationChannel(
+            NotificationChannel(
+                DEAL_PROGRESS,
+                "Deal progress",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "The live card for a dollar deal you have open."
+                setShowBadge(false)
             }
         )
 

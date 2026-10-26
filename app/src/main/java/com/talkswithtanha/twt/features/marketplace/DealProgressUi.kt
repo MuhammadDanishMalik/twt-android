@@ -48,6 +48,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -391,3 +394,93 @@ private fun Input(value: String, placeholder: String, mono: Boolean = false, onC
         )
     }
 }
+
+/**
+ * A step of the deal just happened while the member was watching: a short,
+ * calm animation that says which, then it gets out of the way. Payment sent
+ * flies a paper plane in; confirmed and funds sent draw a tick; sending
+ * slides an arrow across.
+ */
+@Composable
+fun StepCelebration(status: com.talkswithtanha.twt.core.model.DealStatus, onDone: () -> Unit) {
+    val words = when (status) {
+        com.talkswithtanha.twt.core.model.DealStatus.PAYMENT_SENT -> "Payment sent" to "The desk is checking it now"
+        com.talkswithtanha.twt.core.model.DealStatus.PAYMENT_APPROVED -> "Payment confirmed" to "Add where to receive your funds"
+        com.talkswithtanha.twt.core.model.DealStatus.RELEASING -> "Sending your funds" to "You'll be told the moment they're sent"
+        com.talkswithtanha.twt.core.model.DealStatus.COMPLETED -> "Funds sent" to "This deal is complete"
+        else -> return
+    }
+    val enter = remember { androidx.compose.animation.core.Animatable(0f) }
+    val draw = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(status) {
+        enter.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.62f, stiffness = 380f))
+        draw.animateTo(1f, tween(520))
+        delay(1100)
+        enter.animateTo(0f, tween(220))
+        onDone()
+    }
+    Dialog(onDismissRequest = onDone, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Box(
+            Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f * enter.value)).clickable(onClick = onDone),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                Modifier
+                    .graphicsLayerCompat(scale = 0.85f + 0.15f * enter.value, alpha = enter.value)
+                    .clip(RoundedCornerShape(26.dp))
+                    .background(Color(0xFF1C1C1E))
+                    .padding(horizontal = 34.dp, vertical = 28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(Modifier.size(84.dp).clip(CircleShape).background(IosColors.BuyGreen.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
+                    val p = draw.value
+                    when (status) {
+                        com.talkswithtanha.twt.core.model.DealStatus.PAYMENT_SENT -> Icon(
+                            Icons.AutoMirrored.Outlined.Send,
+                            contentDescription = null,
+                            tint = IosColors.BuyGreen,
+                            modifier = Modifier.size(40.dp).graphicsLayerCompat(translationX = (1f - p) * -90f, translationY = (1f - p) * 40f, rotation = (1f - p) * -25f, alpha = p)
+                        )
+                        com.talkswithtanha.twt.core.model.DealStatus.RELEASING -> Icon(
+                            Icons.AutoMirrored.Outlined.ArrowForward,
+                            contentDescription = null,
+                            tint = IosColors.BuyGreen,
+                            modifier = Modifier.size(40.dp).graphicsLayerCompat(translationX = (p - 0.5f) * 60f, alpha = 1f - kotlin.math.abs(p - 0.5f))
+                        )
+                        else -> Canvas(Modifier.size(44.dp)) {
+                            val path = androidx.compose.ui.graphics.Path().apply {
+                                moveTo(size.width * 0.12f, size.height * 0.54f)
+                                lineTo(size.width * 0.40f, size.height * 0.80f)
+                                lineTo(size.width * 0.90f, size.height * 0.22f)
+                            }
+                            val m = androidx.compose.ui.graphics.PathMeasure().apply { setPath(path, false) }
+                            val part = androidx.compose.ui.graphics.Path()
+                            m.getSegment(0f, m.length * p, part, true)
+                            drawPath(part, IosColors.BuyGreen, style = Stroke(5.dp.toPx(), cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+                        }
+                    }
+                }
+                Text(words.first, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(words.second, color = Color.White.copy(alpha = 0.55f), fontSize = 13.sp)
+            }
+        }
+    }
+}
+
+private fun Modifier.graphicsLayerCompat(
+    scale: Float = 1f,
+    alpha: Float = 1f,
+    translationX: Float = 0f,
+    translationY: Float = 0f,
+    rotation: Float = 0f
+): Modifier = this.then(
+    Modifier.graphicsLayer {
+        scaleX = scale
+        scaleY = scale
+        this.alpha = alpha.coerceIn(0f, 1f)
+        this.translationX = translationX.dp.toPx()
+        this.translationY = translationY.dp.toPx()
+        rotationZ = rotation
+    }
+)

@@ -33,7 +33,13 @@ data class Deal(
     val deskBy: Date? = null,
     val deskByFor: DealStatus? = null,
     /** "timeout" when the server closed it for not being paid in time. */
-    val cancelReason: String? = null
+    val cancelReason: String? = null,
+    /** The member's screenshot of their transfer, attached with "I have paid". */
+    val paymentProofUrl: String? = null,
+    /** The desk's screenshot of sending the member's funds. */
+    val releaseProofUrl: String? = null,
+    /** The transaction id or hash the desk sent the funds with. */
+    val releaseReference: String? = null
 ) {
     /** What the member pays, in the currency they pay in. */
     val payTotalMinor: Long

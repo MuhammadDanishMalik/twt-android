@@ -1,5 +1,8 @@
 package com.talkswithtanha.twt.features.marketplace
 
+import kotlinx.coroutines.launch
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
@@ -118,6 +121,17 @@ fun DealDetailScreen(
 
     // The sheets close when the server says the deal moved on, not when the
     // button is tapped: success is the snapshot, never the request.
+    // A step that happens while the deal is on screen gets its moment; the
+    // status the screen opened on is history and does not.
+    var lastStatus by remember { mutableStateOf<DealStatus?>(null) }
+    var celebrating by remember { mutableStateOf<DealStatus?>(null) }
+    LaunchedEffect(deal?.status) {
+        val now = deal?.status ?: return@LaunchedEffect
+        val before = lastStatus
+        lastStatus = now
+        if (before != null && before != now) celebrating = now
+    }
+
     LaunchedEffect(deal?.status) {
         if (deal?.status != DealStatus.AWAITING_PAYMENT) confirming = false
         if (deal?.status != DealStatus.PAYMENT_APPROVED) addingAccount = false
@@ -220,6 +234,9 @@ fun DealDetailScreen(
             }
 
             item { SummaryCard(deal, Modifier.staggeredAppear(3)) }
+            if (deal.paymentProofUrl != null || deal.releaseProofUrl != null) {
+                item { ProofsCard(deal, Modifier.staggeredAppear(3)) }
+            }
             item { DealerRow(seller, Modifier.staggeredAppear(4), openChat) }
 
             if (deal.events.isNotEmpty()) {
@@ -279,7 +296,7 @@ fun DealDetailScreen(
                 confirming = false
                 viewModel.clearError()
             },
-            onConfirm = { transactionId -> viewModel.reportPayment(transactionId) }
+            onConfirm = { transactionId, screenshot -> viewModel.reportPayment(transactionId, screenshot) }
         )
     }
 
@@ -293,6 +310,10 @@ fun DealDetailScreen(
             },
             onSave = viewModel::setReceivingAccount
         )
+    }
+
+    celebrating?.let { step ->
+        StepCelebration(step, onDone = { celebrating = null })
     }
 
     if (askCancel) {
@@ -638,9 +659,19 @@ private fun ConfirmPaymentSheet(
     isSubmitting: Boolean,
     error: String?,
     onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit
+    onConfirm: (String, ByteArray?) -> Unit
 ) {
     var transactionId by remember { mutableStateOf("") }
+    // The transfer screenshot: optional, and the thing that settles a deal
+    // fastest — the desk matches it against its own bank app.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var shot by remember { mutableStateOf<Pair<android.graphics.Bitmap, ByteArray>?>(null) }
+    val picker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) scope.launch { shot = com.talkswithtanha.twt.core.images.prepareScreenshot(context, uri) }
+    }
     val haptics = LocalHapticFeedback.current
     val account = deal.sellerAccount
 
@@ -783,6 +814,55 @@ private fun ConfirmPaymentSheet(
                 )
             }
 
+            Spacer(Modifier.height(18.dp))
+            Text(
+                text = "PAYMENT SCREENSHOT",
+                color = Color.White.copy(alpha = 0.4f),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 1.1.sp
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(FieldFill)
+                    .clickable(enabled = !isSubmitting) {
+                        picker.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                val picked = shot
+                if (picked != null) {
+                    androidx.compose.foundation.Image(
+                        picked.first.asImageBitmap(),
+                        contentDescription = "Your payment screenshot",
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier.size(56.dp).clip(RoundedCornerShape(10.dp))
+                    )
+                } else {
+                    Box(Modifier.size(56.dp).clip(RoundedCornerShape(10.dp)).background(IosColors.BuyGreen.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null, tint = IosColors.BuyGreen, modifier = Modifier.size(24.dp))
+                    }
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        if (picked != null) "Screenshot attached" else "Attach the screenshot of your transfer",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        if (picked != null) "Tap to choose a different one" else "Recommended: the desk confirms faster",
+                        color = Color.White.copy(alpha = 0.45f),
+                        fontSize = 12.sp
+                    )
+                }
+            }
+
             error?.let {
                 Spacer(Modifier.height(12.dp))
                 Text(it, color = IosColors.SellRed, fontSize = 13.sp, lineHeight = 18.sp)
@@ -791,13 +871,13 @@ private fun ConfirmPaymentSheet(
             Spacer(Modifier.weight(1f))
 
             ConfirmButton(
-                label = "I have paid",
+                label = if (isSubmitting && shot != null) "Uploading…" else "I have paid",
                 // The id is the whole point of the sheet, so it is required:
                 // a report with nothing to match against lands on Tanha as a
                 // claim he has to chase.
                 enabled = transactionId.isNotBlank() && !isSubmitting,
                 loading = isSubmitting,
-                onClick = { onConfirm(transactionId) }
+                onClick = { onConfirm(transactionId, shot?.second) }
             )
             Spacer(Modifier.height(16.dp))
         }
@@ -832,3 +912,49 @@ private fun openedAt(deal: Deal): String =
 
 private fun timeOnly(epochMillis: Long): String =
     SimpleDateFormat("h:mm a", Locale.getDefault()).format(java.util.Date(epochMillis))
+
+/** The screenshots on the deal: the member's payment and the desk's proof of sending. */
+@Composable
+private fun ProofsCard(deal: Deal, modifier: Modifier = Modifier) {
+    val shots = listOfNotNull(
+        deal.paymentProofUrl?.let { "Your payment" to it },
+        deal.releaseProofUrl?.let { "Sent by the desk" to it }
+    )
+    var viewing by remember { mutableStateOf<Int?>(null) }
+    viewing?.let { start ->
+        com.talkswithtanha.twt.core.designsystem.components.ImageViewer(
+            images = shots.map { it.second },
+            startIndex = start,
+            onDismiss = { viewing = null }
+        )
+    }
+    Column(modifier.fillMaxWidth()) {
+        SectionLabel("SCREENSHOTS")
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            shots.forEachIndexed { i, (label, url) ->
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Surface)
+                        .clickable { viewing = i }
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    coil3.compose.AsyncImage(
+                        model = url,
+                        contentDescription = label,
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier.fillMaxWidth().height(140.dp).clip(RoundedCornerShape(10.dp))
+                    )
+                    Text(label, color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                }
+            }
+        }
+        deal.releaseReference?.let {
+            Spacer(Modifier.height(8.dp))
+            Text("Desk's transfer reference: $it", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
+        }
+    }
+}

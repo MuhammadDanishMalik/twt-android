@@ -34,7 +34,7 @@ interface DealRepository {
      * The member declaring they have paid — the **only** transition this app is
      * allowed to make.
      */
-    suspend fun markPaymentSent(dealId: String, reference: String)
+    suspend fun markPaymentSent(dealId: String, reference: String, screenshot: ByteArray? = null)
 
     /** Where the member wants their side sent, once the desk has confirmed their payment. */
     suspend fun setReceivingAccount(dealId: String, account: PaymentAccount)
@@ -122,17 +122,29 @@ class FirebaseDealRepository @Inject constructor(
         return reference.id
     }
 
-    override suspend fun markPaymentSent(dealId: String, reference: String) {
+    override suspend fun markPaymentSent(dealId: String, reference: String, screenshot: ByteArray?) {
+        // The screenshot goes up first, into the deal's own private folder,
+        // so the claim and its proof land together.
+        val proofUrl = screenshot?.let { bytes ->
+            val ref = com.google.firebase.storage.FirebaseStorage.getInstance().reference
+                .child("dealProofs/$dealId/payment-${System.currentTimeMillis()}.jpg")
+            ref.putBytes(bytes, com.google.firebase.storage.StorageMetadata.Builder().setContentType("image/jpeg").build()).await()
+            ref.downloadUrl.await().toString()
+        }
         deals.document(dealId).update(
-            mapOf(
-                F.STATUS to DealStatus.PAYMENT_SENT.stored,
-                F.PAYMENT_REFERENCE to reference,
+            buildMap<String, Any> {
+                put(F.STATUS, DealStatus.PAYMENT_SENT.stored)
+                put(F.PAYMENT_REFERENCE, reference)
+                proofUrl?.let { put("paymentProofUrl", it) }
                 // Appended rather than replaced: the history of a deal is what
                 // the argument three weeks later is about.
-                F.EVENTS to FieldValue.arrayUnion(
-                    eventData(DealStatus.PAYMENT_SENT, "Payment reported — ref $reference")
-                )
-            )
+                put(F.EVENTS, FieldValue.arrayUnion(
+                    eventData(
+                        DealStatus.PAYMENT_SENT,
+                        "Payment reported — ref $reference" + if (proofUrl != null) " · screenshot attached" else ""
+                    )
+                ))
+            }
         ).await()
     }
 
@@ -220,7 +232,10 @@ internal fun dealFrom(document: DocumentSnapshot): Deal? {
         payBy = document.getTimestamp("payBy")?.toDate(),
         deskBy = document.getTimestamp("deskBy")?.toDate(),
         deskByFor = document.getString("deskByFor")?.let { DealStatus.from(it) },
-        cancelReason = document.get("cancelReason").asNonBlankString()
+        cancelReason = document.get("cancelReason").asNonBlankString(),
+        paymentProofUrl = document.get("paymentProofUrl").asNonBlankString(),
+        releaseProofUrl = document.get("releaseProofUrl").asNonBlankString(),
+        releaseReference = document.get("releaseReference").asNonBlankString()
     )
 }
 

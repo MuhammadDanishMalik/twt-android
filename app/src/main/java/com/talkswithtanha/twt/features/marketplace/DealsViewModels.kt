@@ -229,8 +229,8 @@ class DealDetailViewModel @Inject constructor(
      * The member declaring they have paid. The screen moves on when the
      * server's snapshot says so, never on this call returning.
      */
-    fun reportPayment(reference: String) = run(DealAction.REPORT) {
-        dealRepository.markPaymentSent(dealId, reference.trim())
+    fun reportPayment(reference: String, screenshot: ByteArray? = null) = run(DealAction.REPORT) {
+        dealRepository.markPaymentSent(dealId, reference.trim(), screenshot)
     }
 
     fun setReceivingAccount(account: PaymentAccount) = run(DealAction.ACCOUNT) {

@@ -42,6 +42,7 @@ class TwtApplication : Application() {
         fun followedSignals(): FollowedSignalTracker
         fun activity(): ActivityTracker
         fun marketAlerts(): com.talkswithtanha.twt.core.notifications.MarketAlerts
+        fun deals(): com.talkswithtanha.twt.core.notifications.DealTracker
     }
 
     override fun onCreate() {
@@ -78,6 +79,8 @@ class TwtApplication : Application() {
         // Session opens and COT reports: subscribe this device to the topics
         // the member has left on (both, by default).
         entryPoint.marketAlerts().start()
+        // A live card in the shade for each open deal, step by step.
+        entryPoint.deals().start()
     }
 
     private companion object {

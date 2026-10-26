@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -31,6 +32,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.outlined.Chat
 import androidx.compose.material.icons.outlined.Close
@@ -95,7 +97,8 @@ private val FieldFill = Color(0xFF141416)
 @Composable
 fun DealDetailScreen(
     onClose: () -> Unit,
-    onOpenChat: () -> Unit,
+    /** Opens the member's chat with the dealer: the room id is theirs. */
+    onOpenChat: (roomId: String) -> Unit,
     viewModel: DealDetailViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -106,6 +109,8 @@ fun DealDetailScreen(
     var askCancel by remember { mutableStateOf(false) }
 
     val deal = state.deal
+    val seller by viewModel.seller.collectAsStateWithLifecycle()
+    val openChat = { deal?.let { onOpenChat(com.talkswithtanha.twt.core.firebase.FirestorePaths.ChatRoom.support(it.userId)) }; Unit }
 
     LaunchedEffect(state.error) {
         if (state.error != null) Haptics.failure(haptics)
@@ -190,7 +195,7 @@ fun DealDetailScreen(
                     FundsSentCard(
                         amount = deal.receiveLabel(),
                         to = deal.receivingAccount?.method ?: "account",
-                        onFeedback = onOpenChat,
+                        onFeedback = openChat,
                         modifier = Modifier.staggeredAppear(1)
                     )
                 } else {
@@ -215,7 +220,7 @@ fun DealDetailScreen(
             }
 
             item { SummaryCard(deal, Modifier.staggeredAppear(3)) }
-            item { MessageSellerRow(Modifier.staggeredAppear(4), onOpenChat) }
+            item { DealerRow(seller, Modifier.staggeredAppear(4), openChat) }
 
             if (deal.events.isNotEmpty()) {
                 item {
@@ -227,7 +232,7 @@ fun DealDetailScreen(
                 }
             }
 
-            item { FooterActions(deal, onOpenChat, onCancel = { askCancel = true }) }
+            item { FooterActions(deal, openChat, onCancel = { askCancel = true }) }
         }
 
         // ── The member's move, when it is their turn ─────────────────────
@@ -445,7 +450,13 @@ private fun SummaryLine(label: String, value: String, monospaced: Boolean = fals
 }
 
 @Composable
-private fun MessageSellerRow(modifier: Modifier = Modifier, onOpenChat: () -> Unit) {
+private fun DealerRow(
+    seller: com.talkswithtanha.twt.core.model.MarketplaceSeller,
+    modifier: Modifier = Modifier,
+    onOpenChat: () -> Unit
+) {
+    // The person on the other side of the deal, with his face and the badge,
+    // so a member knows exactly who to message — and one tap opens the chat.
     val haptics = LocalHapticFeedback.current
     Row(
         modifier
@@ -456,36 +467,60 @@ private fun MessageSellerRow(modifier: Modifier = Modifier, onOpenChat: () -> Un
                 Haptics.tap(haptics)
                 onOpenChat()
             }
-            .padding(16.dp),
+            .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Box(
-            Modifier
-                .size(34.dp)
-                .clip(CircleShape)
-                .background(IosColors.Accent.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Outlined.Chat,
-                contentDescription = null,
-                tint = IosColors.Accent,
-                modifier = Modifier.size(16.dp)
+        Box(contentAlignment = Alignment.BottomEnd) {
+            com.talkswithtanha.twt.core.designsystem.components.MemberAvatar(
+                photoUrl = seller.photoUrl,
+                name = seller.displayName,
+                size = 46.dp
+            )
+            Box(
+                Modifier
+                    .size(11.dp)
+                    .clip(CircleShape)
+                    .background(IosColors.BuyGreen)
+                    .border(2.dp, Surface, CircleShape)
             )
         }
         Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = seller.displayName,
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1
+                )
+                if (seller.isVerified) {
+                    Spacer(Modifier.width(5.dp))
+                    Icon(
+                        androidx.compose.material.icons.Icons.Filled.Verified,
+                        contentDescription = "Verified",
+                        tint = IosColors.Accent,
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+            }
             Text(
-                text = "Message the seller",
-                color = Color.White,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = "Anything about this deal goes here",
-                color = Color.White.copy(alpha = 0.4f),
+                text = (if (seller.isVerified) "Verified dealer" else "Your dealer") +
+                    (seller.releaseMinutes?.let { " · usually replies in $it min" } ?: " · message about this deal"),
+                color = Color.White.copy(alpha = 0.45f),
                 fontSize = 12.sp
             )
+        }
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(50))
+                .background(IosColors.Accent)
+                .padding(horizontal = 12.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Icon(Icons.Outlined.Chat, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+            Text("Chat", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }

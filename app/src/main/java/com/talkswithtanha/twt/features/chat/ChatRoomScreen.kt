@@ -96,6 +96,7 @@ fun ChatRoomScreen(
     viewModel: ChatRoomViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val sellerProfile by viewModel.seller.collectAsStateWithLifecycle()
     val savedNotes by viewModel.savedNotes.collectAsStateWithLifecycle()
     val editing by viewModel.editing.collectAsStateWithLifecycle()
     val activity by viewModel.activity.collectAsStateWithLifecycle()
@@ -142,7 +143,7 @@ fun ChatRoomScreen(
             .imePadding()
     ) {
         when {
-            viewModel.isSellerChat -> SellerHeader(onBack)
+            viewModel.isSellerChat -> SellerHeader(sellerProfile, onBack)
             viewModel.isSupportRoom -> SupportHeader(onBack)
             else -> RoomHeader(
                 title = viewModel.roomTitle,
@@ -181,7 +182,7 @@ fun ChatRoomScreen(
 
             state.messages.isEmpty() && !state.isLoading -> Box(Modifier.weight(1f)) {
                 when {
-                    viewModel.isSellerChat -> SellerOpening()
+                    viewModel.isSellerChat -> SellerOpening(sellerProfile)
                     viewModel.isSupportRoom -> SupportEmptyState(onPrompt = viewModel::onDraftChange)
                     else -> EmptyRoom()
                 }
@@ -693,7 +694,7 @@ private fun SupportHeader(onBack: () -> Unit) {
  * ever exists, this is the one place that should read it.
  */
 @Composable
-private fun SellerHeader(onBack: () -> Unit) {
+private fun SellerHeader(seller: com.talkswithtanha.twt.core.model.MarketplaceSeller, onBack: () -> Unit) {
     Column {
         Row(
             Modifier
@@ -705,22 +706,11 @@ private fun SellerHeader(onBack: () -> Unit) {
             BackButton(onBack)
 
             Box(contentAlignment = Alignment.BottomEnd) {
-                Box(
-                    Modifier
-                        .size(34.dp)
-                        .clip(CircleShape)
-                        .background(
-                            androidx.compose.ui.graphics.Brush.linearGradient(
-                                listOf(
-                                    IosColors.Accent.copy(alpha = 0.35f),
-                                    Color(0xFF8C73BF).copy(alpha = 0.25f)
-                                )
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("T", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                }
+                com.talkswithtanha.twt.core.designsystem.components.MemberAvatar(
+                    photoUrl = seller.photoUrl,
+                    name = seller.displayName,
+                    size = 34.dp
+                )
                 Box(
                     Modifier
                         .size(9.dp)
@@ -736,17 +726,19 @@ private fun SellerHeader(onBack: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        "Trade with Tanha",
+                        seller.displayName,
                         color = IosColors.TextPrimary,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold
                     )
-                    Icon(
-                        Icons.Filled.Verified,
-                        contentDescription = null,
-                        tint = IosColors.Accent,
-                        modifier = Modifier.size(12.dp)
-                    )
+                    if (seller.isVerified) {
+                        Icon(
+                            Icons.Filled.Verified,
+                            contentDescription = "Verified",
+                            tint = IosColors.Accent,
+                            modifier = Modifier.size(13.dp)
+                        )
+                    }
                 }
                 Text("Online", color = IosColors.BuyGreen, fontSize = 11.sp)
             }
@@ -762,10 +754,10 @@ private fun SellerHeader(onBack: () -> Unit) {
 
 /** The line the desk opens with, ported from `SellerChatView.openingMessages`. */
 @Composable
-private fun SellerOpening() {
+private fun SellerOpening(seller: com.talkswithtanha.twt.core.model.MarketplaceSeller) {
     Column(Modifier.fillMaxWidth().padding(16.dp)) {
         Text(
-            text = "Trade with Tanha",
+            text = seller.displayName,
             color = IosColors.TextSecondary,
             fontSize = 13.sp,
             modifier = Modifier.padding(start = 12.dp, bottom = 4.dp)

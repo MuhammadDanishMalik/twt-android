@@ -16,8 +16,13 @@ data class MarketplaceSeller(
     val isVerified: Boolean = false,
     val dealsCompleted: Long? = null,
     val rating: Double? = null,
-    val releaseMinutes: Int? = null
+    val releaseMinutes: Int? = null,
+    /** The dealer's photo, set on the panel's Rates & accounts page. */
+    val photoUrl: String? = null
 ) {
+    /** What to call him when the panel has not named him yet. */
+    val displayName: String get() = name ?: "Trade with Tanha"
+
     /** True when there is at least one statistic worth giving a row to. */
     val hasStats: Boolean
         get() = dealsCompleted != null || rating != null || releaseMinutes != null

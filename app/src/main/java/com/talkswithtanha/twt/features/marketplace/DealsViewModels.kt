@@ -191,10 +191,15 @@ class DealDetailViewModel @Inject constructor(
     private val dealRepository: DealRepository,
     session: SessionRepository,
     prefs: PrefsRepository,
+    marketplaceConfig: com.talkswithtanha.twt.core.data.MarketplaceConfigRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     private val dealId: String = checkNotNull(savedStateHandle[AppRoute.DealDetail.ARG])
+
+    /** Who the member is dealing with: photo, name and badge from the panel. */
+    val seller: StateFlow<com.talkswithtanha.twt.core.model.MarketplaceSeller> = marketplaceConfig.observeSeller()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), com.talkswithtanha.twt.core.model.MarketplaceSeller())
 
     private val _error = MutableStateFlow<String?>(null)
     private val _busy = MutableStateFlow<DealAction?>(null)

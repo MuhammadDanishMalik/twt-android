@@ -454,7 +454,8 @@ fun AppNavHost(
             ProGate("The exchange desk", "Buy and sell USDT with the TWT desk at a locked rate.") {
                 DealDetailScreen(
                     onClose = { navController.popBackStack() },
-                    onOpenChat = { navController.navigateToTab(AppRoute.ChatList.route) }
+                    // Straight into the chat with the dealer, presented as his.
+                    onOpenChat = { roomId -> navController.navigate(AppRoute.ChatRoom.of(roomId, seller = true)) }
                 )
             }
         }

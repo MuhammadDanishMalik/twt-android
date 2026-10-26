@@ -603,10 +603,9 @@ private fun SellerCard(
             .padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            // The seller's own avatar. No photo field on the config yet, so
-            // this is the initial today and one line from a picture later.
+            // The dealer's photo from the panel, or his initial until set.
             MemberAvatar(
-                photoUrl = null,
+                photoUrl = seller.photoUrl,
                 name = seller.name,
                 size = 44.dp
             )

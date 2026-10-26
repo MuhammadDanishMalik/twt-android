@@ -106,8 +106,13 @@ class ChatRoomViewModel @Inject constructor(
     notesStore: VideoNotesStore,
     private val blockedUsers: BlockedUsersStore,
     private val reports: ReportRepository,
+    marketplaceConfig: com.talkswithtanha.twt.core.data.MarketplaceConfigRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
+
+    /** The dealer the seller chat is with: photo, name and badge from the panel. */
+    val seller: StateFlow<com.talkswithtanha.twt.core.model.MarketplaceSeller> = marketplaceConfig.observeSeller()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), com.talkswithtanha.twt.core.model.MarketplaceSeller())
 
     /** The member's saved lesson notes, for the paperclip's share sheet. */
     val savedNotes: StateFlow<List<VideoNote>> = notesStore.notes

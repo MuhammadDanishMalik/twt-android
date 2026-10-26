@@ -431,6 +431,7 @@ object FirestorePaths {
          */
         const val SELLER_NAME = "sellerName"
         const val SELLER_HANDLE = "sellerHandle"
+        const val SELLER_PHOTO = "sellerPhoto"
         const val IS_VERIFIED = "isVerified"
         const val DEALS_COMPLETED = "dealsCompleted"
         const val RATING = "rating"

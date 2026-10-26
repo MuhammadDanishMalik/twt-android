@@ -199,7 +199,8 @@ class FirebaseMarketplaceConfigRepository @Inject constructor(
                     // the row silently vanishing because staff typed 4 not 4.0.
                     dealsCompleted = (document.get(M.DEALS_COMPLETED) as? Number)?.toLong(),
                     rating = (document.get(M.RATING) as? Number)?.toDouble(),
-                    releaseMinutes = (document.get(M.RELEASE_MINUTES) as? Number)?.toInt()
+                    releaseMinutes = (document.get(M.RELEASE_MINUTES) as? Number)?.toInt(),
+                    photoUrl = document.get(M.SELLER_PHOTO).asNonBlankString()
                 )
             }
 }

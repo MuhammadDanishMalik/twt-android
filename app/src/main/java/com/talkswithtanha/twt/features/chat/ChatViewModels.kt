@@ -45,8 +45,12 @@ data class ChatRoomSummary(
 
 @HiltViewModel
 class ChatListViewModel @Inject constructor(
-    session: SessionRepository
+    session: SessionRepository,
+    badges: com.talkswithtanha.twt.core.badges.Badges
 ) : ViewModel() {
+
+    /** Last message, its time and the unread count, per room, live. */
+    val previews = badges.rooms
 
     val user: StateFlow<User?> = session.currentUser
 
@@ -107,8 +111,12 @@ class ChatRoomViewModel @Inject constructor(
     private val blockedUsers: BlockedUsersStore,
     private val reports: ReportRepository,
     marketplaceConfig: com.talkswithtanha.twt.core.data.MarketplaceConfigRepository,
+    private val badges: com.talkswithtanha.twt.core.badges.Badges,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
+
+    /** The room is on screen: what is in it has been read. */
+    fun markRead() = badges.markRoomRead(roomId)
 
     /** The dealer the seller chat is with: photo, name and badge from the panel. */
     val seller: StateFlow<com.talkswithtanha.twt.core.model.MarketplaceSeller> = marketplaceConfig.observeSeller()

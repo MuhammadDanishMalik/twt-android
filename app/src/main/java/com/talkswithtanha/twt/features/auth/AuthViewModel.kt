@@ -87,6 +87,15 @@ class AuthViewModel @Inject constructor(
     }
 
 
+    /** [idToken] comes from Credential Manager — see [GoogleSignIn]. */
+    fun signInWithGoogle(idToken: String, country: String?) = submit {
+        val result = authService.signInWithGoogle(idToken)
+        session.establishSession(result, country)
+    }
+
+    fun onGoogleSignInFailed(message: String) =
+        _state.update { it.copy(isSubmitting = false, error = message) }
+
     fun setSubmitting(value: Boolean) = _state.update { it.copy(isSubmitting = value) }
 
     fun dismissNotice() = _state.update { it.copy(notice = null, error = null) }

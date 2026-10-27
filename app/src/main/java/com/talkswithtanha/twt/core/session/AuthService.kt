@@ -7,6 +7,7 @@ import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException
+import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.userProfileChangeRequest
 import com.talkswithtanha.twt.core.model.LoginProvider
 import kotlinx.coroutines.tasks.await
@@ -102,6 +103,18 @@ class AuthService @Inject constructor(
     suspend fun signIn(email: String, password: String): AuthResult = wrap {
         val result = auth.signInWithEmailAndPassword(email.trim(), password).await()
         result.user!!.toAuthResult(LoginProvider.EMAIL)
+    }
+
+    /**
+     * [idToken] comes from Credential Manager — see `GoogleSignIn`. Google has
+     * already proved the address, so the account arrives verified and skips
+     * the emailed code.
+     */
+    suspend fun signInWithGoogle(idToken: String): AuthResult = wrap {
+        val credential = GoogleAuthProvider.getCredential(idToken, null)
+        val result = auth.signInWithCredential(credential).await()
+        _emailVerified.value = result.user?.isEmailVerified == true
+        result.user!!.toAuthResult(LoginProvider.GOOGLE)
     }
 
     suspend fun signUp(email: String, password: String, fullName: String): AuthResult = wrap {

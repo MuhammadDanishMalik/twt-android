@@ -96,6 +96,9 @@ fun ChatRoomScreen(
     viewModel: ChatRoomViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    // Read as it arrives while the room is open, and once more on leaving.
+    LaunchedEffect(state.messages.lastOrNull()?.id) { viewModel.markRead() }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { viewModel.markRead() } }
     val sellerProfile by viewModel.seller.collectAsStateWithLifecycle()
     val savedNotes by viewModel.savedNotes.collectAsStateWithLifecycle()
     val editing by viewModel.editing.collectAsStateWithLifecycle()

@@ -33,6 +33,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.talkswithtanha.twt.core.designsystem.Haptics
@@ -61,7 +63,9 @@ fun TwtBottomBar(
     items: List<BottomBarItem>,
     currentRoute: String?,
     onNavigate: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** Route → count of new things behind that tab. */
+    badges: Map<String, Int> = emptyMap()
 ) {
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val selectedIndex = items.indexOfFirst { it.route == currentRoute }.coerceAtLeast(0)
@@ -102,6 +106,7 @@ fun TwtBottomBar(
             items.forEachIndexed { index, item ->
                 BottomBarTab(
                     item = item,
+                    badge = badges[item.route] ?: 0,
                     selected = index == selectedIndex,
                     width = tabWidth,
                     onClick = { onNavigate(item.route) }
@@ -114,6 +119,7 @@ fun TwtBottomBar(
 @Composable
 private fun BottomBarTab(
     item: BottomBarItem,
+    badge: Int,
     selected: Boolean,
     width: androidx.compose.ui.unit.Dp,
     onClick: () -> Unit
@@ -162,7 +168,30 @@ private fun BottomBarTab(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        item.icon(tint, Modifier.size(24.dp))
+        Box {
+            item.icon(tint, Modifier.size(24.dp))
+            if (badge > 0) {
+                Box(
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = 10.dp, y = (-6).dp)
+                        .defaultMinSize(minWidth = 17.dp, minHeight = 17.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFFF3B30))
+                        .border(1.5.dp, Color(0xFF1C1C1E), CircleShape)
+                        .padding(horizontal = 4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        if (badge > 99) "99+" else badge.toString(),
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                        lineHeight = 10.sp
+                    )
+                }
+            }
+        }
         Text(text = item.label, fontSize = 11.sp, color = tint, maxLines = 1)
     }
 }

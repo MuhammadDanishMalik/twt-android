@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -295,10 +296,21 @@ private fun FeedTopBar(onOpenChats: () -> Unit) {
             Text("Feed", color = Color.White, style = MaterialTheme.typography.headlineLarge)
             Text("Setups, analysis, breakdowns and voice notes from the desk.", color = IosColors.TextSecondary, fontSize = 12.5.sp, fontFamily = WebFonts.Body)
         }
-        Box(
-            Modifier.size(42.dp).clip(CircleShape).background(IosColors.SecondaryBackground).clickable(onClick = onOpenChats),
-            contentAlignment = Alignment.Center
-        ) { TabIcons.Chat(Modifier.size(19.dp), Color.White) }
+        val chatsVm: com.talkswithtanha.twt.core.badges.BadgesViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+        val unreadChats by chatsVm.chats.collectAsStateWithLifecycle()
+        Box {
+            Box(
+                Modifier.size(42.dp).clip(CircleShape).background(IosColors.SecondaryBackground).clickable(onClick = onOpenChats),
+                contentAlignment = Alignment.Center
+            ) { TabIcons.Chat(Modifier.size(19.dp), Color.White) }
+            // New messages waiting in the chats behind this button.
+            if (unreadChats > 0) {
+                com.talkswithtanha.twt.features.chat.CountBadge(
+                    unreadChats,
+                    Modifier.align(Alignment.TopEnd).offset(x = 6.dp, y = (-4).dp)
+                )
+            }
+        }
     }
 }
 

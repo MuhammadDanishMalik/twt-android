@@ -180,6 +180,10 @@ fun RootScreen(
         // little, the way Instagram's bar sits over the feed. Every tab gets
         // it from here, so no screen has to remember to draw its own.
         // Decorative only — no pointer input, so taps reach the content below.
+        val badgesViewModel: com.talkswithtanha.twt.core.badges.BadgesViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+        val tabBadges by badgesViewModel.tabs.collectAsStateWithLifecycle()
+        LaunchedEffect(currentRoute) { badgesViewModel.onRoute(currentRoute) }
+
         AnimatedVisibility(
             visible = showsBar,
             enter = fadeIn(),
@@ -211,6 +215,7 @@ fun RootScreen(
         ) {
             TwtBottomBar(
                 items = bottomBarItems,
+                badges = tabBadges,
                 currentRoute = currentRoute,
                 onNavigate = { route -> navController.navigateToTab(route) }
             )

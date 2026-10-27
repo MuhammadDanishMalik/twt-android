@@ -586,6 +586,8 @@ internal fun OrDivider(modifier: Modifier = Modifier) {
 internal fun AuthOutlinedButton(
     text: String,
     modifier: Modifier = Modifier,
+    /** Drawn before the text, e.g. the Google "G". */
+    leading: (@Composable () -> Unit)? = null,
     onClick: () -> Unit
 ) {
     val haptics = LocalHapticFeedback.current
@@ -608,13 +610,19 @@ internal fun AuthOutlinedButton(
             .padding(vertical = 15.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = text,
-            color = WebColors.Text,
-            fontSize = 15.sp,
-            fontFamily = WebFonts.Body,
-            fontWeight = FontWeight.SemiBold
-        )
+        androidx.compose.foundation.layout.Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)
+        ) {
+            leading?.invoke()
+            Text(
+                text = text,
+                color = WebColors.Text,
+                fontSize = 15.sp,
+                fontFamily = WebFonts.Body,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
     }
 }
 

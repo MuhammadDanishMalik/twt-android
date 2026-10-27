@@ -50,16 +50,16 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.talkswithtanha.twt.core.designsystem.IosColors
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 enum class AuthMode { SignIn, SignUp }
 
 /**
  * Sign in, or open an account.
  *
- * Email and password only. Google sign-in was removed because it produced
- * accounts whose address nobody had ever proved they could read, and this app
- * now mails a code to that address — two ways in, one of which skips the check,
- * is not two features. It is a hole.
+ * Email and password, or Google. A password account proves its address with
+ * the emailed code on the next screen; a Google account arrives with its
+ * address already verified by Google, so it skips that step.
  *
  * A new account is created here and verified on the next screen. The password
  * goes from this field to Firebase Auth and nowhere else; the code flow that
@@ -214,6 +214,32 @@ fun AuthScreen(
         OrDivider()
 
         Spacer(Modifier.height(18.dp))
+
+        val googleContext = androidx.compose.ui.platform.LocalContext.current
+        val googleScope = androidx.compose.runtime.rememberCoroutineScope()
+        AuthOutlinedButton(
+            text = "Continue with Google",
+            leading = {
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(com.talkswithtanha.twt.R.drawable.ic_google),
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+            },
+            onClick = {
+                if (state.isSubmitting) return@AuthOutlinedButton
+                viewModel.setSubmitting(true)
+                googleScope.launch {
+                    when (val result = GoogleSignIn.requestIdToken(googleContext)) {
+                        is GoogleSignIn.Result.Success -> viewModel.signInWithGoogle(result.idToken, country)
+                        is GoogleSignIn.Result.Cancelled -> viewModel.setSubmitting(false)
+                        is GoogleSignIn.Result.Failed -> viewModel.onGoogleSignInFailed(result.message)
+                    }
+                }
+            }
+        )
+
+        Spacer(Modifier.height(10.dp))
 
         when (mode) {
             AuthMode.SignIn -> {

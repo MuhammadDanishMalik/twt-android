@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -81,6 +82,7 @@ fun ChatListScreen(
     val rooms by viewModel.rooms.collectAsStateWithLifecycle()
     val user by viewModel.user.collectAsStateWithLifecycle()
     val tickets by ticketsViewModel.state.collectAsStateWithLifecycle()
+    val previews by viewModel.previews.collectAsStateWithLifecycle()
 
     Column(
         Modifier
@@ -107,10 +109,13 @@ fun ChatListScreen(
                 SettingsCard {
                     rooms.forEachIndexed { index, room ->
                         val locked = room.requiresAccess && user?.hasAppAccess != true
+                        val preview = previews[room.roomId]
                         ChatRoomRow(
                             modifier = Modifier.staggeredAppear(index),
                             title = room.title,
-                            subtitle = room.subtitle,
+                            subtitle = preview.line() ?: room.subtitle,
+                            time = preview?.lastAt,
+                            unread = preview?.unread ?: 0,
                             initials = room.initials,
                             icon = room.icon,
                             locked = locked,
@@ -199,6 +204,10 @@ private fun ChatRoomRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector?,
     locked: Boolean,
     crowned: Boolean,
+    /** When the last message was sent, shown top right. */
+    time: java.util.Date? = null,
+    /** New messages since the member last had the room open. */
+    unread: Int = 0,
     onClick: () -> Unit
 ) {
     Row(
@@ -268,6 +277,60 @@ private fun ChatRoomRow(
                 tint = IosColors.TextSecondary,
                 modifier = Modifier.size(18.dp)
             )
+        } else if (time != null || unread > 0) {
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                time?.let {
+                    Text(
+                        chatTime(it),
+                        color = if (unread > 0) IosColors.BuyGreen else IosColors.TextSecondary,
+                        fontSize = 12.sp
+                    )
+                }
+                if (unread > 0) CountBadge(unread)
+            }
         }
+    }
+}
+
+/** "Name: message", "You: message", or null when the room is empty. */
+private fun com.talkswithtanha.twt.core.badges.RoomPreview?.line(): String? {
+    val p = this ?: return null
+    val text = p.lastText?.takeIf { it.isNotBlank() } ?: return null
+    val who = if (p.lastIsMine) "You" else p.lastSender?.substringBefore(' ')?.takeIf { it.isNotBlank() }
+    return if (who != null) "$who: $text" else text
+}
+
+/** Today's time, "Yesterday", or the date — as WhatsApp lists them. */
+private fun chatTime(at: java.util.Date): String {
+    val then = java.util.Calendar.getInstance().apply { time = at }
+    val now = java.util.Calendar.getInstance()
+    val sameYear = then.get(java.util.Calendar.YEAR) == now.get(java.util.Calendar.YEAR)
+    val dayDiff = now.get(java.util.Calendar.DAY_OF_YEAR) - then.get(java.util.Calendar.DAY_OF_YEAR)
+    val pattern = when {
+        sameYear && dayDiff == 0 -> "HH:mm"
+        sameYear && dayDiff == 1 -> return "Yesterday"
+        sameYear -> "d MMM"
+        else -> "d MMM yyyy"
+    }
+    return java.text.SimpleDateFormat(pattern, java.util.Locale.getDefault()).format(at)
+}
+
+/** The green unread count, as on every chat list. */
+@Composable
+fun CountBadge(count: Int, modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .defaultMinSize(minWidth = 20.dp, minHeight = 20.dp)
+            .clip(CircleShape)
+            .background(IosColors.BuyGreen)
+            .padding(horizontal = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            com.talkswithtanha.twt.core.badges.badgeText(count),
+            color = Color.Black,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }

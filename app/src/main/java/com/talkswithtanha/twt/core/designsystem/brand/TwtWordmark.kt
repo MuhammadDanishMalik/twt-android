@@ -127,7 +127,7 @@ fun TwtWordmark(
         androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     }
 
-    // The new TWT logo: its letters take the foil, its green stroke stays brand green.
+    // The TWT logo: its white letters take the foil, the green stroke and W stay brand green.
     val letters = ImageBitmap.imageResource(com.talkswithtanha.twt.R.drawable.twt_letters)
     val stroke = ImageBitmap.imageResource(com.talkswithtanha.twt.R.drawable.twt_slash)
 
@@ -146,4 +146,4 @@ fun TwtWordmark(
 }
 
 /** Width over height of the new TWT wordmark. */
-const val TWT_WORDMARK_ASPECT = 4.342f
+const val TWT_WORDMARK_ASPECT = 4.401f

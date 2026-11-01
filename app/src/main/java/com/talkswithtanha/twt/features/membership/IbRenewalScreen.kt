@@ -142,22 +142,18 @@ class IbRenewalViewModel @Inject constructor(
 
     fun signOut() = session.signOut()
 
-    /** Downscaled to 1600px on the long edge and JPEG 85: legible, and light on data. */
+    /** Downscaled to 1280px on the long edge and compressed: legible, and light on data. */
     private fun prepare(context: Context, uri: Uri): Pair<Bitmap, ByteArray> {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         context.contentResolver.openInputStream(uri).use { BitmapFactory.decodeStream(it, null, bounds) }
         var sample = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 1600) sample *= 2
+        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 1280) sample *= 2
         val bitmap = context.contentResolver.openInputStream(uri).use {
             BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
         } ?: error("undecodable")
-        val scale = 1600f / maxOf(bitmap.width, bitmap.height)
+        val scale = 1280f / maxOf(bitmap.width, bitmap.height)
         val sized = if (scale < 1f) Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true) else bitmap
-        val bytes = ByteArrayOutputStream().use { out ->
-            sized.compress(Bitmap.CompressFormat.JPEG, 85, out)
-            out.toByteArray()
-        }
-        return sized to bytes
+        return sized to com.talkswithtanha.twt.core.images.compactBytes(sized)
     }
 }
 

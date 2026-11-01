@@ -118,6 +118,7 @@ class ChatRoomViewModel @Inject constructor(
     private val reports: ReportRepository,
     marketplaceConfig: com.talkswithtanha.twt.core.data.MarketplaceConfigRepository,
     private val badges: com.talkswithtanha.twt.core.badges.Badges,
+    private val uploader: com.talkswithtanha.twt.core.images.CloudinaryUploader,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -161,9 +162,9 @@ class ChatRoomViewModel @Inject constructor(
     /**
      * Sends a picture — a payment screenshot, usually — into the thread.
      *
-     * It goes into the member's own private proofs folder, which only they
-     * and staff can read, and the message carries its link: the chat already
-     * shows any image link in a message as the picture.
+     * It goes up to Cloudinary, like every other picture in the app, and the
+     * message carries its link: the chat already shows any image link in a
+     * message as the picture.
      */
     fun sendPhoto(jpeg: ByteArray) {
         val user = session.currentUser.value ?: return
@@ -171,10 +172,7 @@ class ChatRoomViewModel @Inject constructor(
         _sendingPhoto.value = true
         viewModelScope.launch {
             runCatching {
-                val ref = com.google.firebase.storage.FirebaseStorage.getInstance().reference
-                    .child("paymentProofs/${user.id}/chat-${System.currentTimeMillis()}.jpg")
-                ref.putBytes(jpeg, com.google.firebase.storage.StorageMetadata.Builder().setContentType("image/jpeg").build()).await()
-                val url = ref.downloadUrl.await().toString()
+                val url = uploader.uploadImageOrThrow(jpeg)
                 val ownThread = roomId == FirestorePaths.ChatRoom.support(user.id)
                 if (isSupportRoom && ownThread) {
                     chatRepository.ensureSupportRoom(

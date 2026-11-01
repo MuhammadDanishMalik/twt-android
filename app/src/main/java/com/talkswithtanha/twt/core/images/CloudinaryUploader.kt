@@ -95,6 +95,58 @@ class CloudinaryUploader @Inject constructor() {
     }
 
     /**
+     * Uploads an already-compressed picture — a payment screenshot — and
+     * returns its delivery URL. WebP or JPEG, told apart by their first bytes.
+     *
+     * Firebase Storage is not set up on this project (every upload there
+     * answers 404), so screenshots go where every other picture in the app
+     * already lives, under the same preset the panel uses.
+     */
+    suspend fun uploadImage(bytes: ByteArray): UploadResult = withContext(Dispatchers.IO) {
+        val webp = bytes.size > 12 && String(bytes, 8, 4, Charsets.US_ASCII) == "WEBP"
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart(
+                name = "file",
+                filename = if (webp) "screenshot.webp" else "screenshot.jpg",
+                body = bytes.toRequestBody((if (webp) "image/webp" else "image/jpeg").toMediaType())
+            )
+            .addFormDataPart("upload_preset", Cloudinary.AVATAR_PRESET)
+            .build()
+
+        val request = Request.Builder()
+            .url(Cloudinary.UPLOAD_ENDPOINT)
+            .post(body)
+            .build()
+
+        runCatching {
+            client.newCall(request).execute().use { response ->
+                val text = response.body?.string().orEmpty()
+                val json = runCatching { JSONObject(text) }.getOrNull()
+                if (!response.isSuccessful) {
+                    val detail = json?.optJSONObject("error")?.optString("message")
+                    return@use UploadResult.Failed(
+                        detail?.takeIf { it.isNotBlank() } ?: "Upload failed (${response.code})"
+                    )
+                }
+                val url = json?.optString("secure_url").orEmpty()
+                val publicId = json?.optString("public_id").orEmpty()
+                if (url.isBlank()) UploadResult.Failed("Cloudinary returned no image URL")
+                else UploadResult.Success(url, publicId)
+            }
+        }.getOrElse { error ->
+            UploadResult.Failed(error.message ?: "Could not reach Cloudinary")
+        }
+    }
+
+    /** The URL, or an exception carrying Cloudinary's reason. */
+    suspend fun uploadImageOrThrow(bytes: ByteArray): String =
+        when (val r = uploadImage(bytes)) {
+            is UploadResult.Success -> r.url
+            is UploadResult.Failed -> throw IllegalStateException(r.message)
+        }
+
+    /**
      * Uploads a recorded voice note and returns its delivery URL.
      *
      * Sent as a stream from the file rather than read into memory: a long note

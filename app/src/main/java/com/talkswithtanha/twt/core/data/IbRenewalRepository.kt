@@ -3,8 +3,6 @@ package com.talkswithtanha.twt.core.data
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
-import com.google.firebase.storage.FirebaseStorage
-import com.google.firebase.storage.StorageMetadata
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
@@ -34,7 +32,8 @@ data class IbRenewal(
  */
 @Singleton
 class IbRenewalRepository @Inject constructor(
-    private val db: FirebaseFirestore
+    private val db: FirebaseFirestore,
+    private val uploader: com.talkswithtanha.twt.core.images.CloudinaryUploader
 ) {
     private val renewals get() = db.collection("ibRenewals")
 
@@ -60,7 +59,7 @@ class IbRenewalRepository @Inject constructor(
                 )
             }
 
-    /** Uploads the screenshot privately, then files the request. */
+    /** Uploads the screenshot, then files the request. */
     suspend fun submit(
         uid: String,
         name: String,
@@ -68,10 +67,8 @@ class IbRenewalRepository @Inject constructor(
         expiresAt: Date?,
         jpeg: ByteArray
     ) {
-        val ref = FirebaseStorage.getInstance().reference
-            .child("paymentProofs/$uid/ib-renewal-${System.currentTimeMillis()}.jpg")
-        ref.putBytes(jpeg, StorageMetadata.Builder().setContentType("image/jpeg").build()).await()
-        val url = ref.downloadUrl.await().toString()
+        // Cloudinary, because Storage is not set up on this project.
+        val url = uploader.uploadImageOrThrow(jpeg)
 
         renewals.add(
             buildMap {

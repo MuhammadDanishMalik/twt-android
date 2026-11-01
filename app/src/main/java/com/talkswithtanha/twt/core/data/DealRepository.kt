@@ -61,7 +61,8 @@ interface DealRepository {
  */
 @Singleton
 class FirebaseDealRepository @Inject constructor(
-    private val db: FirebaseFirestore
+    private val db: FirebaseFirestore,
+    private val uploader: com.talkswithtanha.twt.core.images.CloudinaryUploader
 ) : DealRepository {
 
     private val deals get() = db.collection(Collection.DEALS)
@@ -123,14 +124,9 @@ class FirebaseDealRepository @Inject constructor(
     }
 
     override suspend fun markPaymentSent(dealId: String, reference: String, screenshot: ByteArray?) {
-        // The screenshot goes up first, into the deal's own private folder,
-        // so the claim and its proof land together.
-        val proofUrl = screenshot?.let { bytes ->
-            val ref = com.google.firebase.storage.FirebaseStorage.getInstance().reference
-                .child("dealProofs/$dealId/payment-${System.currentTimeMillis()}.jpg")
-            ref.putBytes(bytes, com.google.firebase.storage.StorageMetadata.Builder().setContentType("image/jpeg").build()).await()
-            ref.downloadUrl.await().toString()
-        }
+        // The screenshot goes up first, so the claim and its proof land
+        // together. Cloudinary, because Storage is not set up on this project.
+        val proofUrl = screenshot?.let { bytes -> uploader.uploadImageOrThrow(bytes) }
         deals.document(dealId).update(
             buildMap<String, Any> {
                 put(F.STATUS, DealStatus.PAYMENT_SENT.stored)

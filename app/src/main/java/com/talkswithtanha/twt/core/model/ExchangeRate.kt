@@ -27,9 +27,22 @@ data class ExchangeRate(
     val history: List<Long> = emptyList(),
     val minAmountPaisa: Long? = null,
     val maxAmountPaisa: Long? = null,
-    val isAcceptingDeals: Boolean = true
+    val isAcceptingDeals: Boolean = true,
+    /** Dollars the desk deals on [fundDate]; 0 means no limit. Set on the panel's deals page. */
+    val dailyFundUsd: Long = 0,
+    /** The desk day the fund is for, `yyyy-MM-dd` in Karachi. */
+    val fundDate: String? = null,
+    /** Dollars of that fund already taken by approved deals. */
+    val fundUsedUsd: Long = 0
 ) {
     val pair: String get() = "$base/$quote"
+
+    /** Dollars the desk can still take today, or null when no fund limits today. */
+    fun fundLeftUsd(today: String = deskDay()): Long? =
+        if (fundDate == today && dailyFundUsd > 0) (dailyFundUsd - fundUsedUsd).coerceAtLeast(0) else null
+
+    /** Open for new deals: switched on, and today's fund not used up. */
+    val takingDeals: Boolean get() = isAcceptingDeals && fundLeftUsd() != 0L
 
     val spreadPaisa: Long get() = buyPaisa - sellPaisa
     val deltaPaisa: Long get() = buyPaisa - previousBuyPaisa
@@ -74,3 +87,9 @@ data class ExchangeRate(
         }
     }
 }
+
+/** Today as the desk counts it: the date in Karachi, as the panel writes `fundDate`. */
+fun deskDay(at: Date = Date()): String =
+    java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+        .apply { timeZone = java.util.TimeZone.getTimeZone("Asia/Karachi") }
+        .format(at)

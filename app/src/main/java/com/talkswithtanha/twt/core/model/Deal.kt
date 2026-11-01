@@ -105,6 +105,8 @@ enum class DealSide(val stored: String, val title: String) {
  * complete and is sent money for nothing.
  */
 enum class DealStatus(val stored: String, val title: String) {
+    /** Asked for; the desk approves it before anything is shown or paid. */
+    AWAITING_APPROVAL("awaitingApproval", "Waiting for approval"),
     AWAITING_PAYMENT("awaitingPayment", "Send payment"),
     PAYMENT_SENT("paymentSent", "Awaiting approval"),
     PAYMENT_APPROVED("paymentApproved", "Payment approved"),
@@ -116,7 +118,7 @@ enum class DealStatus(val stored: String, val title: String) {
     /** Position on the happy path, or null for the two ways out of it. */
     val stepIndex: Int?
         get() = when (this) {
-            AWAITING_PAYMENT -> 0
+            AWAITING_APPROVAL, AWAITING_PAYMENT -> 0
             PAYMENT_SENT -> 1
             PAYMENT_APPROVED -> 2
             RELEASING -> 3
@@ -130,7 +132,11 @@ enum class DealStatus(val stored: String, val title: String) {
     /** The only transition this app is allowed to make. */
     val memberCanReportPayment: Boolean get() = this == AWAITING_PAYMENT
 
+    /** A member may back out while the desk decides, or after approval but before paying. */
+    val memberCanCancel: Boolean get() = this == AWAITING_APPROVAL || this == AWAITING_PAYMENT
+
     fun detail(side: DealSide): String = when (this) {
+        AWAITING_APPROVAL -> "The desk is looking at your request. You will see where to pay once it is approved."
         AWAITING_PAYMENT -> "Send the exact amount to the account below, then confirm."
         PAYMENT_SENT -> "Tanha is verifying your transfer. This usually takes a few minutes."
         PAYMENT_APPROVED -> "Payment confirmed. Tanha will ask where to send your ${side.receiveCurrency}."

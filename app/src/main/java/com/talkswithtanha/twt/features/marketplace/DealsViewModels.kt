@@ -105,7 +105,10 @@ class NewDealViewModel @Inject constructor(
         // The desk's own limits, checked here so the member hears why; the
         // security rules refuse the same deals regardless.
         val refusal = when {
-            !currentRate.isAcceptingDeals -> "The desk is closed for new deals right now. Your open deals are unaffected."
+            !currentRate.isAcceptingDeals -> "We are not available for new deals right now. Your open deals are unaffected."
+            currentRate.fundLeftUsd() == 0L -> "Today's deals are full. Please try again tomorrow."
+            currentRate.fundLeftUsd()?.let { cents > it * 100 } == true ->
+                "The desk can take up to ${"%,d".format(currentRate.fundLeftUsd())} USD more today. Try a smaller amount."
             accounts.value.isEmpty() -> "The desk has no payment account set up yet, so a deal cannot be opened. Message Tanha."
             else -> {
                 val pkrPaisa = cents * currentRate.paisaFor(_state.value.side) / 100
@@ -143,7 +146,7 @@ class NewDealViewModel @Inject constructor(
                         // spread — on a $100 sell that is 34,100 rupees where
                         // 23,000 was quoted, out of Tanha's pocket.
                         lockedRatePaisa = currentRate.paisaFor(_state.value.side),
-                        status = com.talkswithtanha.twt.core.model.DealStatus.AWAITING_PAYMENT,
+                        status = com.talkswithtanha.twt.core.model.DealStatus.AWAITING_APPROVAL,
                         // The account the member actually chose, rather than
                         // whichever happened to be configured first.
                         sellerAccount = accounts.value.getOrNull(_state.value.accountIndex)

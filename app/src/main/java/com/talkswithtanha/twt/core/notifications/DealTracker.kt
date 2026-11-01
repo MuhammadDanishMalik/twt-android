@@ -158,6 +158,7 @@ class DealTracker @Inject constructor(
     }
 
     private fun chip(status: DealStatus) = when (status) {
+        DealStatus.AWAITING_APPROVAL -> "WAIT"
         DealStatus.AWAITING_PAYMENT -> "PAY"
         DealStatus.PAYMENT_SENT -> "CHECK"
         DealStatus.PAYMENT_APPROVED -> "PAID"

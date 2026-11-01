@@ -138,6 +138,12 @@ fun MarketplaceScreen(
                 }
             }
 
+            // Closed by the panel, or today's fund used up: said plainly at the
+            // top, and no new deal can be started until the desk opens again.
+            rate?.takeIf { !it.takingDeals }?.let { current ->
+                item { DeskClosedCard(fundFull = current.isAcceptingDeals, modifier = Modifier.staggeredAppear(1)) }
+            }
+
             item {
                 Column(Modifier.staggeredAppear(2)) {
                     // Chat first. Every deal here starts as a conversation about
@@ -155,7 +161,7 @@ fun MarketplaceScreen(
                         onClick = { sellerRoomId?.let(onOpenSellerChat) }
                     )
                     Spacer(Modifier.height(10.dp))
-                    SecondaryButton("Start a new deal", onClick = onNewDeal)
+                    if (rate?.takingDeals != false) SecondaryButton("Start a new deal", onClick = onNewDeal)
                 }
             }
 
@@ -784,5 +790,38 @@ private fun relativeTime(then: Date): String {
         minutes < 60 -> "${minutes}m ago"
         hours < 24 -> "${hours}h ago"
         else -> "${days}d ago"
+    }
+}
+
+/** The desk is not taking new deals: switched off on the panel, or today's fund is used up. */
+@Composable
+private fun DeskClosedCard(fundFull: Boolean, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(IosColors.SellRed.copy(alpha = 0.12f))
+            .padding(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier.size(10.dp).clip(CircleShape).background(IosColors.SellRed)
+        )
+        Column {
+            Text(
+                if (fundFull) "Today's deals are full" else "Not available for new deals",
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                if (fundFull) "The desk has reached today's limit. Please come back tomorrow."
+                else "We are not taking new deals right now. Your open deals carry on as usual.",
+                color = IosColors.TextSecondary,
+                fontSize = 14.sp,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
     }
 }

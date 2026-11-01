@@ -624,7 +624,7 @@ private fun FooterActions(deal: Deal, onOpenChat: () -> Unit, onCancel: () -> Un
     ) {
         // A member may back out only before paying — the rules allow exactly
         // that. After it, cancelling is a conversation with the desk.
-        if (deal.status == DealStatus.AWAITING_PAYMENT) {
+        if (deal.status.memberCanCancel) {
             FooterAction(
                 icon = Icons.Outlined.Close,
                 label = "Cancel deal",

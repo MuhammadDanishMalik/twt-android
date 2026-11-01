@@ -132,12 +132,13 @@ class DealPulseViewModel @Inject constructor(
         DealStatus.COMPLETED -> "Funds sent. Deal complete."
         DealStatus.CANCELLED -> "Deal cancelled. Nothing moved."
         DealStatus.DISPUTED -> "TWT support is reviewing this deal."
-        DealStatus.AWAITING_PAYMENT -> "Deal opened."
+        DealStatus.AWAITING_APPROVAL -> "Request sent. Waiting for the desk to approve."
+        DealStatus.AWAITING_PAYMENT -> "Approved. Send your payment now."
     }
 
     /** The member's turn is important; money arriving is success; a stop is an alert. */
     private fun soundFor(status: DealStatus) = when (status) {
-        DealStatus.PAYMENT_APPROVED -> com.talkswithtanha.twt.core.sound.AppSounds.Sound.IMPORTANT
+        DealStatus.PAYMENT_APPROVED, DealStatus.AWAITING_PAYMENT -> com.talkswithtanha.twt.core.sound.AppSounds.Sound.IMPORTANT
         DealStatus.COMPLETED -> com.talkswithtanha.twt.core.sound.AppSounds.Sound.SUCCESS
         DealStatus.CANCELLED, DealStatus.DISPUTED -> com.talkswithtanha.twt.core.sound.AppSounds.Sound.ALERT
         else -> com.talkswithtanha.twt.core.sound.AppSounds.Sound.MESSAGE

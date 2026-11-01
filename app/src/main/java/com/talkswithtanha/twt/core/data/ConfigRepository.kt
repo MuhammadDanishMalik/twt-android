@@ -65,7 +65,10 @@ class FirebaseExchangeRateRepository @Inject constructor(
                         .mapNotNull { it.asLongOrNull() },
                     minAmountPaisa = document.get(E.MIN_AMOUNT_PAISA).asLongOrNull(),
                     maxAmountPaisa = document.get(E.MAX_AMOUNT_PAISA).asLongOrNull(),
-                    isAcceptingDeals = document.getBoolean(E.IS_ACCEPTING_DEALS) ?: true
+                    isAcceptingDeals = document.getBoolean(E.IS_ACCEPTING_DEALS) ?: true,
+                    dailyFundUsd = document.get("dailyFundUsd").asLongOrNull() ?: 0,
+                    fundDate = document.getString("fundDate"),
+                    fundUsedUsd = document.get("fundUsedUsd").asLongOrNull() ?: 0
                 )
             }
 }

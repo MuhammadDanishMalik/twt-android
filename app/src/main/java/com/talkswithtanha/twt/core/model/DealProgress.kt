@@ -45,6 +45,12 @@ fun Deal.progress(): DealProgress {
     val via = sellerAccount?.method?.takeIf { it.isNotBlank() } ?: "account"
     val none: (String) -> String = { it }
     return when (status) {
+        DealStatus.AWAITING_APPROVAL -> DealProgress(
+            0, false, Turn.DESK,
+            "Request sent. The TWT desk is approving your deal",
+            "Once approved you see where to pay $sends, and the ${DealProgress.PAY_MINUTES}-minute pay window starts.",
+            null, none, "Awaiting approval"
+        )
         DealStatus.AWAITING_PAYMENT -> DealProgress(
             1, false, Turn.YOU,
             "Pay $sends to the desk's $via, then tap I have paid",
@@ -80,8 +86,11 @@ fun Deal.progress(): DealProgress {
         )
         DealStatus.CANCELLED -> DealProgress(
             0, false, Turn.CLOSED,
-            if (cancelReason == "timeout") "Expired, not paid in time, so the deal closed itself"
-            else "This deal was cancelled",
+            when (cancelReason) {
+                "timeout" -> "Expired, not paid in time, so the deal closed itself"
+                "rejected" -> "The desk could not take this deal right now"
+                else -> "This deal was cancelled"
+            },
             if (cancelReason == "timeout") "Nothing moved. If you already paid, message the desk with your transaction id."
             else "Nothing moved. You can open a new deal at any time.",
             null, none, "Cancelled"

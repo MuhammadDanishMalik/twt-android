@@ -145,7 +145,9 @@ class FirebaseUserRepository @Inject constructor(
             if (existing.country.isNullOrBlank() && !country.isNullOrBlank()) {
                 refresh[F.COUNTRY] = country.uppercase()
             }
-            runCatching { document.update(refresh).await() }
+            // Not awaited: the write is queued and lands on its own, and
+            // waiting for the server here added a round trip to every sign-in.
+            document.update(refresh).addOnFailureListener { }
             return existing
         }
 

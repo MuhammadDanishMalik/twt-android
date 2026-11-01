@@ -88,7 +88,10 @@ class AuthViewModel @Inject constructor(
 
 
     /** [idToken] comes from Credential Manager — see [GoogleSignIn]. */
-    fun signInWithGoogle(idToken: String, country: String?) = submit {
+    // The Google button marks the screen busy before the account picker opens,
+    // so this must run although `isSubmitting` is already true -- through the
+    // ordinary guard it returned at once and the spinner turned forever.
+    fun signInWithGoogle(idToken: String, country: String?) = submit(alreadyStarted = true) {
         val result = authService.signInWithGoogle(idToken)
         session.establishSession(result, country)
     }
@@ -100,8 +103,8 @@ class AuthViewModel @Inject constructor(
 
     fun dismissNotice() = _state.update { it.copy(notice = null, error = null) }
 
-    private fun submit(block: suspend () -> Unit) {
-        if (_state.value.isSubmitting) return
+    private fun submit(alreadyStarted: Boolean = false, block: suspend () -> Unit) {
+        if (_state.value.isSubmitting && !alreadyStarted) return
         _state.update { it.copy(isSubmitting = true, error = null) }
         viewModelScope.launch {
             try {

@@ -449,7 +449,8 @@ class FirebaseFeedRepository @Inject constructor(
             parentId = document.getString(C.PARENT_ID),
             replyCount = (document.getLong(C.REPLY_COUNT) ?: 0L).toInt(),
             isAuthorReply = document.getBoolean("isAuthorReply") == true,
-            audioUrl = document.getString("audioUrl")
+            audioUrl = document.getString("audioUrl")?.takeIf { it.isNotBlank() },
+            audioDurationSec = (document.getLong("audioDurationSec") ?: 0L).toInt()
         )
     }
 }

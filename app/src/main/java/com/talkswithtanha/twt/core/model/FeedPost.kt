@@ -125,7 +125,8 @@ data class FeedComment(
     val parentId: String? = null,
     val replyCount: Int = 0,
     val isAuthorReply: Boolean = false,
-    val audioUrl: String? = null
+    val audioUrl: String? = null,
+    val audioDurationSec: Int = 0
 )
 
 /** One change the desk made to a live trade, newest first on the setup card. */

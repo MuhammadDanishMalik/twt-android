@@ -249,13 +249,23 @@ private fun CommentRow(
                 Text("· ${shortAgo(comment.createdAt)}", color = IosColors.TextSecondary, fontSize = 12.sp)
             }
 
-            Text(
-                text = comment.text,
-                color = Color.White.copy(alpha = 0.92f),
-                fontSize = 14.5.sp,
-                lineHeight = 20.sp,
-                modifier = Modifier.padding(top = 2.dp)
-            )
+            // A voice reply from the panel carries a placeholder line when Tanha
+            // said nothing in writing; the player is the reply then.
+            val placeholder = comment.audioUrl != null && comment.text == "🎙 Voice reply"
+            if (!placeholder) {
+                Text(
+                    text = comment.text,
+                    color = Color.White.copy(alpha = 0.92f),
+                    fontSize = 14.5.sp,
+                    lineHeight = 20.sp,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+            comment.audioUrl?.let { url ->
+                Box(Modifier.padding(top = 6.dp)) {
+                    VoiceNote(url, "Voice reply", comment.audioDurationSec, null)
+                }
+            }
 
             Row(
                 Modifier.padding(top = 6.dp),

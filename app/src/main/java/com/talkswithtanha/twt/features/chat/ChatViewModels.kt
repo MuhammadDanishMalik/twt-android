@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 /** One row in the chat list. */
@@ -46,8 +47,13 @@ data class ChatRoomSummary(
 @HiltViewModel
 class ChatListViewModel @Inject constructor(
     session: SessionRepository,
-    badges: com.talkswithtanha.twt.core.badges.Badges
+    badges: com.talkswithtanha.twt.core.badges.Badges,
+    marketplaceConfig: com.talkswithtanha.twt.core.data.MarketplaceConfigRepository
 ) : ViewModel() {
+
+    /** The dealer, as the panel names and pictures him, for the Marketplace row. */
+    val seller: StateFlow<com.talkswithtanha.twt.core.model.MarketplaceSeller> = marketplaceConfig.observeSeller()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), com.talkswithtanha.twt.core.model.MarketplaceSeller())
 
     /** Last message, its time and the unread count, per room, live. */
     val previews = badges.rooms
@@ -145,6 +151,51 @@ class ChatRoomViewModel @Inject constructor(
         FirestorePaths.ChatRoom.PREMIUM -> "Premium Community"
         FirestorePaths.ChatRoom.COMMUNITY -> "Community"
         else -> "Talks with Tanha"
+    }
+
+    private val _sendingPhoto = MutableStateFlow(false)
+
+    /** A photo from the gallery is on its way up. */
+    val sendingPhoto: StateFlow<Boolean> = _sendingPhoto
+
+    /**
+     * Sends a picture — a payment screenshot, usually — into the thread.
+     *
+     * It goes into the member's own private proofs folder, which only they
+     * and staff can read, and the message carries its link: the chat already
+     * shows any image link in a message as the picture.
+     */
+    fun sendPhoto(jpeg: ByteArray) {
+        val user = session.currentUser.value ?: return
+        if (_sendingPhoto.value) return
+        _sendingPhoto.value = true
+        viewModelScope.launch {
+            runCatching {
+                val ref = com.google.firebase.storage.FirebaseStorage.getInstance().reference
+                    .child("paymentProofs/${user.id}/chat-${System.currentTimeMillis()}.jpg")
+                ref.putBytes(jpeg, com.google.firebase.storage.StorageMetadata.Builder().setContentType("image/jpeg").build()).await()
+                val url = ref.downloadUrl.await().toString()
+                val ownThread = roomId == FirestorePaths.ChatRoom.support(user.id)
+                if (isSupportRoom && ownThread) {
+                    chatRepository.ensureSupportRoom(
+                        uid = user.id,
+                        userName = user.fullName,
+                        userEmail = user.email,
+                        lastMessage = "📷 Photo"
+                    )
+                }
+                chatRepository.send(
+                    roomId = roomId,
+                    text = url,
+                    senderId = user.id,
+                    senderName = user.fullName,
+                    replyTo = null,
+                    note = null,
+                    senderRole = user.chatRole
+                )
+            }.onFailure { _error.value = "That photo did not send. Try again." }
+            _sendingPhoto.value = false
+        }
     }
 
     private val _draft = MutableStateFlow("")

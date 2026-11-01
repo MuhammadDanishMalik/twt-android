@@ -47,6 +47,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material3.Icon
@@ -100,6 +101,16 @@ fun ChatRoomScreen(
     LaunchedEffect(state.messages.lastOrNull()?.id) { viewModel.markRead() }
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { viewModel.markRead() } }
     val sellerProfile by viewModel.seller.collectAsStateWithLifecycle()
+    val sendingPhoto by viewModel.sendingPhoto.collectAsStateWithLifecycle()
+    val photoContext = androidx.compose.ui.platform.LocalContext.current
+    val photoScope = androidx.compose.runtime.rememberCoroutineScope()
+    val photoPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) photoScope.launch {
+            com.talkswithtanha.twt.core.images.prepareScreenshot(photoContext, uri)?.let { viewModel.sendPhoto(it.second) }
+        }
+    }
     val savedNotes by viewModel.savedNotes.collectAsStateWithLifecycle()
     val editing by viewModel.editing.collectAsStateWithLifecycle()
     val activity by viewModel.activity.collectAsStateWithLifecycle()
@@ -252,12 +263,35 @@ fun ChatRoomScreen(
             ComposeBanner(editing = editing != null, message = target, onCancel = viewModel::cancelCompose)
         }
 
+        if (sendingPhoto) {
+            Text(
+                "Sending photo…",
+                color = IosColors.TextSecondary,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+            )
+        }
+
         ChatInputBar(
             draft = state.draft,
-            enabled = state.canPost,
+            enabled = state.canPost && !sendingPhoto,
             hasAttachment = state.pendingNote != null,
+            // With the dealer, a lesson note means nothing; the payment
+            // screenshot is what gets shared. Everywhere else the paperclip
+            // still shares a note.
+            photoMode = viewModel.isSellerChat,
             onDraftChange = viewModel::onDraftChange,
-            onAttach = { pickingNote = true },
+            onAttach = {
+                if (viewModel.isSellerChat) {
+                    photoPicker.launch(
+                        androidx.activity.result.PickVisualMediaRequest(
+                            androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
+                        )
+                    )
+                } else {
+                    pickingNote = true
+                }
+            },
             onSend = viewModel::send
         )
     }
@@ -948,7 +982,8 @@ private fun ChatInputBar(
     hasAttachment: Boolean,
     onDraftChange: (String) -> Unit,
     onAttach: () -> Unit,
-    onSend: () -> Unit
+    onSend: () -> Unit,
+    photoMode: Boolean = false
 ) {
     val haptics = LocalHapticFeedback.current
     // A note can be sent on its own, without any text.
@@ -975,8 +1010,8 @@ private fun ChatInputBar(
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                Icons.Filled.AttachFile,
-                contentDescription = "Share a lesson note",
+                if (photoMode) Icons.Filled.Image else Icons.Filled.AttachFile,
+                contentDescription = if (photoMode) "Send a photo" else "Share a lesson note",
                 tint = if (hasAttachment) IosColors.Accent else IosColors.TextSecondary,
                 modifier = Modifier.size(18.dp)
             )

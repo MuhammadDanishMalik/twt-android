@@ -104,6 +104,7 @@ class Badges @Inject constructor(
         return RoomPreview(
             lastText = when {
                 last.audioUrl != null -> "🎤 Voice note"
+                PHOTO_LINK.matches(last.text.trim()) -> "📷 Photo"
                 last.noteAttachment != null && last.text.isBlank() -> "Shared a lesson note"
                 else -> last.text
             },
@@ -146,6 +147,8 @@ class Badges @Inject constructor(
     private fun roomKey(roomId: String) = "room.$roomId"
 
     private companion object {
+        /** A message that is nothing but a link to a picture: a photo sent in the chat. */
+        val PHOTO_LINK = Regex("""https?://\S+?\.(?:png|jpe?g|gif|webp)(?:\?\S*)?""", RegexOption.IGNORE_CASE)
         const val PAGE = 30
         const val FEED = "feed"
         const val SIGNALS = "signals"

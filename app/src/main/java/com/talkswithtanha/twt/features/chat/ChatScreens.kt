@@ -83,6 +83,7 @@ fun ChatListScreen(
     val user by viewModel.user.collectAsStateWithLifecycle()
     val tickets by ticketsViewModel.state.collectAsStateWithLifecycle()
     val previews by viewModel.previews.collectAsStateWithLifecycle()
+    val seller by viewModel.seller.collectAsStateWithLifecycle()
 
     Column(
         Modifier
@@ -166,10 +167,15 @@ fun ChatListScreen(
             if (com.talkswithtanha.twt.BuildConfig.MARKETPLACE_ENABLED) item {
                 SettingsCard {
                     val supportRoom = rooms.lastOrNull()?.roomId
+                    val preview = supportRoom?.let { previews[it] }
                     ChatRoomRow(
-                        title = "Trade with Tanha",
-                        subtitle = "Buy and sell dollars",
-                        initials = "TW",
+                        title = seller.displayName,
+                        subtitle = preview.line() ?: "Buy and sell dollars",
+                        time = preview?.lastAt,
+                        unread = preview?.unread ?: 0,
+                        initials = seller.displayName.split(' ').filter { it.isNotBlank() }.take(2)
+                            .joinToString("") { it.first().uppercase() },
+                        photoUrl = seller.photoUrl,
                         icon = null,
                         locked = supportRoom == null,
                         crowned = false,
@@ -204,6 +210,8 @@ private fun ChatRoomRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector?,
     locked: Boolean,
     crowned: Boolean,
+    /** A person's photo, in place of their initials. */
+    photoUrl: String? = null,
     /** When the last message was sent, shown top right. */
     time: java.util.Date? = null,
     /** New messages since the member last had the room open. */
@@ -226,6 +234,12 @@ private fun ChatRoomRow(
             contentAlignment = Alignment.Center
         ) {
             when {
+                !photoUrl.isNullOrBlank() -> coil3.compose.AsyncImage(
+                    model = com.talkswithtanha.twt.core.images.Cloudinary.avatar(photoUrl, 144) ?: photoUrl,
+                    contentDescription = title,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
                 icon != null -> Icon(
                     icon,
                     contentDescription = null,

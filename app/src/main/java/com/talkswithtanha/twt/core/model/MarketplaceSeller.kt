@@ -21,7 +21,7 @@ data class MarketplaceSeller(
     val photoUrl: String? = null
 ) {
     /** What to call him when the panel has not named him yet. */
-    val displayName: String get() = name ?: "Trade with Tanha"
+    val displayName: String get() = name?.takeIf { it.isNotBlank() } ?: "Rafiullah Khan"
 
     /** True when there is at least one statistic worth giving a row to. */
     val hasStats: Boolean

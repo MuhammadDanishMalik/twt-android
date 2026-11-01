@@ -31,7 +31,20 @@ data class SupportThread(
 )
 
 /** Who else has a room open, and who is typing in it. */
-data class RoomActivity(val online: Int = 0, val typing: List<String> = emptyList())
+data class RoomActivity(
+    val online: Int = 0,
+    val typing: List<String> = emptyList(),
+    /** Recording a voice note: the panel marks its `typing` entry `activity: recording`. */
+    val recording: List<String> = emptyList()
+) {
+    /** "Tanha is recording…" / "Tanha is typing…", or null when nobody is. */
+    fun line(): String? = when {
+        recording.isNotEmpty() -> "${recording.first()} is recording…"
+        typing.size == 1 -> "${typing.first()} is typing…"
+        typing.size > 1 -> "${typing.size} people are typing…"
+        else -> null
+    }
+}
 
 interface ChatRepository {
     /** Live window on the most recent messages in a room, oldest first. */
@@ -232,10 +245,11 @@ class FirebaseChatRepository @Inject constructor(
         db.collection(Collection.CHAT_ROOMS).document(roomId).snapshotFlow().map { snapshot ->
             val doc = (snapshot as? Snapshot.Data)?.value
             val now = System.currentTimeMillis()
-            fun entries(field: String, timeKey: String, freshMs: Long): List<String> =
+            fun entries(field: String, timeKey: String, freshMs: Long, recording: Boolean? = null): List<String> =
                 (doc?.get(field) as? Map<*, *>).orEmpty().mapNotNull { (uid, value) ->
                     val entry = value as? Map<*, *> ?: return@mapNotNull null
                     if (uid == currentUserId) return@mapNotNull null
+                    if (recording != null && (entry["activity"] == "recording") != recording) return@mapNotNull null
                     val at = (entry[timeKey] as? Timestamp)?.toDate()?.time ?: return@mapNotNull null
                     if (now - at > freshMs) return@mapNotNull null
                     (entry["name"] as? String)?.takeIf { it.isNotBlank() } ?: "Someone"
@@ -245,7 +259,8 @@ class FirebaseChatRepository @Inject constructor(
                 online = entries(R.PRESENCE, "lastSeenAt", 2 * 60_000L).size,
                 // Typing goes stale fast: a phone that died mid-sentence must not
                 // keep "typing…" up for good.
-                typing = entries(R.TYPING, "typingAt", 8_000L)
+                typing = entries(R.TYPING, "typingAt", 8_000L, recording = false),
+                recording = entries(R.TYPING, "typingAt", 8_000L, recording = true)
             )
         }
 

@@ -62,6 +62,7 @@ import com.talkswithtanha.twt.core.designsystem.TwtColors
 import com.talkswithtanha.twt.core.designsystem.components.EmptyState
 import com.talkswithtanha.twt.core.designsystem.components.TwtCard
 import com.talkswithtanha.twt.core.designsystem.components.TwtScreen
+import com.talkswithtanha.twt.core.firebase.FirestorePaths
 import com.talkswithtanha.twt.core.model.ChatMessage
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -84,6 +85,7 @@ fun ChatListScreen(
     val tickets by ticketsViewModel.state.collectAsStateWithLifecycle()
     val previews by viewModel.previews.collectAsStateWithLifecycle()
     val seller by viewModel.seller.collectAsStateWithLifecycle()
+    val tanhaPhoto by viewModel.tanhaPhoto.collectAsStateWithLifecycle()
 
     Column(
         Modifier
@@ -111,13 +113,16 @@ fun ChatListScreen(
                     rooms.forEachIndexed { index, room ->
                         val locked = room.requiresAccess && user?.hasAppAccess != true
                         val preview = previews[room.roomId]
+                        val isTanha = room.roomId.startsWith(FirestorePaths.ChatRoom.SUPPORT_PREFIX)
                         ChatRoomRow(
                             modifier = Modifier.staggeredAppear(index),
                             title = room.title,
-                            subtitle = preview.line() ?: room.subtitle,
+                            subtitle = preview?.activity ?: preview.line() ?: room.subtitle,
+                            subtitleLive = preview?.activity != null,
                             time = preview?.lastAt,
                             unread = preview?.unread ?: 0,
                             initials = room.initials,
+                            photoUrl = if (isTanha) tanhaPhoto else null,
                             icon = room.icon,
                             locked = locked,
                             crowned = room.crowned
@@ -170,7 +175,8 @@ fun ChatListScreen(
                     val preview = supportRoom?.let { previews[it] }
                     ChatRoomRow(
                         title = seller.displayName,
-                        subtitle = preview.line() ?: "Buy and sell dollars",
+                        subtitle = preview?.activity ?: preview.line() ?: "Buy and sell dollars",
+                        subtitleLive = preview?.activity != null,
                         time = preview?.lastAt,
                         unread = preview?.unread ?: 0,
                         initials = seller.displayName.split(' ').filter { it.isNotBlank() }.take(2)
@@ -212,6 +218,8 @@ private fun ChatRoomRow(
     crowned: Boolean,
     /** A person's photo, in place of their initials. */
     photoUrl: String? = null,
+    /** The subtitle is "… is typing" rather than a message: drawn in the accent. */
+    subtitleLive: Boolean = false,
     /** When the last message was sent, shown top right. */
     time: java.util.Date? = null,
     /** New messages since the member last had the room open. */
@@ -277,7 +285,7 @@ private fun ChatRoomRow(
             }
             Text(
                 text = subtitle,
-                color = IosColors.TextSecondary,
+                color = if (subtitleLive) IosColors.BuyGreen else IosColors.TextSecondary,
                 fontSize = 15.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis

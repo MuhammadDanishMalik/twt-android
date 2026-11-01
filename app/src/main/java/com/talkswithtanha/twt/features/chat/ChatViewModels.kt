@@ -48,8 +48,13 @@ data class ChatRoomSummary(
 class ChatListViewModel @Inject constructor(
     session: SessionRepository,
     badges: com.talkswithtanha.twt.core.badges.Badges,
-    marketplaceConfig: com.talkswithtanha.twt.core.data.MarketplaceConfigRepository
+    marketplaceConfig: com.talkswithtanha.twt.core.data.MarketplaceConfigRepository,
+    supportConfig: com.talkswithtanha.twt.core.data.SupportConfigRepository
 ) : ViewModel() {
+
+    /** Tanha's photo, for his private chat. */
+    val tanhaPhoto: StateFlow<String?> = supportConfig.observeConfig().map { it.tanhaPhotoUrl }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** The dealer, as the panel names and pictures him, for the Marketplace row. */
     val seller: StateFlow<com.talkswithtanha.twt.core.model.MarketplaceSeller> = marketplaceConfig.observeSeller()
@@ -119,8 +124,13 @@ class ChatRoomViewModel @Inject constructor(
     marketplaceConfig: com.talkswithtanha.twt.core.data.MarketplaceConfigRepository,
     private val badges: com.talkswithtanha.twt.core.badges.Badges,
     private val uploader: com.talkswithtanha.twt.core.images.CloudinaryUploader,
+    supportConfig: com.talkswithtanha.twt.core.data.SupportConfigRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
+
+    /** Tanha's photo, for his private chat's header and the seen mark. */
+    val tanhaPhoto: StateFlow<String?> = supportConfig.observeConfig().map { it.tanhaPhotoUrl }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** The room is on screen: what is in it has been read. */
     fun markRead() = badges.markRoomRead(roomId)
@@ -204,10 +214,10 @@ class ChatRoomViewModel @Inject constructor(
     /** The member's own message being edited, if any; its text is in the draft. */
     val editing: StateFlow<ChatMessage?> = _editing.asStateFlow()
 
-    /** Who else is in the room and who is typing. Not shown in support threads. */
+    /** Who else is in the room, and who is typing or recording. */
     val activity: StateFlow<com.talkswithtanha.twt.core.data.RoomActivity> = session.currentUser
         .flatMapLatest { user ->
-            if (user == null || isSupportRoom) flowOf(com.talkswithtanha.twt.core.data.RoomActivity())
+            if (user == null) flowOf(com.talkswithtanha.twt.core.data.RoomActivity())
             else chatRepository.observeActivity(roomId, user.id)
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), com.talkswithtanha.twt.core.data.RoomActivity())
@@ -301,7 +311,6 @@ class ChatRoomViewModel @Inject constructor(
      * while keys are going, and cleared 4 s after the last one.
      */
     private fun reportTyping(active: Boolean) {
-        if (isSupportRoom) return
         val user = session.currentUser.value ?: return
         typingClearJob?.cancel()
         if (!active) {
@@ -324,10 +333,11 @@ class ChatRoomViewModel @Inject constructor(
 
     /**
      * Marks this member in the room while it is on screen, refreshed every 30 s
-     * so the admin's "online now" stays honest; cleared when they leave.
+     * so the admin's "online now" stays honest; cleared when they leave. In a
+     * private thread it is also what tells the panel not to push a reply the
+     * member is already watching arrive.
      */
     fun onRoomVisible(visible: Boolean) {
-        if (isSupportRoom) return
         val user = session.currentUser.value ?: return
         presenceJob?.cancel()
         if (visible) {

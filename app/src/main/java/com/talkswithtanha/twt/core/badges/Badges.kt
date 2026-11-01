@@ -31,7 +31,9 @@ data class RoomPreview(
     val lastSender: String? = null,
     val lastAt: Date? = null,
     val lastIsMine: Boolean = false,
-    val unread: Int = 0
+    val unread: Int = 0,
+    /** "Tanha is recording…" while it is happening, in place of the last message. */
+    val activity: String? = null
 )
 
 /**
@@ -90,8 +92,15 @@ class Badges @Inject constructor(
         .flatMapLatest { (u, ids) ->
             if (u == null || ids.isEmpty()) return@flatMapLatest flowOf(emptyMap())
             val flows = ids.map { id ->
-                combine(chats.observeMessages(id, u.id, PAGE.toLong()), marks) { snap, _ ->
-                    id to preview(id, (snap as? Snapshot.Data)?.value.orEmpty())
+                // Only the private thread says who is typing: in the community
+                // somebody always is, and the row would never show a message.
+                val activity = if (id.startsWith(FirestorePaths.ChatRoom.SUPPORT_PREFIX)) {
+                    chats.observeActivity(id, u.id).map { it.line() }
+                } else {
+                    flowOf(null)
+                }
+                combine(chats.observeMessages(id, u.id, PAGE.toLong()), marks, activity) { snap, _, line ->
+                    id to preview(id, (snap as? Snapshot.Data)?.value.orEmpty()).copy(activity = line)
                 }
             }
             combine(flows) { it.toMap() }

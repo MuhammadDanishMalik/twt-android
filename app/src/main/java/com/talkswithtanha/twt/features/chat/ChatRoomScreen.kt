@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.material3.ExperimentalMaterial3Api
 import coil3.compose.AsyncImage
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.expandVertically
@@ -102,6 +103,11 @@ fun ChatRoomScreen(
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { viewModel.markRead() } }
     val sellerProfile by viewModel.seller.collectAsStateWithLifecycle()
     val sendingPhoto by viewModel.sendingPhoto.collectAsStateWithLifecycle()
+    val tanhaPhoto by viewModel.tanhaPhoto.collectAsStateWithLifecycle()
+    // Photos go both ways in the two private threads; the community keeps to
+    // notes. In the dealer's chat a photo is the only thing to attach.
+    val photosAllowed = viewModel.isSellerChat || viewModel.isSupportRoom
+    var attachMenu by remember { mutableStateOf(false) }
     val photoContext = androidx.compose.ui.platform.LocalContext.current
     val photoScope = androidx.compose.runtime.rememberCoroutineScope()
     val photoPicker = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -168,13 +174,12 @@ fun ChatRoomScreen(
             .imePadding()
     ) {
         when {
-            viewModel.isSellerChat -> SellerHeader(sellerProfile, onBack)
-            viewModel.isSupportRoom -> SupportHeader(onBack)
+            viewModel.isSellerChat -> SellerHeader(sellerProfile, activity.line(), onBack)
+            viewModel.isSupportRoom -> SupportHeader(tanhaPhoto, activity.line(), onBack)
             else -> RoomHeader(
                 title = viewModel.roomTitle,
                 subtitle = when {
-                    activity.typing.size == 1 -> "${activity.typing.first()} is typing…"
-                    activity.typing.size > 1 -> "${activity.typing.size} people are typing…"
+                    activity.line() != null -> activity.line()
                     activity.online > 0 -> "${activity.online + 1} online"
                     else -> null
                 },
@@ -237,7 +242,15 @@ fun ChatRoomScreen(
                     openNote,
                     onLongPress = { actionsFor = it },
                     onOpenImage = { images, index -> viewing = images to index },
-                    supportMemberId = viewModel.supportMemberId
+                    supportMemberId = viewModel.supportMemberId,
+                    // In a private thread: Tanha's (or the dealer's) face under
+                    // the last of the member's messages he has read.
+                    seenMark = if (photosAllowed) {
+                        SeenMark(
+                            photoUrl = if (viewModel.isSellerChat) sellerProfile.photoUrl else tanhaPhoto,
+                            name = if (viewModel.isSellerChat) sellerProfile.displayName else "Tanha"
+                        )
+                    } else null
                 )
             }
         }
@@ -282,7 +295,9 @@ fun ChatRoomScreen(
             photoMode = viewModel.isSellerChat,
             onDraftChange = viewModel::onDraftChange,
             onAttach = {
-                if (viewModel.isSellerChat) {
+                if (viewModel.isSupportRoom && !viewModel.isSellerChat) {
+                    attachMenu = true
+                } else if (viewModel.isSellerChat) {
                     photoPicker.launch(
                         androidx.activity.result.PickVisualMediaRequest(
                             androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
@@ -344,6 +359,24 @@ fun ChatRoomScreen(
         ImageViewer(images = images, startIndex = index, onDismiss = { viewing = null })
     }
 
+    if (attachMenu) {
+        AttachSheet(
+            onPhoto = {
+                attachMenu = false
+                photoPicker.launch(
+                    androidx.activity.result.PickVisualMediaRequest(
+                        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
+                    )
+                )
+            },
+            onNote = {
+                attachMenu = false
+                pickingNote = true
+            },
+            onDismiss = { attachMenu = false }
+        )
+    }
+
     if (pickingNote) {
         NotePickerSheet(
             notes = savedNotes,
@@ -368,8 +401,14 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsWithDateDividers
     onOpenNote: (ChatMessage.NoteAttachment) -> Unit,
     onLongPress: (ChatMessage) -> Unit,
     onOpenImage: (List<String>, Int) -> Unit,
-    supportMemberId: String?
+    supportMemberId: String?,
+    seenMark: SeenMark? = null
 ) {
+    // The member's last message that somebody else has opened. In a private
+    // thread the only other reader is the desk.
+    val seenAt = seenMark?.let {
+        messages.lastOrNull { m -> m.isCurrentUser && m.seenBy.any { uid -> uid != m.senderId } }?.id
+    }
     messages.forEachIndexed { index, message ->
         val previous = messages.getOrNull(index - 1)
         if (previous == null || !isSameDay(previous.timestamp, message.timestamp)) {
@@ -383,6 +422,54 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsWithDateDividers
         val role = message.senderRole
             ?: if (supportMemberId != null && message.senderId != supportMemberId) "admin" else null
         item(key = message.id) { ChatBubble(message, onOpenNote, onLongPress, onOpenImage, role) }
+        // One item with one key for the whole thread, so when a newer message
+        // is read the list slides this face down to it instead of redrawing.
+        if (seenMark != null && message.id == seenAt) {
+            item(key = "seen-mark") { SeenAvatar(seenMark, Modifier.animateItem()) }
+        }
+    }
+}
+
+/** Who reads the member's messages in a private thread. */
+private data class SeenMark(val photoUrl: String?, val name: String)
+
+@Composable
+private fun SeenAvatar(mark: SeenMark, modifier: Modifier = Modifier) {
+    Box(modifier.fillMaxWidth().padding(end = 16.dp, top = 2.dp), contentAlignment = Alignment.CenterEnd) {
+        com.talkswithtanha.twt.core.designsystem.components.MemberAvatar(
+            photoUrl = mark.photoUrl,
+            name = mark.name,
+            size = 16.dp
+        )
+    }
+}
+
+/** The paperclip in Tanha's private chat: a photo, or a lesson note. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AttachSheet(onPhoto: () -> Unit, onNote: () -> Unit, onDismiss: () -> Unit) {
+    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Color(0xFF1C1C1E)) {
+        Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+            AttachRow(Icons.Filled.Image, "Photo", "A screenshot or picture from your gallery", onPhoto)
+            AttachRow(Icons.Filled.AttachFile, "Lesson note", "One of your saved Academy notes", onNote)
+        }
+    }
+}
+
+@Composable
+private fun AttachRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(Modifier.size(40.dp).clip(CircleShape).background(Color(0xFF2C2C2E)), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+        }
+        Column {
+            Text(title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text(subtitle, color = IosColors.TextSecondary, fontSize = 13.sp)
+        }
     }
 }
 
@@ -670,7 +757,7 @@ private fun RoomHeader(title: String, subtitle: String?, onBack: () -> Unit) {
             subtitle?.let {
                 Text(
                     text = it,
-                    color = if (it.endsWith("typing…")) IosColors.Accent else IosColors.TextSecondary,
+                    color = if (it.endsWith("typing…") || it.endsWith("recording…")) IosColors.Accent else IosColors.TextSecondary,
                     fontSize = 13.sp
                 )
             }
@@ -679,7 +766,7 @@ private fun RoomHeader(title: String, subtitle: String?, onBack: () -> Unit) {
 }
 
 @Composable
-private fun SupportHeader(onBack: () -> Unit) {
+private fun SupportHeader(photoUrl: String?, activityLine: String?, onBack: () -> Unit) {
     Column {
         Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
             BackButton(onBack)
@@ -691,14 +778,18 @@ private fun SupportHeader(onBack: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(IosColors.Gold.copy(alpha = 0.18f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("T", color = IosColors.Gold, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            if (!photoUrl.isNullOrBlank()) {
+                com.talkswithtanha.twt.core.designsystem.components.MemberAvatar(photoUrl = photoUrl, name = "Tanha", size = 40.dp)
+            } else {
+                Box(
+                    Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(IosColors.Gold.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("T", color = IosColors.Gold, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
             }
             Column {
                 Row(
@@ -719,8 +810,8 @@ private fun SupportHeader(onBack: () -> Unit) {
                     )
                 }
                 Text(
-                    "Private chat · Tanha and his team",
-                    color = IosColors.TextSecondary,
+                    activityLine ?: "Private chat · Tanha and his team",
+                    color = if (activityLine != null) IosColors.BuyGreen else IosColors.TextSecondary,
                     fontSize = 11.sp
                 )
             }
@@ -742,7 +833,7 @@ private fun SupportHeader(onBack: () -> Unit) {
  * ever exists, this is the one place that should read it.
  */
 @Composable
-private fun SellerHeader(seller: com.talkswithtanha.twt.core.model.MarketplaceSeller, onBack: () -> Unit) {
+private fun SellerHeader(seller: com.talkswithtanha.twt.core.model.MarketplaceSeller, activityLine: String?, onBack: () -> Unit) {
     Column {
         Row(
             Modifier
@@ -788,7 +879,7 @@ private fun SellerHeader(seller: com.talkswithtanha.twt.core.model.MarketplaceSe
                         )
                     }
                 }
-                Text("Online", color = IosColors.BuyGreen, fontSize = 11.sp)
+                Text(activityLine ?: "Online", color = IosColors.BuyGreen, fontSize = 11.sp)
             }
         }
         Box(

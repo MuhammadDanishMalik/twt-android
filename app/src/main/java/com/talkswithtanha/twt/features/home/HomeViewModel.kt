@@ -37,8 +37,13 @@ class HomeViewModel @Inject constructor(
     signalRepository: SignalRepository,
     exchangeRates: ExchangeRateRepository,
     private val tracker: FollowedSignalTracker,
-    private val banners: com.talkswithtanha.twt.core.data.BannerRepository
+    private val banners: com.talkswithtanha.twt.core.data.BannerRepository,
+    supportConfig: com.talkswithtanha.twt.core.data.SupportConfigRepository
 ) : ViewModel() {
+
+    /** The WhatsApp number and the rest, as the panel sets them, for "tap to renew". */
+    val support: StateFlow<com.talkswithtanha.twt.core.model.SupportConfig> = supportConfig.observeConfig()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), com.talkswithtanha.twt.core.model.SupportConfig())
 
     /** Active promotional banners, in the order the admin panel set. */
     val activeBanners: StateFlow<List<com.talkswithtanha.twt.core.data.Banner>> = banners.observeActive()

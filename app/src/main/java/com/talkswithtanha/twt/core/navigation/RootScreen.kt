@@ -83,6 +83,8 @@ fun RootScreen(
     onPendingSignalHandled: () -> Unit = {},
     pendingDealId: String? = null,
     onPendingDealHandled: () -> Unit = {},
+    pendingRoomId: String? = null,
+    onPendingRoomHandled: () -> Unit = {},
     navController: NavHostController = rememberNavController(),
     viewModel: RootViewModel = hiltViewModel()
 ) {
@@ -154,6 +156,14 @@ fun RootScreen(
         if (gate != RootViewModel.Gate.Allowed) return@LaunchedEffect
         navController.navigate(AppRoute.DealDetail.of(dealId)) { launchSingleTop = true }
         onPendingDealHandled()
+    }
+
+    // A reply in the member's private chat, held for the gate the same way.
+    LaunchedEffect(pendingRoomId, gate) {
+        val roomId = pendingRoomId ?: return@LaunchedEffect
+        if (gate != RootViewModel.Gate.Allowed) return@LaunchedEffect
+        navController.navigate(AppRoute.ChatRoom.of(roomId)) { launchSingleTop = true }
+        onPendingRoomHandled()
     }
 
     LaunchedEffect(wasKicked) {

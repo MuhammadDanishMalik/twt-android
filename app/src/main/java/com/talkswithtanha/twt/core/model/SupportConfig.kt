@@ -21,7 +21,9 @@ data class SupportConfig(
     val whatsAppNumber: String = DEFAULT_WHATSAPP,
     val supportEmail: String = DEFAULT_EMAIL,
     val termsUrl: String = DEFAULT_TERMS,
-    val privacyUrl: String = DEFAULT_PRIVACY
+    val privacyUrl: String = DEFAULT_PRIVACY,
+    /** Tanha's photo for his private chat with each member, set on the panel. */
+    val tanhaPhotoUrl: String? = null
 ) {
     /**
      * A WhatsApp deep link with the first message already typed.
@@ -39,7 +41,7 @@ data class SupportConfig(
     companion object {
         // The live site. The old twt-admin.vercel.app address returns 404.
         const val DEFAULT_ACCESS_PAGE = "https://tradewithtanha.io/get-access"
-        const val DEFAULT_WHATSAPP = "923000000000"
+        const val DEFAULT_WHATSAPP = "923087050116"
         const val DEFAULT_EMAIL = "support@talkswithtanha.com"
         // Served by twt-admin on the live site (app/terms, app/privacy).
         const val DEFAULT_TERMS = "https://tradewithtanha.io/terms"

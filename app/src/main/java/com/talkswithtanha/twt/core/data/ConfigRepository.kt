@@ -117,7 +117,8 @@ class FirebaseSupportConfigRepository @Inject constructor(
                     termsUrl = httpsOrNull(document.getString(S.TERMS_URL))
                         ?: SupportConfig.DEFAULT_TERMS,
                     privacyUrl = httpsOrNull(document.getString(S.PRIVACY_URL))
-                        ?: SupportConfig.DEFAULT_PRIVACY
+                        ?: SupportConfig.DEFAULT_PRIVACY,
+                    tanhaPhotoUrl = httpsOrNull(document.getString("tanhaPhoto"))
                 )
             }
 

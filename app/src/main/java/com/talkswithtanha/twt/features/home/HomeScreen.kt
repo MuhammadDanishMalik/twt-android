@@ -98,6 +98,31 @@ fun HomeScreen(
     val rate by viewModel.rate.collectAsStateWithLifecycle()
     val followed by viewModel.followedSignalIds.collectAsStateWithLifecycle()
     val layout by viewModel.shortcutsLayout.collectAsStateWithLifecycle()
+    val support by viewModel.support.collectAsStateWithLifecycle()
+    // "Tap to renew": the member picks how to reach the desk.
+    var renewing by remember { mutableStateOf(false) }
+
+    if (renewing) {
+        RenewSheet(
+            whatsAppNumber = support.whatsAppNumber,
+            onWhatsApp = {
+                renewing = false
+                runCatching {
+                    context.startActivity(
+                        android.content.Intent(
+                            android.content.Intent.ACTION_VIEW,
+                            android.net.Uri.parse(support.whatsAppUrl("Assalam o Alaikum, I would like to renew / upgrade my TWT access."))
+                        )
+                    )
+                }
+            },
+            onChat = {
+                renewing = false
+                onOpenSupport()
+            },
+            onDismiss = { renewing = false }
+        )
+    }
 
     Box(Modifier.fillMaxSize()) {
         Image(
@@ -189,7 +214,7 @@ fun HomeScreen(
                         grantedAt = user?.accessGrantedAt,
                         accessCode = user?.accessCode,
                         banners = banners,
-                        onContactSupport = onOpenSupport,
+                        onContactSupport = { renewing = true },
                         onBannerTap = { banner ->
                             viewModel.bannerTapped(banner.id)
                             when (banner.action) {
@@ -432,3 +457,52 @@ private fun Modifier.clickableNoRipple(onClick: () -> Unit): Modifier {
         onClick = onClick
     )
 }
+
+/**
+ * Renewing or upgrading access: the two ways to reach the desk. WhatsApp, on
+ * the number the panel sets (Settings → Support links), or Tanha's private
+ * chat in the app.
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun RenewSheet(whatsAppNumber: String, onWhatsApp: () -> Unit, onChat: () -> Unit, onDismiss: () -> Unit) {
+    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Color(0xFF1C1C1E)) {
+        androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 28.dp)) {
+            androidx.compose.material3.Text("Renew or upgrade", color = Color.White, fontSize = 20.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+            androidx.compose.material3.Text(
+                "Talk to customer support the way you prefer.",
+                color = Color.White.copy(alpha = 0.6f),
+                fontSize = 14.sp,
+                modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+            )
+            RenewOption("WhatsApp support", "+${whatsAppNumber.chunkedPhone()}", Color(0xFF25D366), onWhatsApp)
+            androidx.compose.foundation.layout.Spacer(Modifier.height(10.dp))
+            RenewOption("Chat with Tanha in the app", "Your private chat, answered by Tanha and his team", Color(0xFF0A84FF), onChat)
+        }
+    }
+}
+
+@Composable
+private fun RenewOption(title: String, subtitle: String, tint: Color, onClick: () -> Unit) {
+    androidx.compose.foundation.layout.Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+            .background(Color(0xFF2C2C2E))
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(14.dp)
+    ) {
+        Box(Modifier.size(12.dp).clip(androidx.compose.foundation.shape.CircleShape).background(tint))
+        androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+            androidx.compose.material3.Text(title, color = Color.White, fontSize = 16.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+            androidx.compose.material3.Text(subtitle, color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp)
+        }
+        androidx.compose.material3.Text("›", color = Color.White.copy(alpha = 0.5f), fontSize = 22.sp)
+    }
+}
+
+/** `923087050116` → `92 308 7050116`, as people read a Pakistani mobile. */
+private fun String.chunkedPhone(): String =
+    if (length == 12 && startsWith("92")) "${substring(0, 2)} ${substring(2, 5)} ${substring(5)}" else this

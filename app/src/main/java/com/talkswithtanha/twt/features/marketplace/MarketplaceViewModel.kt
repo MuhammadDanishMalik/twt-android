@@ -43,14 +43,11 @@ class MarketplaceViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MarketplaceSeller())
 
     /**
-     * The member's private thread with the seller.
-     *
-     * The same `support_{uid}` room the Chat tab opens — there is one
-     * conversation with Tanha, and reaching it from the rate screen must not
-     * start a second one.
+     * The member's thread with the exchange desk: `dealer_{uid}`, its own
+     * conversation, answered by the dealer from the panel's exchange Chats.
      */
     val sellerRoomId: StateFlow<String?> = session.currentUser
-        .map { user -> user?.id?.let(FirestorePaths.ChatRoom::support) }
+        .map { user -> user?.id?.let(FirestorePaths.ChatRoom::dealer) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /**

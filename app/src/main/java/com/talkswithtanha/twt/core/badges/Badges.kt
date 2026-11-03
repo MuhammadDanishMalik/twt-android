@@ -85,7 +85,12 @@ class Badges @Inject constructor(
     /** The rooms this member is in: everybody's, and their own with Tanha. */
     private val roomIds = session.currentUser.map { u ->
         if (u == null) emptyList()
-        else listOf(FirestorePaths.ChatRoom.COMMUNITY, FirestorePaths.ChatRoom.support(u.id))
+        else listOfNotNull(
+            FirestorePaths.ChatRoom.COMMUNITY,
+            FirestorePaths.ChatRoom.support(u.id),
+            // The exchange desk's thread, in builds that have the exchange.
+            FirestorePaths.ChatRoom.dealer(u.id).takeIf { com.talkswithtanha.twt.BuildConfig.MARKETPLACE_ENABLED }
+        )
     }
 
     val rooms: StateFlow<Map<String, RoomPreview>> = combine(session.currentUser, roomIds) { u, ids -> u to ids }
@@ -94,7 +99,7 @@ class Badges @Inject constructor(
             val flows = ids.map { id ->
                 // Only the private thread says who is typing: in the community
                 // somebody always is, and the row would never show a message.
-                val activity = if (id.startsWith(FirestorePaths.ChatRoom.SUPPORT_PREFIX)) {
+                val activity = if (id.startsWith(FirestorePaths.ChatRoom.SUPPORT_PREFIX) || id.startsWith(FirestorePaths.ChatRoom.DEALER_PREFIX)) {
                     chats.observeActivity(id, u.id).map { it.line() }
                 } else {
                     flowOf(null)

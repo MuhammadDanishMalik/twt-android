@@ -225,7 +225,9 @@ fun AppNavHost(
             )
         ) { entry ->
             val roomId = entry.arguments?.getString(AppRoute.ChatRoom.ARG).orEmpty()
-            if (roomId.startsWith("support_")) {
+            // Private threads are open to every member: Tanha's, and the
+            // exchange desk's, which free members use as much as Pro ones.
+            if (roomId.startsWith("support_") || roomId.startsWith("dealer_")) {
                 ChatRoomScreen(
                     onBack = { navController.popBackStack() },
                     onOpenLesson = { videoId, title, start ->
@@ -266,7 +268,8 @@ fun AppNavHost(
         }
 
             screen(sharedScope, AppRoute.Marketplace.route) {
-            ProGate("The exchange desk", "Buy and sell USDT with the TWT desk at a locked rate.") {
+            // The exchange is open to free members as well as Pro.
+            run {
                 MarketplaceScreen(
                     onBack = { navController.popBackStack() },
                     onOpenWhatsApp = ::openUrl,
@@ -422,7 +425,8 @@ fun AppNavHost(
         }
 
             sheetRoute(sharedScope, AppRoute.MyDeals.route) {
-            ProGate("The exchange desk", "Buy and sell USDT with the TWT desk at a locked rate.") {
+            // The exchange is open to free members as well as Pro.
+            run {
                 MyDealsScreen(
                     onClose = { navController.popBackStack() },
                     onOpenDeal = { navController.navigate(AppRoute.DealDetail.of(it)) },
@@ -432,7 +436,8 @@ fun AppNavHost(
         }
 
             sheetRoute(sharedScope, AppRoute.NewDeal.route) {
-            ProGate("The exchange desk", "Buy and sell USDT with the TWT desk at a locked rate.") {
+            // The exchange is open to free members as well as Pro.
+            run {
                 NewDealScreen(
                     onClose = { navController.popBackStack() },
                     onOpened = { dealId ->
@@ -451,7 +456,8 @@ fun AppNavHost(
             route = AppRoute.DealDetail.route,
             arguments = listOf(navArgument(AppRoute.DealDetail.ARG) { type = NavType.StringType })
         ) {
-            ProGate("The exchange desk", "Buy and sell USDT with the TWT desk at a locked rate.") {
+            // The exchange is open to free members as well as Pro.
+            run {
                 DealDetailScreen(
                     onClose = { navController.popBackStack() },
                     // Straight into the chat with the dealer, presented as his.

@@ -148,9 +148,13 @@ class ChatRoomViewModel @Inject constructor(
 
     val roomId: String = checkNotNull(savedStateHandle[AppRoute.ChatRoom.ARG])
 
-    /** Marketplace presentation of the same thread. */
+    /** The exchange desk's thread (or, from older links, the marketplace look on Tanha's). */
     val isSellerChat: Boolean =
-        savedStateHandle.get<String>(AppRoute.ChatRoom.SELLER_ARG)?.toBoolean() == true
+        savedStateHandle.get<String>(AppRoute.ChatRoom.SELLER_ARG)?.toBoolean() == true ||
+            roomId.startsWith(FirestorePaths.ChatRoom.DEALER_PREFIX)
+
+    /** The member's own thread with the exchange desk. */
+    private val isDealerRoom: Boolean = roomId.startsWith(FirestorePaths.ChatRoom.DEALER_PREFIX)
 
     val isSupportRoom: Boolean = roomId.startsWith(FirestorePaths.ChatRoom.SUPPORT_PREFIX)
 
@@ -186,6 +190,14 @@ class ChatRoomViewModel @Inject constructor(
                 val ownThread = roomId == FirestorePaths.ChatRoom.support(user.id)
                 if (isSupportRoom && ownThread) {
                     chatRepository.ensureSupportRoom(
+                        uid = user.id,
+                        userName = user.fullName,
+                        userEmail = user.email,
+                        lastMessage = "📷 Photo"
+                    )
+                }
+                if (isDealerRoom && roomId == FirestorePaths.ChatRoom.dealer(user.id)) {
+                    chatRepository.ensureDealerRoom(
                         uid = user.id,
                         userName = user.fullName,
                         userEmail = user.email,
@@ -438,6 +450,14 @@ class ChatRoomViewModel @Inject constructor(
                 val ownThread = roomId == FirestorePaths.ChatRoom.support(user.id)
                 if (isSupportRoom && ownThread) {
                     chatRepository.ensureSupportRoom(
+                        uid = user.id,
+                        userName = user.fullName,
+                        userEmail = user.email,
+                        lastMessage = text.ifEmpty { "Shared a lesson note" }
+                    )
+                }
+                if (isDealerRoom && roomId == FirestorePaths.ChatRoom.dealer(user.id)) {
+                    chatRepository.ensureDealerRoom(
                         uid = user.id,
                         userName = user.fullName,
                         userEmail = user.email,

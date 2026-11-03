@@ -86,9 +86,9 @@ class MainActivity : ComponentActivity() {
         pendingRoomId = intent.roomId()
     }
 
-    /** `roomId` from a chat push: only a private thread, the one kind the panel pushes. */
+    /** `roomId` from a chat push: only a private thread, the kinds the panel pushes. */
     private fun Intent.roomId(): String? =
-        getStringExtra("roomId")?.takeIf { it.startsWith("support_") }
+        getStringExtra("roomId")?.takeIf { it.startsWith("support_") || it.startsWith("dealer_") }
 
     /** `dealId` from the push's data, put there by the panel's deal watcher. */
     private fun Intent.dealId(): String? =

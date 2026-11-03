@@ -113,6 +113,15 @@ object FirestorePaths {
          * the security rules can authorise a read without a document lookup.
          */
         fun support(uid: String): String = SUPPORT_PREFIX + uid
+
+        const val DEALER_PREFIX = "dealer_"
+
+        /**
+         * The member's thread with the exchange desk (the dealer), apart from
+         * their thread with Tanha: the dealer answers it from the panel's
+         * exchange Chats, and never reads Tanha's conversations.
+         */
+        fun dealer(uid: String): String = DEALER_PREFIX + uid
     }
 
     /**

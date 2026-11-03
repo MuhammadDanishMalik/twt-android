@@ -171,7 +171,8 @@ fun ChatListScreen(
 
             if (com.talkswithtanha.twt.BuildConfig.MARKETPLACE_ENABLED) item {
                 SettingsCard {
-                    val supportRoom = rooms.lastOrNull()?.roomId
+                    // The member's own thread with the exchange desk.
+                    val supportRoom = user?.id?.let(FirestorePaths.ChatRoom::dealer)
                     val preview = supportRoom?.let { previews[it] }
                     ChatRoomRow(
                         title = seller.displayName,

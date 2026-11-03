@@ -107,6 +107,14 @@ interface ChatRepository {
         lastMessage: String?
     )
 
+    /** The same for the member's thread with the exchange desk. */
+    suspend fun ensureDealerRoom(
+        uid: String,
+        userName: String,
+        userEmail: String,
+        lastMessage: String?
+    )
+
     companion object {
         const val DEFAULT_LIMIT = 60L
     }
@@ -342,6 +350,30 @@ class FirebaseChatRepository @Inject constructor(
         // message that put it in Tanha's queue.
         db.collection(Collection.CHAT_ROOMS)
             .document(FirestorePaths.ChatRoom.support(uid))
+            .set(payload, SetOptions.merge())
+            .await()
+    }
+
+    override suspend fun ensureDealerRoom(
+        uid: String,
+        userName: String,
+        userEmail: String,
+        lastMessage: String?
+    ) {
+        val payload = mutableMapOf<String, Any>(
+            R.KIND to "dealer",
+            R.MEMBER_ID to uid,
+            R.MEMBER_NAME to userName,
+            R.MEMBER_EMAIL to userEmail,
+            R.UPDATED_AT to FieldValue.serverTimestamp()
+        )
+        lastMessage?.let {
+            payload[R.LAST_MESSAGE] = it.take(140)
+            payload[R.LAST_MESSAGE_AT] = FieldValue.serverTimestamp()
+            payload[R.NEEDS_REPLY] = true
+        }
+        db.collection(Collection.CHAT_ROOMS)
+            .document(FirestorePaths.ChatRoom.dealer(uid))
             .set(payload, SetOptions.merge())
             .await()
     }

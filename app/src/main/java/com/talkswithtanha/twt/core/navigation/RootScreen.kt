@@ -162,7 +162,7 @@ fun RootScreen(
     LaunchedEffect(pendingRoomId, gate) {
         val roomId = pendingRoomId ?: return@LaunchedEffect
         if (gate != RootViewModel.Gate.Allowed) return@LaunchedEffect
-        navController.navigate(AppRoute.ChatRoom.of(roomId)) { launchSingleTop = true }
+        navController.navigate(AppRoute.ChatRoom.of(roomId, seller = roomId.startsWith("dealer_"))) { launchSingleTop = true }
         onPendingRoomHandled()
     }
 

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Resources the release build must keep although no code names them directly.
+
+  GoogleSignIn.kt looks `default_web_client_id` up by name (so the project
+  still compiles without google-services.json), which resource shrinking
+  cannot see: it removed the string from release builds, and Google sign-in in
+  production said "not configured" while debug builds worked.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@string/default_web_client_id,@string/gcm_defaultSenderId,@string/google_app_id,@string/google_api_key,@string/project_id" />

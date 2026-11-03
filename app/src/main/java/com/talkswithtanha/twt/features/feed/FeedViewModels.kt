@@ -268,7 +268,10 @@ class FeedViewModel @Inject constructor(
             }
             is UploadResult.Failed -> {
                 file.delete()
-                onDone(null, result.message)
+                // The upload service's own words ("Upload preset not found")
+                // mean nothing to whoever is posting; they go to the log.
+                android.util.Log.w("FeedVoice", "Voice upload failed: ${result.message}")
+                onDone(null, "The voice note did not upload. Check your connection and record it again.")
             }
         }
     }

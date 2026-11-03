@@ -35,23 +35,13 @@ object Cloudinary {
     /** Public by design — it appears in every delivery URL the app renders. */
     const val CLOUD_NAME = "zqncgxxg"
 
-    /** The unsigned preset that governs member avatar uploads. */
-    const val AVATAR_PRESET = "twt_avatars"
-
     /**
-     * The unsigned preset for voice notes on the feed.
-     *
-     * Create it once, as **unsigned**, with:
-     *
-     *  - Folder: `twt/voice`
-     *  - Resource type: `video` (Cloudinary files audio under video)
-     *  - Allowed formats: `m4a, mp4, aac, mp3`
-     *  - Max file size: 25 MB
-     *
-     * Until it exists Cloudinary answers "Upload preset not found", which the
-     * composer shows as-is rather than inventing a friendlier lie.
+     * The unsigned preset for everything the app uploads: avatars, screenshots
+     * and voice notes. It is the one the admin panel uses too; a separate
+     * voice preset was planned and never created, and pointing at it failed
+     * every recording.
      */
-    const val VOICE_PRESET = "twt_voice"
+    const val AVATAR_PRESET = "twt_avatars"
 
     const val UPLOAD_ENDPOINT = "https://api.cloudinary.com/v1_1/$CLOUD_NAME/image/upload"
 

@@ -161,7 +161,11 @@ class CloudinaryUploader @Inject constructor() {
                 filename = file.name,
                 body = file.asRequestBody("audio/mp4".toMediaType())
             )
-            .addFormDataPart("upload_preset", Cloudinary.VOICE_PRESET)
+            // The panel's preset, which takes audio as well as pictures. The
+            // dedicated `twt_voice` preset was never created on the account,
+            // so every recording from the app failed with "Upload preset not
+            // found".
+            .addFormDataPart("upload_preset", Cloudinary.AVATAR_PRESET)
             .build()
 
         val request = Request.Builder()

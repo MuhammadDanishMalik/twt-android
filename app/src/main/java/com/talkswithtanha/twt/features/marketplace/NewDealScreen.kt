@@ -1,5 +1,7 @@
 package com.talkswithtanha.twt.features.marketplace
 
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -98,6 +100,14 @@ fun NewDealScreen(
     }
     LaunchedEffect(state.error) {
         if (state.error != null) Haptics.failure(haptics)
+    }
+
+    val needsRules by viewModel.needsRules.collectAsStateWithLifecycle()
+    var readingRules by remember { mutableStateOf(false) }
+    if (needsRules) {
+        ExchangeRulesSheet(onAgree = { viewModel.agreeToRules() }, onClose = onClose)
+    } else if (readingRules) {
+        ExchangeRulesSheet(readOnly = true, onClose = { readingRules = false })
     }
 
     val buying = state.side == DealSide.BUY
@@ -280,6 +290,14 @@ fun NewDealScreen(
                     }
                 }
             }
+
+            Text(
+                text = "Pay from your own account only. The desk confirms the exact account to use when it accepts your deal.  Deal rules",
+                color = Color.White.copy(alpha = 0.5f),
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                modifier = Modifier.padding(top = 8.dp).clickable { readingRules = true }
+            )
 
             Spacer(Modifier.height(22.dp))
 

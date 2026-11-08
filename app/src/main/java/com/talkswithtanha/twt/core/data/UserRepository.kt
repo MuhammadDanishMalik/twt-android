@@ -315,6 +315,7 @@ class FirebaseUserRepository @Inject constructor(
             lastLoginAt = snapshot.getTimestamp(F.LAST_LOGIN_AT)?.toDate(),
             tradingProfile = mapTradingProfile(snapshot.get(F.TRADING_PROFILE)),
             profileSetupAt = snapshot.getTimestamp(F.PROFILE_SETUP_AT)?.toDate(),
+            exchangeRulesAcceptedAt = snapshot.getTimestamp("exchangeRulesAcceptedAt")?.toDate(),
             createdAt = snapshot.getTimestamp(F.CREATED_AT)?.toDate() ?: Date(),
             updatedAt = snapshot.getTimestamp(F.UPDATED_AT)?.toDate() ?: Date()
         )

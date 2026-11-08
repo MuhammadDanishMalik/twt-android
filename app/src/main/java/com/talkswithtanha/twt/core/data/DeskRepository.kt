@@ -66,8 +66,12 @@ class DeskRepository @Inject constructor(
         )
     )
 
-    /** "Yes, go ahead": the member is shown where to pay, and the dollars come off today's fund. */
-    suspend fun accept(dealId: String, by: String) {
+    /**
+     * "Yes, go ahead": the member is shown where to pay — [account], the one
+     * the desk chose for this deal — and the dollars come off today's fund.
+     * With [saveAccount], it joins the desk's list for next time.
+     */
+    suspend fun accept(dealId: String, by: String, account: com.talkswithtanha.twt.core.model.PaymentAccount? = null, saveAccount: Boolean = false) {
         val dealRef = deals.document(dealId)
         db.runTransaction { tx ->
             val deal = tx.get(dealRef)
@@ -79,13 +83,25 @@ class DeskRepository @Inject constructor(
             val fund = cfg.getLong("dailyFundUsd") ?: 0L
             val counted = cfg.getString("fundDate") == today && fund > 0
             val amount = deal.getDouble("amountUSD") ?: 0.0
+            val cfgChanges = mutableMapOf<String, Any>()
             if (counted) {
                 val used = cfg.getDouble("fundUsedUsd") ?: 0.0
                 if (used + amount > fund) {
                     throw DeskRefusal("Only ${"%,d".format((fund - used).toLong().coerceAtLeast(0))} USDT of today's fund is left.")
                 }
-                tx.update(rateDoc, "fundUsedUsd", used + amount)
+                cfgChanges["fundUsedUsd"] = used + amount
             }
+            if (account != null && saveAccount) {
+                val existing = (cfg.get("accounts") as? List<*>).orEmpty()
+                val known = existing.any { (it as? Map<*, *>)?.get("accountNumber") == account.accountNumber && (it as? Map<*, *>)?.get("method") == account.method }
+                if (!known) cfgChanges["accounts"] = existing + mapOf(
+                    "method" to account.method,
+                    "accountTitle" to account.accountTitle,
+                    "accountNumber" to account.accountNumber,
+                    "isActive" to true
+                )
+            }
+            if (cfgChanges.isNotEmpty()) tx.update(rateDoc, cfgChanges)
             tx.update(
                 dealRef,
                 mapOf(
@@ -94,7 +110,9 @@ class DeskRepository @Inject constructor(
                     "approvedBy" to by,
                     "fundDay" to if (counted) today else null,
                     "events" to event(DealStatus.AWAITING_PAYMENT, "Approved by $by. Payment details shown to the member")
-                )
+                ) + (account?.let {
+                    mapOf("sellerAccount" to mapOf("method" to it.method, "accountTitle" to it.accountTitle, "accountNumber" to it.accountNumber))
+                } ?: emptyMap())
             )
         }.await()
     }

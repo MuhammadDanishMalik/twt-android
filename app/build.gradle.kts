@@ -36,8 +36,8 @@ android {
         applicationId = "com.orixto.twt"
         minSdk = 24
         targetSdk = 36
-        versionCode = 29
-        versionName = "1.0.28"
+        versionCode = 30
+        versionName = "1.0.29"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

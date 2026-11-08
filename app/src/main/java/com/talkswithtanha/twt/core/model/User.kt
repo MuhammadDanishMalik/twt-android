@@ -58,6 +58,8 @@ data class User(
     /** When profile setup was finished. Null means it has not been — the gate
      *  sends a member without access there before the access-code screen. */
     val profileSetupAt: Date? = null,
+    /** Agreed to the exchange desk's rules ([ExchangeRules]), before their first deal. */
+    val exchangeRulesAcceptedAt: Date? = null,
     val createdAt: Date = Date(),
     val updatedAt: Date = Date()
 ) {

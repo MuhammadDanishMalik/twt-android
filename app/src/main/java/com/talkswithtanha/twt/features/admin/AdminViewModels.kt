@@ -239,8 +239,13 @@ class AdminDealsViewModel @Inject constructor(
     repository: AdminRepository,
     private val desk: com.talkswithtanha.twt.core.data.DeskRepository,
     rates: com.talkswithtanha.twt.core.data.ExchangeRateRepository,
-    private val session: SessionRepository
+    private val session: SessionRepository,
+    marketplaceConfig: com.talkswithtanha.twt.core.data.MarketplaceConfigRepository
 ) : ViewModel() {
+
+    /** The desk's saved accounts, offered first when accepting a deal. */
+    val accounts: StateFlow<List<com.talkswithtanha.twt.core.model.PaymentAccount>> = marketplaceConfig.observeAccounts()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val working = MutableStateFlow<String?>(null)
     private val failure = MutableStateFlow<String?>(null)
@@ -282,7 +287,8 @@ class AdminDealsViewModel @Inject constructor(
         working.value = null
     }
 
-    fun accept(deal: Deal) = run(deal.id, "${deal.reference} accepted. The member can pay now.") { desk.accept(deal.id, me) }
+    fun accept(deal: Deal, account: com.talkswithtanha.twt.core.model.PaymentAccount, save: Boolean) =
+        run(deal.id, "${deal.reference} accepted. The member pays into ${account.method}.") { desk.accept(deal.id, me, account, save) }
     fun decline(deal: Deal, reason: String) = run(deal.id, "${deal.reference} declined.") { desk.decline(deal.id, reason) }
     fun cancel(deal: Deal, reason: String) = run(deal.id, "${deal.reference} cancelled.") { desk.cancel(deal.id, reason) }
     fun confirmPayment(deal: Deal) = run(deal.id, "${deal.reference}: payment confirmed.") { desk.confirmPayment(deal.id, me) }

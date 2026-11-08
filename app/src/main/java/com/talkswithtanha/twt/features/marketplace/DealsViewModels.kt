@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.marketplace
 
+import kotlinx.coroutines.tasks.await
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -61,8 +62,34 @@ class NewDealViewModel @Inject constructor(
     private val session: SessionRepository,
     private val dealRepository: DealRepository,
     exchangeRates: ExchangeRateRepository,
-    marketplaceConfig: MarketplaceConfigRepository
+    marketplaceConfig: MarketplaceConfigRepository,
+    @dagger.hilt.android.qualifiers.ApplicationContext context: android.content.Context
 ) : ViewModel() {
+
+    // Agreed on this phone. Kept as well as the profile field, so a member is
+    // never asked twice even before the profile write lands.
+    private val prefs = context.getSharedPreferences("exchange", android.content.Context.MODE_PRIVATE)
+    private val agreedHere = MutableStateFlow(false)
+
+    /** A member's first deal: the desk's rules come first, agreed to once. */
+    val needsRules: StateFlow<Boolean> = kotlinx.coroutines.flow.combine(session.currentUser, agreedHere) { user, local ->
+        user != null && !user.isStaff && user.exchangeRulesAcceptedAt == null && !local &&
+            !prefs.getBoolean("rules_${user.id}", false)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun agreeToRules() {
+        val user = session.currentUser.value ?: return
+        prefs.edit().putBoolean("rules_${user.id}", true).apply()
+        agreedHere.value = true
+        viewModelScope.launch {
+            runCatching {
+                com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("users").document(user.id)
+                    .update("exchangeRulesAcceptedAt", com.google.firebase.firestore.FieldValue.serverTimestamp())
+                    .await()
+            }
+        }
+    }
 
     private val _state = MutableStateFlow(NewDealUiState())
     val state: StateFlow<NewDealUiState> = _state.asStateFlow()

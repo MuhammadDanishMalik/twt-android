@@ -102,6 +102,8 @@ fun AdminDealsScreen(
     }
     var prompt by remember { mutableStateOf<DeskPrompt?>(null) }
     var editingRates by remember { mutableStateOf(false) }
+    var accepting by remember { mutableStateOf<Deal?>(null) }
+    val savedAccounts by viewModel.accounts.collectAsStateWithLifecycle()
 
     Column(
         Modifier
@@ -241,12 +243,21 @@ fun AdminDealsScreen(
                         deal = deal,
                         fundLeft = state.rate?.fundLeftUsd(),
                         working = state.workingId == deal.id,
-                        onAccept = { viewModel.accept(deal) },
+                        onAccept = { accepting = deal },
                         onPrompt = { prompt = it }
                     )
                 }
             }
         }
+    }
+
+    accepting?.let { deal ->
+        AcceptDealSheet(
+            deal = deal,
+            saved = savedAccounts,
+            onDismiss = { accepting = null },
+            onAccept = { account, save -> accepting = null; viewModel.accept(deal, account, save) }
+        )
     }
 
     if (editingRates) {

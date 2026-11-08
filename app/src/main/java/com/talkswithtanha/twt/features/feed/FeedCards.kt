@@ -737,27 +737,46 @@ private fun SetupAction(label: String, on: Boolean = false, onClick: () -> Unit)
 private fun ActionBar(post: FeedPost, mine: Reaction?, savedIn: List<String>?, collections: List<String>, actions: CardActions) {
     val haptics = LocalHapticFeedback.current
     var saveMenu by remember { mutableStateOf(false) }
+    var picking by remember { mutableStateOf(false) }
     val isSaved = savedIn != null
+    val offered = Reaction.entries.filter { !it.setupsOnly || post.type == PostType.SETUP }
+    // WhatsApp's way: one small react button, a picker that pops up from it,
+    // and what people chose stacked in a pill at the bottom right.
+    val chosen = offered.map { it to (post.reactionCounts[it.stored] ?: 0).coerceAtLeast(0) }.filter { it.second > 0 }.sortedByDescending { it.second }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Reaction.entries.filter { !it.setupsOnly || post.type == PostType.SETUP }.forEach { r ->
-            val count = (post.reactionCounts[r.stored] ?: 0).coerceAtLeast(0)
-            val on = mine == r
+        Box {
             Row(
                 Modifier
                     .clip(RoundedCornerShape(50))
-                    .background(if (on) IosColors.BuyGreen.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.05f))
-                    .border(0.8.dp, if (on) IosColors.BuyGreen.copy(alpha = 0.5f) else Color.Transparent, RoundedCornerShape(50))
+                    .background(if (mine != null) IosColors.BuyGreen.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.05f))
                     .bouncyClick {
                         Haptics.tap(haptics)
-                        actions.onReact(r)
+                        picking = true
                     }
                     .padding(horizontal = 10.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(r.glyph, fontSize = 14.sp)
-                if (count > 0) {
-                    Spacer(Modifier.width(5.dp))
-                    Text("$count", color = if (on) IosColors.BuyGreen else IosColors.TextSecondary, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, fontFamily = WebFonts.Body)
+                Text(mine?.glyph ?: "🙂", fontSize = 15.sp)
+                Spacer(Modifier.width(4.dp))
+                Text(if (mine != null) mine.label else "React", color = if (mine != null) IosColors.BuyGreen else IosColors.TextSecondary, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, fontFamily = WebFonts.Body)
+            }
+            DropdownMenu(expanded = picking, onDismissRequest = { picking = false }, containerColor = Color(0xFF1F1F1F), shape = RoundedCornerShape(28.dp)) {
+                Row(Modifier.padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    offered.forEach { r ->
+                        Text(
+                            r.glyph,
+                            fontSize = 26.sp,
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(if (mine == r) Color.White.copy(alpha = 0.14f) else Color.Transparent)
+                                .clickable {
+                                    picking = false
+                                    Haptics.tap(haptics)
+                                    actions.onReact(r)
+                                }
+                                .padding(8.dp)
+                        )
+                    }
                 }
             }
         }
@@ -792,6 +811,37 @@ private fun ActionBar(post: FeedPost, mine: Reaction?, savedIn: List<String>?, c
                 }
             }
         }
+        if (chosen.isNotEmpty()) ReactionStack(chosen.map { it.first.glyph }, chosen.sumOf { it.second }, mine != null) { picking = true }
+    }
+}
+
+/** What people reacted with, stacked and overlapping, with the total: WhatsApp's pill. */
+@Composable
+private fun ReactionStack(glyphs: List<String>, total: Int, mineIncluded: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(Color(0xFF2A2A2C))
+            .border(1.dp, if (mineIncluded) IosColors.BuyGreen.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.10f), RoundedCornerShape(50))
+            .clickable(onClick = onClick)
+            .padding(start = 4.dp, end = 8.dp, top = 2.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box {
+            glyphs.take(3).forEachIndexed { i, g ->
+                Box(
+                    Modifier
+                        .offset(x = (i * 13).dp)
+                        .size(22.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF2A2A2C)),
+                    contentAlignment = Alignment.Center
+                ) { Text(g, fontSize = 13.sp) }
+            }
+            Spacer(Modifier.width((22 + (glyphs.take(3).size - 1) * 13).dp))
+        }
+        Spacer(Modifier.width(4.dp))
+        Text("$total", color = IosColors.TextSecondary, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, fontFamily = WebFonts.Body)
     }
 }
 

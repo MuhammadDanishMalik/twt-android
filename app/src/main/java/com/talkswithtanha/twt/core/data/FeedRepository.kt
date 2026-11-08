@@ -142,7 +142,14 @@ class FirebaseFeedRepository @Inject constructor(
         posts.orderBy(F.BUMPED_AT, Query.Direction.DESCENDING).limit(4).snapshotFlow().map { snapshot ->
             val cutoff = System.currentTimeMillis() - 48 * 3_600_000L
             (snapshot as? Snapshot.Data)?.value?.documents.orEmpty()
-                .filter { (it.getDate(F.BUMPED_AT)?.time ?: 0L) > cutoff }
+                // Bumped after it was posted, not merely stamped when it was
+                // made: the panel sets bumpedAt on a new post too, and every
+                // fresh post was being labelled "UPDATED".
+                .filter {
+                    val bumped = it.getDate(F.BUMPED_AT)?.time ?: 0L
+                    val created = it.getDate(F.CREATED_AT)?.time ?: 0L
+                    bumped > cutoff && bumped - created > 2 * 60_000L
+                }
                 .mapNotNull { map(it) }
         }
 

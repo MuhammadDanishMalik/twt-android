@@ -98,7 +98,7 @@ fun AdminDealsScreen(
     if (deskMode) {
         androidx.compose.runtime.LaunchedEffect(state) {
             DeskShell.badges.value = DeskTab.entries
-                .filter { it != DeskTab.HISTORY && it != DeskTab.WAITING }
+                .filter { it != DeskTab.HISTORY }
                 .associate { DeskShell.route(it) to state.count(it) }
         }
     }

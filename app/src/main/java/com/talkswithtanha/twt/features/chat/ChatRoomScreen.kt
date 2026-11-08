@@ -510,6 +510,10 @@ private fun ChatBubble(
     val bodyText = remember(message.text, images) {
         images.fold(message.text) { t, url -> t.replace(url, "") }.trim()
     }
+    // A photo on its own is shown bare, like WhatsApp: no coloured bubble
+    // framing it, no border.
+    val photoOnly = images.isNotEmpty() && bodyText.isEmpty() && message.replyTo == null &&
+        message.noteAttachment == null && message.type != ChatMessage.Type.ANNOUNCEMENT
     val haptics = LocalHapticFeedback.current
     var appeared by remember(message.id) { mutableStateOf(false) }
     LaunchedEffect(message.id) { appeared = true }
@@ -566,12 +570,19 @@ private fun ChatBubble(
                 Modifier
                     .clip(RoundedCornerShape(20.dp))
                     .background(
-                        if (message.isCurrentUser) IosColors.Accent else Color(0xFF2C2C2E)
+                        when {
+                            photoOnly -> Color.Transparent
+                            message.isCurrentUser -> IosColors.Accent
+                            else -> Color(0xFF2C2C2E)
+                        }
                     )
                     .border(
                         if (message.type == ChatMessage.Type.ANNOUNCEMENT) 1.dp else 0.5.dp,
-                        if (message.type == ChatMessage.Type.ANNOUNCEMENT) Color(0xFFFBBF24).copy(alpha = 0.6f)
-                        else Color.White.copy(alpha = 0.15f),
+                        when {
+                            photoOnly -> Color.Transparent
+                            message.type == ChatMessage.Type.ANNOUNCEMENT -> Color(0xFFFBBF24).copy(alpha = 0.6f)
+                            else -> Color.White.copy(alpha = 0.15f)
+                        },
                         RoundedCornerShape(20.dp)
                     )
                     // Hold any message to react; someone else's also to
@@ -583,7 +594,7 @@ private fun ChatBubble(
                             onLongPress(message)
                         }
                     )
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                    .padding(horizontal = if (photoOnly) 0.dp else 14.dp, vertical = if (photoOnly) 0.dp else 10.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 if (message.type == ChatMessage.Type.ANNOUNCEMENT) AnnouncementTag()

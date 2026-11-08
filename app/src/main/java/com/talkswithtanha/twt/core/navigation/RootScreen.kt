@@ -270,7 +270,12 @@ fun RootScreen(
                 currentRoute = currentRoute,
                 currentDealId = backStackEntry?.arguments?.getString(AppRoute.DealDetail.ARG)
                     ?.takeIf { currentRoute == AppRoute.DealDetail.route },
-                pillBottom = if (showsBar) 104.dp else 28.dp,
+                // In a chat it sits above the message box, never on it.
+                pillBottom = when {
+                    showsBar -> 104.dp
+                    currentRoute == AppRoute.ChatRoom.route -> 112.dp
+                    else -> 28.dp
+                },
                 onOpenDeal = { navController.navigate(AppRoute.DealDetail.of(it)) { launchSingleTop = true } },
                 onOpenDeals = { navController.navigate(AppRoute.MyDeals.route) { launchSingleTop = true } }
             )

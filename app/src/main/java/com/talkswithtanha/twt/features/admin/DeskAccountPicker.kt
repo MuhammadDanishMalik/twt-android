@@ -62,6 +62,8 @@ import com.talkswithtanha.twt.core.model.PaymentMethods
 internal fun AcceptDealSheet(
     deal: Deal,
     saved: List<PaymentAccount>,
+    /** Already accepted: pointing the member at a different account. */
+    changing: Boolean = false,
     onDismiss: () -> Unit,
     onAccept: (account: PaymentAccount, saveForNextTime: Boolean) -> Unit
 ) {
@@ -93,7 +95,7 @@ internal fun AcceptDealSheet(
         ) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Accept ${deal.reference}", color = IosColors.TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Text(if (changing) "Change account · ${deal.reference}" else "Accept ${deal.reference}", color = IosColors.TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                     Text(
                         "${deal.userName.ifBlank { "The member" }} pays ${deal.payLabel()}. Where should it go?",
                         color = IosColors.TextSecondary, fontSize = 13.5.sp
@@ -110,7 +112,7 @@ internal fun AcceptDealSheet(
                     )
                 }
                 if (usable.isNotEmpty()) {
-                    Text("Your accounts", color = IosColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text("Your accounts · saved and recently used", color = IosColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     usable.forEach { acc ->
                         val on = !addingNew && picked == acc
                         AccountRow(acc, on) { picked = acc; addingNew = false }
@@ -192,7 +194,7 @@ internal fun AcceptDealSheet(
                         color = IosColors.TextSecondary, fontSize = 12.5.sp, modifier = Modifier.padding(bottom = 10.dp)
                     )
                 }
-                PrimaryAction("Accept and share this account", enabled = chosen != null) {
+                PrimaryAction(if (changing) "Share this account instead" else "Accept and share this account", enabled = chosen != null) {
                     chosen?.let { onAccept(it, addingNew && save) }
                 }
             }

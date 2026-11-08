@@ -91,16 +91,6 @@ class DeskRepository @Inject constructor(
                 }
                 cfgChanges["fundUsedUsd"] = used + amount
             }
-            if (account != null && saveAccount) {
-                val existing = (cfg.get("accounts") as? List<*>).orEmpty()
-                val known = existing.any { (it as? Map<*, *>)?.get("accountNumber") == account.accountNumber && (it as? Map<*, *>)?.get("method") == account.method }
-                if (!known) cfgChanges["accounts"] = existing + mapOf(
-                    "method" to account.method,
-                    "accountTitle" to account.accountTitle,
-                    "accountNumber" to account.accountNumber,
-                    "isActive" to true
-                )
-            }
             if (cfgChanges.isNotEmpty()) tx.update(rateDoc, cfgChanges)
             tx.update(
                 dealRef,
@@ -115,6 +105,47 @@ class DeskRepository @Inject constructor(
                 } ?: emptyMap())
             )
         }.await()
+    }
+
+    /**
+     * This dealer's own accounts, kept apart from the desk's shared list:
+     * `config/deskAccounts_{uid}`. Only he is offered them when accepting.
+     */
+    private fun myAccountsDoc(uid: String) = db.collection(FirestorePaths.Collection.CONFIG).document("deskAccounts_$uid")
+
+    fun observeMyAccounts(uid: String): Flow<List<com.talkswithtanha.twt.core.model.PaymentAccount>> =
+        myAccountsDoc(uid).snapshotFlow().map { snap ->
+            val d = (snap as? Snapshot.Data)?.value ?: return@map emptyList()
+            (d.get("accounts") as? List<*>).orEmpty().filterIsInstance<Map<*, *>>().mapNotNull { m ->
+                val number = (m["accountNumber"] as? String)?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                com.talkswithtanha.twt.core.model.PaymentAccount(
+                    method = (m["method"] as? String).orEmpty(),
+                    accountTitle = (m["accountTitle"] as? String).orEmpty(),
+                    accountNumber = number
+                )
+            }.reversed() // newest first
+        }
+
+    suspend fun saveMyAccount(uid: String, account: com.talkswithtanha.twt.core.model.PaymentAccount) {
+        myAccountsDoc(uid).set(
+            mapOf(
+                "accounts" to FieldValue.arrayUnion(
+                    mapOf("method" to account.method, "accountTitle" to account.accountTitle, "accountNumber" to account.accountNumber)
+                ),
+                "updatedAt" to FieldValue.serverTimestamp()
+            ),
+            SetOptions.merge()
+        ).await()
+    }
+
+    /** Points a member who has not paid yet at a different account. */
+    suspend fun changePaymentAccount(dealId: String, account: com.talkswithtanha.twt.core.model.PaymentAccount, by: String) {
+        deals.document(dealId).update(
+            mapOf(
+                "sellerAccount" to mapOf("method" to account.method, "accountTitle" to account.accountTitle, "accountNumber" to account.accountNumber),
+                "events" to event(DealStatus.AWAITING_PAYMENT, "$by changed where to pay: ${account.method} ${account.accountNumber.takeLast(4)}")
+            )
+        ).await()
     }
 
     /** "Not this one", before anything was shown or paid. */

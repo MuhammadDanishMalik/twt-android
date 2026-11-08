@@ -187,7 +187,8 @@ fun AppNavHost(
                 onOpenSupport = { openSupportThread() },
                 onOpenChat = { navController.navigateToTab(AppRoute.ChatList.route) },
                 onOpenDesk = { navController.navigate(AppRoute.AdminDeals.route) { launchSingleTop = true } },
-                onOpenDeskChat = { navController.navigate(AppRoute.ChatRoom.of(it, seller = true)) }
+                onOpenDeskChat = { navController.navigate(AppRoute.ChatRoom.of(it, seller = true)) },
+                onOpenRoom = { navController.navigate(AppRoute.ChatRoom.of(it)) }
             )
         }
 

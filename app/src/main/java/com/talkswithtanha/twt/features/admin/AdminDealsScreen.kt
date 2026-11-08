@@ -87,6 +87,8 @@ fun AdminDealsScreen(
     deskMode: Boolean = false,
     userInitial: String = "",
     onOpenSettings: () -> Unit = {},
+    /** The dealer's own line to Tanha and the team, pinned above the members' chats. */
+    onOpenTeamChat: (() -> Unit)? = null,
     viewModel: AdminDealsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -103,6 +105,7 @@ fun AdminDealsScreen(
     var prompt by remember { mutableStateOf<DeskPrompt?>(null) }
     var editingRates by remember { mutableStateOf(false) }
     var accepting by remember { mutableStateOf<Deal?>(null) }
+    var changingFor by remember { mutableStateOf<Deal?>(null) }
     val savedAccounts by viewModel.accounts.collectAsStateWithLifecycle()
 
     Column(
@@ -222,6 +225,7 @@ fun AdminDealsScreen(
                 }
             }
             if (tab == DeskTab.CHATS) {
+                onOpenTeamChat?.let { open -> item(key = "team") { TeamChatRow(open) } }
                 if (state.threads.isEmpty()) item { Empty("No chats yet. When a member messages the desk from the Exchange, it appears here.") }
                 items(state.threads, key = { it.roomId }) { ThreadRow(it) { onOpenChat(it.roomId) } }
             } else {
@@ -244,6 +248,7 @@ fun AdminDealsScreen(
                         fundLeft = state.rate?.fundLeftUsd(),
                         working = state.workingId == deal.id,
                         onAccept = { accepting = deal },
+                        onChangeAccount = { changingFor = deal },
                         onPrompt = { prompt = it }
                     )
                 }
@@ -257,6 +262,16 @@ fun AdminDealsScreen(
             saved = savedAccounts,
             onDismiss = { accepting = null },
             onAccept = { account, save -> accepting = null; viewModel.accept(deal, account, save) }
+        )
+    }
+
+    changingFor?.let { deal ->
+        AcceptDealSheet(
+            deal = deal,
+            saved = savedAccounts,
+            changing = true,
+            onDismiss = { changingFor = null },
+            onAccept = { account, save -> changingFor = null; viewModel.changeAccount(deal, account, save) }
         )
     }
 
@@ -342,6 +357,27 @@ private fun Empty(text: String) {
     Text(text, color = IosColors.TextSecondary, fontSize = 14.sp, modifier = Modifier.padding(vertical = 24.dp))
 }
 
+/** Pinned: the dealer's private thread with Tanha, answered from the panel's Support chats. */
+@Composable
+private fun TeamChatRow(onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(IosColors.SecondaryBackground)
+            .border(1.dp, IosColors.BuyGreen.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick).padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(Modifier.size(42.dp).clip(CircleShape).background(IosColors.BuyGreen), contentAlignment = Alignment.Center) {
+            Text("TT", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text("Tanha · TWT team", color = IosColors.TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text("Your direct line to Tanha and Hafiz Sadiq", color = IosColors.TextSecondary, fontSize = 13.sp, maxLines = 1)
+        }
+        Text("📌", fontSize = 14.sp)
+    }
+}
+
 @Composable
 private fun ThreadRow(thread: DeskThread, onClick: () -> Unit) {
     Row(
@@ -372,6 +408,7 @@ private fun DeskDealCard(
     fundLeft: Long?,
     working: Boolean,
     onAccept: () -> Unit,
+    onChangeAccount: () -> Unit = {},
     onPrompt: (DeskPrompt) -> Unit
 ) {
     val clipboard = LocalClipboardManager.current
@@ -435,7 +472,11 @@ private fun DeskDealCard(
             when (deal.status) {
                 DealStatus.AWAITING_APPROVAL -> Action("Decline", IosColors.SellRed) { onPrompt(DeskPrompt.Decline(deal)) }
                 DealStatus.PAYMENT_SENT, DealStatus.RELEASING -> Action("Something's wrong", IosColors.SellRed) { onPrompt(DeskPrompt.Dispute(deal)) }
-                DealStatus.AWAITING_PAYMENT, DealStatus.PAYMENT_APPROVED -> Action("Cancel deal", IosColors.SellRed) { onPrompt(DeskPrompt.Cancel(deal)) }
+                DealStatus.AWAITING_PAYMENT -> {
+                    Action("Change account", IosColors.BuyGreen, onClick = onChangeAccount)
+                    Action("Cancel deal", IosColors.SellRed) { onPrompt(DeskPrompt.Cancel(deal)) }
+                }
+                DealStatus.PAYMENT_APPROVED -> Action("Cancel deal", IosColors.SellRed) { onPrompt(DeskPrompt.Cancel(deal)) }
                 else -> Unit
             }
         }

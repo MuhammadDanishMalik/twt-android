@@ -243,9 +243,23 @@ class AdminDealsViewModel @Inject constructor(
     marketplaceConfig: com.talkswithtanha.twt.core.data.MarketplaceConfigRepository
 ) : ViewModel() {
 
-    /** The desk's saved accounts, offered first when accepting a deal. */
-    val accounts: StateFlow<List<com.talkswithtanha.twt.core.model.PaymentAccount>> = marketplaceConfig.observeAccounts()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    /**
+     * Offered when accepting: this dealer's own saved accounts, then the ones
+     * he has recently given members — never the desk's shared list, which
+     * holds other people's accounts.
+     */
+    val accounts: StateFlow<List<com.talkswithtanha.twt.core.model.PaymentAccount>> =
+        session.currentUser.flatMapLatest { u ->
+            if (u == null) kotlinx.coroutines.flow.flowOf(emptyList())
+            else combine(desk.observeMyAccounts(u.id), repository.observeAllDeals()) { mine, snap ->
+                val name = u.fullName
+                val recent = (snap as? Snapshot.Data)?.value.orEmpty()
+                    .filter { it.approvedBy == name && it.sellerAccount != null }
+                    .sortedByDescending { it.createdAt }
+                    .mapNotNull { it.sellerAccount }
+                (mine + recent).distinctBy { it.method to it.accountNumber }.take(8)
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val working = MutableStateFlow<String?>(null)
     private val failure = MutableStateFlow<String?>(null)
@@ -288,7 +302,16 @@ class AdminDealsViewModel @Inject constructor(
     }
 
     fun accept(deal: Deal, account: com.talkswithtanha.twt.core.model.PaymentAccount, save: Boolean) =
-        run(deal.id, "${deal.reference} accepted. The member pays into ${account.method}.") { desk.accept(deal.id, me, account, save) }
+        run(deal.id, "${deal.reference} accepted. The member pays into ${account.method}.") {
+            desk.accept(deal.id, me, account)
+            if (save) session.currentUser.value?.id?.let { runCatching { desk.saveMyAccount(it, account) } }
+        }
+
+    fun changeAccount(deal: Deal, account: com.talkswithtanha.twt.core.model.PaymentAccount, save: Boolean) =
+        run(deal.id, "${deal.reference}: the member now pays into ${account.method}.") {
+            desk.changePaymentAccount(deal.id, account, me)
+            if (save) session.currentUser.value?.id?.let { runCatching { desk.saveMyAccount(it, account) } }
+        }
     fun decline(deal: Deal, reason: String) = run(deal.id, "${deal.reference} declined.") { desk.decline(deal.id, reason) }
     fun cancel(deal: Deal, reason: String) = run(deal.id, "${deal.reference} cancelled.") { desk.cancel(deal.id, reason) }
     fun confirmPayment(deal: Deal) = run(deal.id, "${deal.reference}: payment confirmed.") { desk.confirmPayment(deal.id, me) }

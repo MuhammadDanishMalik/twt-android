@@ -93,6 +93,8 @@ fun HomeScreen(
     onOpenDesk: () -> Unit = {},
     /** A member's thread with the desk, opened from the dealer's Chats. */
     onOpenDeskChat: (String) -> Unit = {},
+    /** A room by id, opened as an ordinary chat (the dealer's line to Tanha). */
+    onOpenRoom: (String) -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val desk by viewModel.deskSummary.collectAsStateWithLifecycle()
@@ -105,7 +107,8 @@ fun HomeScreen(
             onOpenChat = onOpenDeskChat,
             deskMode = true,
             userInitial = me?.fullName?.trim()?.firstOrNull()?.uppercase().orEmpty(),
-            onOpenSettings = onOpenSettings
+            onOpenSettings = onOpenSettings,
+            onOpenTeamChat = { me?.id?.let { onOpenRoom(com.talkswithtanha.twt.core.firebase.FirestorePaths.ChatRoom.support(it)) } }
         )
         return
     }

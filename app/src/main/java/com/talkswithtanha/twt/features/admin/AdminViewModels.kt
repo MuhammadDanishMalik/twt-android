@@ -194,7 +194,13 @@ class AdminSignalsViewModel @Inject constructor(
 // ─── The exchange desk, from the other side of the counter ──────────────────
 
 /** The desk's queues, as the panel's Deals page splits them. */
-enum class DeskTab(val title: String) { REQUESTS("New requests"), NEEDS("Needs you"), WAITING("Waiting on member"), CHATS("Chats"), HISTORY("History") }
+enum class DeskTab(val title: String, val short: String) {
+    REQUESTS("New requests", "Desk"),
+    NEEDS("Needs you", "Needs you"),
+    WAITING("Waiting on member", "Waiting"),
+    CHATS("Chats", "Chats"),
+    HISTORY("History", "History")
+}
 
 data class AdminDealsUiState(
     val deals: List<Deal> = emptyList(),
@@ -284,6 +290,13 @@ class AdminDealsViewModel @Inject constructor(
     fun dispute(deal: Deal, reason: String) = run(deal.id, "${deal.reference} moved to review.") { desk.dispute(deal.id, reason) }
     fun setTakingDeals(on: Boolean) = run("desk", if (on) "Desk open for new deals." else "Desk closed for new deals.") { desk.setTakingDeals(on, me) }
     fun setFund(amount: Long) = run("desk", "Today's fund set to ${"%,d".format(amount)} USDT.") { desk.setDailyFund(amount, me) }
+    fun setRates(buyRupees: Double, sellRupees: Double) {
+        if (buyRupees <= 0 || sellRupees <= 0) { failure.value = "Enter both rates."; return }
+        if (sellRupees > buyRupees) { failure.value = "The sell rate cannot be above the buy rate."; return }
+        val buy = Math.round(buyRupees * 100)
+        val sell = Math.round(sellRupees * 100)
+        run("desk", "Rates saved: buy ${"%.2f".format(buyRupees)} · sell ${"%.2f".format(sellRupees)}.") { desk.setRates(buy, sell, me) }
+    }
     fun dismissNotice() { notice.value = null; failure.value = null }
 }
 

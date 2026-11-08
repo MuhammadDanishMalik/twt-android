@@ -211,7 +211,8 @@ fun SettingsScreen(
             // post a signal is here to post a signal, not to change their
             // notification settings — and a row buried under Preferences is a
             // row nobody taps on a phone.
-            if (user?.isStaff == true) {
+            // The dealer runs the desk from Home and its tab bar, not from here.
+            if (user?.isStaff == true && user?.isDeskOnly != true) {
                 item {
                     Spacer(Modifier.height(12.dp))
                     SettingsSectionHeader("Running TWT")

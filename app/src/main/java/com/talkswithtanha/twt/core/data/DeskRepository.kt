@@ -192,6 +192,31 @@ class DeskRepository @Inject constructor(
         }.await()
     }
 
+    /**
+     * Today's buy and sell rate, in paisa: the same fields and the same
+     * 24-point history the panel's rate page writes, so the app's sparkline
+     * and the members' screens move the moment it is saved.
+     */
+    suspend fun setRates(buyPaisa: Long, sellPaisa: Long, by: String) {
+        db.runTransaction { tx ->
+            val cfg = tx.get(rateDoc)
+            val previous = cfg.getLong("pkrPerUsdPaisa") ?: 0L
+            val history = (cfg.get("history") as? List<*>).orEmpty().mapNotNull { (it as? Number)?.toLong() } + buyPaisa
+            tx.set(
+                rateDoc,
+                mapOf(
+                    "pkrPerUsdPaisa" to buyPaisa,
+                    "sellPkrPerUsdPaisa" to sellPaisa,
+                    "previousPkrPerUsdPaisa" to if (previous > 0) previous else buyPaisa,
+                    "history" to history.takeLast(24),
+                    "updatedBy" to by,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                ),
+                SetOptions.merge()
+            )
+        }.await()
+    }
+
     /** Every exchange chat, the most recent first. Sorted here, so no index is needed. */
     fun observeThreads(): Flow<Snapshot<List<DeskThread>>> =
         db.collection(FirestorePaths.Collection.CHAT_ROOMS)

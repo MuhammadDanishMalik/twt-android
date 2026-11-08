@@ -163,7 +163,13 @@ fun RootScreen(
     // A desk alert, held for the gate the same way.
     LaunchedEffect(pendingDesk, gate) {
         if (!pendingDesk || gate != RootViewModel.Gate.Allowed) return@LaunchedEffect
-        navController.navigate(AppRoute.AdminDeals.route) { launchSingleTop = true }
+        if (viewModel.deskOnly.value) {
+            // Their Home is the desk; open it on the new requests.
+            com.talkswithtanha.twt.features.admin.DeskShell.selected.value = com.talkswithtanha.twt.features.admin.DeskTab.REQUESTS
+            navController.navigate(AppRoute.Home.route) { launchSingleTop = true }
+        } else {
+            navController.navigate(AppRoute.AdminDeals.route) { launchSingleTop = true }
+        }
         onPendingDeskHandled()
     }
 
@@ -184,7 +190,12 @@ fun RootScreen(
     }
 
     val haze = rememberHazeState()
-    val showsBar = currentRoute in AppRoute.bottomBarRoutes
+    val deskOnly by viewModel.deskOnly.collectAsStateWithLifecycle()
+    // The dealer's app is the desk: Home is the only tab screen they use,
+    // and the bar under it switches the desk's queues.
+    val showsBar = if (deskOnly) currentRoute == AppRoute.Home.route else currentRoute in AppRoute.bottomBarRoutes
+    val deskTab by com.talkswithtanha.twt.features.admin.DeskShell.selected.collectAsStateWithLifecycle()
+    val deskBadges by com.talkswithtanha.twt.features.admin.DeskShell.badges.collectAsStateWithLifecycle()
 
     TwtScreen {
         AppNavHost(
@@ -232,12 +243,25 @@ fun RootScreen(
             exit = fadeOut() + slideOutVertically { it },
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
-            TwtBottomBar(
-                items = bottomBarItems,
-                badges = tabBadges,
-                currentRoute = currentRoute,
-                onNavigate = { route -> navController.navigateToTab(route) }
-            )
+            if (deskOnly) {
+                TwtBottomBar(
+                    items = com.talkswithtanha.twt.features.admin.DeskShell.items,
+                    badges = deskBadges,
+                    currentRoute = com.talkswithtanha.twt.features.admin.DeskShell.route(deskTab),
+                    onNavigate = { route ->
+                        com.talkswithtanha.twt.features.admin.DeskShell.tabOf(route)?.let {
+                            com.talkswithtanha.twt.features.admin.DeskShell.selected.value = it
+                        }
+                    }
+                )
+            } else {
+                TwtBottomBar(
+                    items = bottomBarItems,
+                    badges = tabBadges,
+                    currentRoute = currentRoute,
+                    onNavigate = { route -> navController.navigateToTab(route) }
+                )
+            }
         }
 
         // Open deals and their changes, over every screen once let in.

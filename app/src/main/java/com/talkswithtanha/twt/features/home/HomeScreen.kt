@@ -91,17 +91,23 @@ fun HomeScreen(
     onOpenChat: () -> Unit = {},
     /** The exchange desk, for staff who hold the marketplace. */
     onOpenDesk: () -> Unit = {},
+    /** A member's thread with the desk, opened from the dealer's Chats. */
+    onOpenDeskChat: (String) -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val desk by viewModel.deskSummary.collectAsStateWithLifecycle()
-    // The dealer's account is the desk: it opens on the desk once per launch,
-    // and Back from there is the ordinary app.
-    var deskOpened by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(desk?.deskOnly) {
-        if (desk?.deskOnly == true && !deskOpened) {
-            deskOpened = true
-            onOpenDesk()
-        }
+    val me by viewModel.user.collectAsStateWithLifecycle()
+    // The dealer's account is the desk: their Home is the desk itself, and
+    // the tab bar (RootScreen) holds its queues.
+    if (me?.isDeskOnly == true) {
+        com.talkswithtanha.twt.features.admin.AdminDealsScreen(
+            onBack = {},
+            onOpenChat = onOpenDeskChat,
+            deskMode = true,
+            userInitial = me?.fullName?.trim()?.firstOrNull()?.uppercase().orEmpty(),
+            onOpenSettings = onOpenSettings
+        )
+        return
     }
     val banners by viewModel.activeBanners.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current

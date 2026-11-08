@@ -79,11 +79,29 @@ import java.util.Locale
 fun AdminDealsScreen(
     onBack: () -> Unit,
     onOpenChat: (String) -> Unit = {},
+    /**
+     * The dealer's Home: no way back (there is nowhere behind it), their
+     * avatar for settings instead, and the queues on the app's tab bar
+     * ([DeskShell]) rather than in a row of chips here.
+     */
+    deskMode: Boolean = false,
+    userInitial: String = "",
+    onOpenSettings: () -> Unit = {},
     viewModel: AdminDealsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    var tab by rememberSaveable { mutableStateOf(DeskTab.REQUESTS) }
+    var localTab by rememberSaveable { mutableStateOf(DeskTab.REQUESTS) }
+    val shellTab by DeskShell.selected.collectAsStateWithLifecycle()
+    val tab = if (deskMode) shellTab else localTab
+    if (deskMode) {
+        androidx.compose.runtime.LaunchedEffect(state) {
+            DeskShell.badges.value = DeskTab.entries
+                .filter { it != DeskTab.HISTORY && it != DeskTab.WAITING }
+                .associate { DeskShell.route(it) to state.count(it) }
+        }
+    }
     var prompt by remember { mutableStateOf<DeskPrompt?>(null) }
+    var editingRates by remember { mutableStateOf(false) }
 
     Column(
         Modifier
@@ -95,16 +113,23 @@ fun AdminDealsScreen(
             Modifier.fillMaxWidth().padding(horizontal = SettingsMetrics.pageInset, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                Modifier.size(40.dp).clip(CircleShape).background(IosColors.SecondaryBackground).clickable(onClick = onBack),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = IosColors.TextPrimary, modifier = Modifier.size(18.dp))
+            if (!deskMode) {
+                Box(
+                    Modifier.size(40.dp).clip(CircleShape).background(IosColors.SecondaryBackground).clickable(onClick = onBack),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = IosColors.TextPrimary, modifier = Modifier.size(18.dp))
+                }
+                Spacer(Modifier.width(12.dp))
             }
-            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("Exchange desk", color = IosColors.TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                state.rate?.let {
+                Text(
+                    if (deskMode && tab != DeskTab.REQUESTS) tab.title else "Exchange desk",
+                    color = IosColors.TextPrimary,
+                    fontSize = if (deskMode) 26.sp else 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                state.rate?.takeUnless { deskMode && tab == DeskTab.REQUESTS }?.let {
                     Text(
                         "Buy ${ExchangeRate.formatPaisa(it.buyPaisa)} · Sell ${ExchangeRate.formatPaisa(it.sellPaisa)}",
                         color = IosColors.TextSecondary,
@@ -112,9 +137,17 @@ fun AdminDealsScreen(
                     )
                 }
             }
+            if (deskMode) {
+                Box(
+                    Modifier.size(40.dp).clip(CircleShape).background(IosColors.SecondaryBackground).clickable(onClick = onOpenSettings),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(userInitial.ifBlank { "•" }, color = IosColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+            }
         }
 
-        DeskBar(
+        if (!deskMode) DeskBar(
             rate = state.rate,
             busy = state.workingId == "desk",
             onToggle = { viewModel.setTakingDeals(it) },
@@ -130,7 +163,7 @@ fun AdminDealsScreen(
             )
         }
 
-        Row(
+        if (!deskMode) Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = SettingsMetrics.pageInset, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -141,7 +174,7 @@ fun AdminDealsScreen(
                     Modifier
                         .clip(RoundedCornerShape(999.dp))
                         .background(if (on) Color.White else IosColors.SecondaryBackground)
-                        .clickable { tab = t }
+                        .clickable { localTab = t }
                         .padding(horizontal = 14.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -167,9 +200,25 @@ fun AdminDealsScreen(
         }
 
         LazyColumn(
-            contentPadding = PaddingValues(start = SettingsMetrics.pageInset, end = SettingsMetrics.pageInset, top = 6.dp, bottom = 48.dp),
+            contentPadding = PaddingValues(start = SettingsMetrics.pageInset, end = SettingsMetrics.pageInset, top = 6.dp, bottom = if (deskMode) 150.dp else 48.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            if (deskMode && tab == DeskTab.REQUESTS) {
+                item {
+                    DeskDashboard(
+                        state = state,
+                        busy = state.workingId == "desk",
+                        onToggle = { viewModel.setTakingDeals(it) },
+                        onRates = { editingRates = true },
+                        onQuickFund = { viewModel.setFund(it) },
+                        onCustomFund = { prompt = DeskPrompt.Fund },
+                        onJump = { DeskShell.selected.value = it }
+                    )
+                }
+                item {
+                    Text("New requests", color = IosColors.TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
+                }
+            }
             if (tab == DeskTab.CHATS) {
                 if (state.threads.isEmpty()) item { Empty("No chats yet. When a member messages the desk from the Exchange, it appears here.") }
                 items(state.threads, key = { it.roomId }) { ThreadRow(it) { onOpenChat(it.roomId) } }
@@ -198,6 +247,14 @@ fun AdminDealsScreen(
                 }
             }
         }
+    }
+
+    if (editingRates) {
+        RatesDialog(
+            rate = state.rate,
+            onDismiss = { editingRates = false },
+            onSave = { b, sl -> editingRates = false; viewModel.setRates(b, sl) }
+        )
     }
 
     prompt?.let { p ->
@@ -325,6 +382,7 @@ private fun DeskDealCard(
             color = IosColors.TextSecondary,
             fontSize = 12.5.sp
         )
+        DealSteps(deal)
 
         deal.paymentReference?.let {
             Info("Their transaction id", it) { clipboard.setText(AnnotatedString(it)) }
@@ -352,24 +410,21 @@ private fun DeskDealCard(
             return@Column
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+        // One big button for the next step; the ways out sit small beside it.
+        val short = deal.status == DealStatus.AWAITING_APPROVAL && fundLeft != null && fundLeft * 100 < deal.amountUsdCents
+        when (deal.status) {
+            DealStatus.AWAITING_APPROVAL -> PrimaryAction(if (short) "Today's fund is too low" else "Accept deal", enabled = !short, onClick = onAccept)
+            DealStatus.PAYMENT_SENT -> PrimaryAction("Confirm the money arrived") { onPrompt(DeskPrompt.Arrived(deal)) }
+            DealStatus.RELEASING -> PrimaryAction("I have sent it") { onPrompt(DeskPrompt.Release(deal)) }
+            DealStatus.AWAITING_PAYMENT -> Text("Waiting for the member to pay.", color = IosColors.TextSecondary, fontSize = 13.sp)
+            DealStatus.PAYMENT_APPROVED -> Text("Waiting for the member's receiving account.", color = IosColors.TextSecondary, fontSize = 13.sp)
+            else -> Unit
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             when (deal.status) {
-                DealStatus.AWAITING_APPROVAL -> {
-                    val short = fundLeft != null && fundLeft * 100 < deal.amountUsdCents
-                    Action(if (short) "Fund too low" else "Accept deal", IosColors.BuyGreen, enabled = !short, onClick = onAccept)
-                    Action("Decline", IosColors.SellRed) { onPrompt(DeskPrompt.Decline(deal)) }
-                }
-                DealStatus.PAYMENT_SENT -> {
-                    Action("Money arrived", IosColors.BuyGreen) { onPrompt(DeskPrompt.Arrived(deal)) }
-                    Action("Dispute", IosColors.SellRed) { onPrompt(DeskPrompt.Dispute(deal)) }
-                }
-                DealStatus.RELEASING -> {
-                    Action("Mark as sent", IosColors.BuyGreen) { onPrompt(DeskPrompt.Release(deal)) }
-                    Action("Dispute", IosColors.SellRed) { onPrompt(DeskPrompt.Dispute(deal)) }
-                }
-                DealStatus.AWAITING_PAYMENT, DealStatus.PAYMENT_APPROVED -> {
-                    Action("Cancel deal", IosColors.SellRed) { onPrompt(DeskPrompt.Cancel(deal)) }
-                }
+                DealStatus.AWAITING_APPROVAL -> Action("Decline", IosColors.SellRed) { onPrompt(DeskPrompt.Decline(deal)) }
+                DealStatus.PAYMENT_SENT, DealStatus.RELEASING -> Action("Something's wrong", IosColors.SellRed) { onPrompt(DeskPrompt.Dispute(deal)) }
+                DealStatus.AWAITING_PAYMENT, DealStatus.PAYMENT_APPROVED -> Action("Cancel deal", IosColors.SellRed) { onPrompt(DeskPrompt.Cancel(deal)) }
                 else -> Unit
             }
         }

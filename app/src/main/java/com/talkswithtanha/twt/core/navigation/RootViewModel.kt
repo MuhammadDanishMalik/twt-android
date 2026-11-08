@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.core.navigation
 
+import kotlinx.coroutines.flow.map
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.talkswithtanha.twt.core.session.SessionRepository
@@ -46,6 +47,11 @@ class RootViewModel @Inject constructor(
         IbRenewal,
         Allowed
     }
+
+    /** The dealer's account: the tab bar shows the desk's queues instead of the app's tabs. */
+    val deskOnly: StateFlow<Boolean> = session.currentUser
+        .map { it?.isDeskOnly == true }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     val gate: StateFlow<Gate> = combine(
         session.state,

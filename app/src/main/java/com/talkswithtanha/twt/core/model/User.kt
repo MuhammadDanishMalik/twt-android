@@ -120,6 +120,12 @@ data class User(
     val isStaff: Boolean get() = role == UserRole.OWNER || role == UserRole.ADMIN
 
     /**
+     * The dealer: an admin whose only area is the exchange. Their whole app is
+     * the desk — the desk is their home, and the tab bar holds its queues.
+     */
+    val isDeskOnly: Boolean get() = role == UserRole.ADMIN && staffAccess == listOf(StaffArea.MARKETPLACE)
+
+    /**
      * What this account's messages are marked as: Tanha ("owner"), a full
      * admin, or a team member — an admin limited to some areas. Null for
      * members. The rules check it against the profile, so it cannot be faked.

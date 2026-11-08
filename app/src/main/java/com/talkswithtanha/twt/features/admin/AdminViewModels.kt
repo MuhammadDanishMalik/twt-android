@@ -191,53 +191,100 @@ class AdminSignalsViewModel @Inject constructor(
     }
 }
 
-// ─── The marketplace, from the other side of the counter ────────────────────
+// ─── The exchange desk, from the other side of the counter ──────────────────
+
+/** The desk's queues, as the panel's Deals page splits them. */
+enum class DeskTab(val title: String) { REQUESTS("New requests"), NEEDS("Needs you"), WAITING("Waiting on member"), CHATS("Chats"), HISTORY("History") }
 
 data class AdminDealsUiState(
     val deals: List<Deal> = emptyList(),
+    val threads: List<com.talkswithtanha.twt.core.data.DeskThread> = emptyList(),
+    val rate: com.talkswithtanha.twt.core.model.ExchangeRate? = null,
     val workingId: String? = null,
-    val error: String? = null
+    val error: String? = null,
+    val notice: String? = null
 ) {
-    /** Waiting on us rather than on the member — the same test the panel uses. */
-    val needsAction: List<Deal>
-        get() = deals.filter {
-            it.status == DealStatus.PAYMENT_SENT ||
-                it.status == DealStatus.RELEASING ||
-                it.status == DealStatus.DISPUTED
+    fun of(tab: DeskTab): List<Deal> = deals.filter {
+        when (tab) {
+            DeskTab.REQUESTS -> it.status == DealStatus.AWAITING_APPROVAL
+            DeskTab.NEEDS -> it.status == DealStatus.PAYMENT_SENT || it.status == DealStatus.RELEASING || it.status == DealStatus.DISPUTED
+            DeskTab.WAITING -> it.status == DealStatus.AWAITING_PAYMENT || it.status == DealStatus.PAYMENT_APPROVED
+            DeskTab.HISTORY -> it.status == DealStatus.COMPLETED || it.status == DealStatus.CANCELLED
+            DeskTab.CHATS -> false
         }
+    }
 
-    val rest: List<Deal> get() = deals - needsAction.toSet()
+    fun count(tab: DeskTab): Int = if (tab == DeskTab.CHATS) threads.count { it.unseen } else of(tab).size
+
+    /** Finished today, and by whom: what the owner reads to see the desk's day. */
+    val doneToday: List<Pair<String, Int>>
+        get() {
+            val start = java.util.Calendar.getInstance().apply {
+                set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0); set(java.util.Calendar.SECOND, 0)
+            }.time
+            return deals.filter { it.status == DealStatus.COMPLETED && (it.releasedAt ?: it.createdAt).after(start) }
+                .groupingBy { it.releasedBy ?: "Desk" }.eachCount().toList().sortedByDescending { it.second }
+        }
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class AdminDealsViewModel @Inject constructor(
-    private val repository: AdminRepository
+    repository: AdminRepository,
+    private val desk: com.talkswithtanha.twt.core.data.DeskRepository,
+    rates: com.talkswithtanha.twt.core.data.ExchangeRateRepository,
+    private val session: SessionRepository
 ) : ViewModel() {
 
     private val working = MutableStateFlow<String?>(null)
     private val failure = MutableStateFlow<String?>(null)
+    private val notice = MutableStateFlow<String?>(null)
+
+    private val messages = combine(working, failure, notice) { w, f, n -> Triple(w, f, n) }
 
     val state: StateFlow<AdminDealsUiState> = combine(
         repository.observeAllDeals(),
-        working,
-        failure
-    ) { snapshot, workingId, error ->
+        desk.observeThreads(),
+        rates.observeRate(),
+        messages
+    ) { snapshot, threads, rate, (workingId, error, info) ->
         AdminDealsUiState(
             deals = (snapshot as? Snapshot.Data)?.value.orEmpty(),
+            threads = (threads as? Snapshot.Data)?.value.orEmpty(),
+            rate = rate,
             workingId = workingId,
+            notice = info,
             error = error ?: (snapshot as? Snapshot.Failed)?.let {
                 "Deals could not be loaded. ${it.error.localizedMessage ?: "Check your connection."}"
             }
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AdminDealsUiState())
 
-    fun apply(deal: Deal, status: DealStatus, note: String) = viewModelScope.launch {
-        working.value = deal.id
+    /** Who is acting, for the deal's timeline: the same name the panel records. */
+    private val me: String get() = session.currentUser.value?.fullName?.takeIf { it.isNotBlank() } ?: "TWT Desk"
+
+    private fun run(id: String, done: String, block: suspend () -> Unit) = viewModelScope.launch {
+        working.value = id
         failure.value = null
-        runCatching { repository.setDealStatus(deal.id, status, note) }
-            .onFailure { failure.value = "That did not save. ${it.localizedMessage ?: ""}".trim() }
+        notice.value = null
+        runCatching { block() }
+            .onSuccess { notice.value = done }
+            .onFailure {
+                failure.value = (it as? com.talkswithtanha.twt.core.data.DeskRefusal)?.message
+                    ?: "That did not save. Check your connection and try again."
+            }
         working.value = null
     }
+
+    fun accept(deal: Deal) = run(deal.id, "${deal.reference} accepted. The member can pay now.") { desk.accept(deal.id, me) }
+    fun decline(deal: Deal, reason: String) = run(deal.id, "${deal.reference} declined.") { desk.decline(deal.id, reason) }
+    fun cancel(deal: Deal, reason: String) = run(deal.id, "${deal.reference} cancelled.") { desk.cancel(deal.id, reason) }
+    fun confirmPayment(deal: Deal) = run(deal.id, "${deal.reference}: payment confirmed.") { desk.confirmPayment(deal.id, me) }
+    fun release(deal: Deal, reference: String) = run(deal.id, "${deal.reference} completed. The member was told.") { desk.release(deal.id, reference, me) }
+    fun dispute(deal: Deal, reason: String) = run(deal.id, "${deal.reference} moved to review.") { desk.dispute(deal.id, reason) }
+    fun setTakingDeals(on: Boolean) = run("desk", if (on) "Desk open for new deals." else "Desk closed for new deals.") { desk.setTakingDeals(on, me) }
+    fun setFund(amount: Long) = run("desk", "Today's fund set to ${"%,d".format(amount)} USDT.") { desk.setDailyFund(amount, me) }
+    fun dismissNotice() { notice.value = null; failure.value = null }
 }
 
 // ─── Banners ────────────────────────────────────────────────────────────────

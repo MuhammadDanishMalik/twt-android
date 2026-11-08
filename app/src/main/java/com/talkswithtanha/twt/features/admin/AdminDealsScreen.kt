@@ -1,8 +1,9 @@
 package com.talkswithtanha.twt.features.admin
 
-import com.talkswithtanha.twt.core.designsystem.WebFonts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,62 +12,78 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.compose.AsyncImage
+import com.talkswithtanha.twt.core.data.DeskThread
 import com.talkswithtanha.twt.core.designsystem.IosColors
 import com.talkswithtanha.twt.core.model.Deal
-import com.talkswithtanha.twt.core.model.DealSide
 import com.talkswithtanha.twt.core.model.DealStatus
+import com.talkswithtanha.twt.core.model.ExchangeRate
 import com.talkswithtanha.twt.features.settings.SettingsMetrics
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 /**
- * The exchange, from the other side of the counter.
+ * The exchange desk on the phone: the same queues and the same buttons as the
+ * panel's Deals and Chats, writing the same fields, so the dealer can run the
+ * desk from either and both stay in step.
  *
- * This is the screen the marketplace area unlocks: somebody has sent money and
- * is waiting to be told it arrived, or has been approved and is waiting for
- * their dollars. Both are people standing still until a human acts, which is
- * exactly the work that should not have to wait for a laptop.
- *
- * The buttons say "Money arrived" and "I've sent theirs" rather than "approve"
- * and "release". The person tapping them is confirming something they did in
- * their banking app a moment ago, and the question they are answering is not
- * "do you approve" — it is "did the money turn up". Each one asks once before
- * it writes, because every one of them moves real money.
+ *  - New requests: accept (the member is then shown where to pay, and the
+ *    dollars come off today's fund) or decline.
+ *  - Needs you: check the money arrived, then send theirs with its reference.
+ *  - Waiting on member, History, and the members' chats with the desk.
+ *  - The desk open or closed, and today's fund.
  */
 @Composable
 fun AdminDealsScreen(
     onBack: () -> Unit,
+    onOpenChat: (String) -> Unit = {},
     viewModel: AdminDealsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    var pending by remember { mutableStateOf<PendingDealAction?>(null) }
+    var tab by rememberSaveable { mutableStateOf(DeskTab.REQUESTS) }
+    var prompt by remember { mutableStateOf<DeskPrompt?>(null) }
 
     Column(
         Modifier
@@ -75,252 +92,346 @@ fun AdminDealsScreen(
             .statusBarsPadding()
     ) {
         Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = SettingsMetrics.pageInset, vertical = 8.dp),
+            Modifier.fillMaxWidth().padding(horizontal = SettingsMetrics.pageInset, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(IosColors.SecondaryBackground)
-                    .clickable(onClick = onBack),
+                Modifier.size(40.dp).clip(CircleShape).background(IosColors.SecondaryBackground).clickable(onClick = onBack),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = IosColors.TextPrimary, modifier = Modifier.size(18.dp))
             }
-            Spacer(Modifier.weight(1f))
-            Text("Marketplace", color = IosColors.TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.weight(1f))
-            Spacer(Modifier.size(40.dp))
-        }
-
-        LazyColumn(
-            contentPadding = PaddingValues(
-                start = SettingsMetrics.pageInset,
-                end = SettingsMetrics.pageInset,
-                bottom = 48.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            state.error?.let { item { Text(it, color = IosColors.SellRed, fontSize = 13.sp) } }
-
-            if (state.deals.isEmpty()) {
-                item {
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Exchange desk", color = IosColors.TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                state.rate?.let {
                     Text(
-                        text = "No deals yet. One appears here the moment a member opens an exchange in the app.",
+                        "Buy ${ExchangeRate.formatPaisa(it.buyPaisa)} · Sell ${ExchangeRate.formatPaisa(it.sellPaisa)}",
                         color = IosColors.TextSecondary,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(vertical = 24.dp)
+                        fontSize = 12.sp
                     )
-                }
-            }
-
-            if (state.needsAction.isNotEmpty()) {
-                item { Label("Waiting on you") }
-                items(state.needsAction, key = { it.id }) { deal ->
-                    DealCard(deal, state.workingId == deal.id) { pending = it }
-                }
-            }
-            if (state.rest.isNotEmpty()) {
-                item { Label("Everything else") }
-                items(state.rest, key = { it.id }) { deal ->
-                    DealCard(deal, state.workingId == deal.id) { pending = it }
                 }
             }
         }
-    }
 
-    pending?.let { action ->
-        AlertDialog(
-            onDismissRequest = { pending = null },
-            title = { Text(action.question) },
-            text = { Text(action.detail) },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.apply(action.deal, action.status, action.note)
-                    pending = null
-                }) {
-                    Text(
-                        action.confirmTitle,
-                        color = if (action.isDestructive) IosColors.SellRed else IosColors.BuyGreen
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { pending = null }) { Text("Not yet") }
-            }
+        DeskBar(
+            rate = state.rate,
+            busy = state.workingId == "desk",
+            onToggle = { viewModel.setTakingDeals(it) },
+            onFund = { prompt = DeskPrompt.Fund }
         )
-    }
-}
 
-@Composable
-private fun Label(text: String) {
-    Text(
-        text = text.uppercase(),
-        color = IosColors.TextSecondary,
-        fontSize = 11.sp,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(top = 12.dp)
-    )
-}
-
-@Composable
-private fun DealCard(deal: Deal, isWorking: Boolean, onAction: (PendingDealAction) -> Unit) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(Color(0xFF141414))
-            .padding(14.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        if (state.doneToday.isNotEmpty()) {
             Text(
-                text = deal.reference,
-                color = IosColors.TextPrimary,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = WebFonts.Mono
+                "Done today: " + state.doneToday.joinToString(" · ") { "${it.first} ${it.second}" },
+                color = IosColors.TextSecondary,
+                fontSize = 12.5.sp,
+                modifier = Modifier.padding(horizontal = SettingsMetrics.pageInset, vertical = 4.dp)
             )
-            Spacer(Modifier.size(8.dp))
-            Box(
-                Modifier
-                    .clip(RoundedCornerShape(50))
-                    .background(if (deal.side == DealSide.BUY) IosColors.BuyGreen else IosColors.SellRed)
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
-            ) {
-                Text(
-                    text = if (deal.side == DealSide.BUY) "BUY USD" else "SELL USD",
-                    color = Color.Black,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Black
-                )
-            }
-            Spacer(Modifier.weight(1f))
-            if (isWorking) {
-                CircularProgressIndicator(
-                    color = IosColors.TextSecondary,
-                    modifier = Modifier.size(14.dp),
-                    strokeWidth = 2.dp
-                )
-                Spacer(Modifier.size(8.dp))
-            }
-            Text(deal.status.title, color = IosColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-        }
-
-        Text(
-            text = deal.userName.ifEmpty { "Member" },
-            color = IosColors.TextPrimary,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(top = 8.dp)
-        )
-        Text(
-            text = "${deal.payLabel()} → ${deal.receiveLabel()}",
-            color = IosColors.TextSecondary,
-            fontSize = 12.sp,
-            fontFamily = WebFonts.Mono,
-            modifier = Modifier.padding(top = 2.dp)
-        )
-        deal.paymentReference?.takeIf { it.isNotBlank() }?.let {
-            Text("Their payment ref: $it", color = IosColors.TextSecondary, fontSize = 12.sp)
-        }
-        deal.receivingAccount?.let {
-            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
-                com.talkswithtanha.twt.core.designsystem.components.PaymentMethodIcon(it.method, size = 20.dp)
-                Text(
-                    text = "Send to: ${it.accountTitle} · ${it.accountNumber} (${it.method})",
-                    color = IosColors.TextSecondary,
-                    fontSize = 12.sp
-                )
-            }
         }
 
         Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(top = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(7.dp)
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = SettingsMetrics.pageInset, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            when (deal.status) {
-                DealStatus.PAYMENT_SENT -> Action("Money arrived", IosColors.BuyGreen) {
-                    onAction(
-                        PendingDealAction(
-                            deal = deal,
-                            status = DealStatus.PAYMENT_APPROVED,
-                            note = "Payment confirmed by Trade with Tanha",
-                            question = "Confirm their payment arrived?",
-                            detail = "${deal.userName} says they sent ${deal.payLabel()}. Check your account before confirming — they are asked for their dollars next.",
-                            confirmTitle = "It arrived"
-                        )
-                    )
+            DeskTab.entries.forEach { t ->
+                val count = state.count(t)
+                val on = t == tab
+                Row(
+                    Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(if (on) Color.White else IosColors.SecondaryBackground)
+                        .clickable { tab = t }
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(t.title, color = if (on) Color.Black else IosColors.TextPrimary, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
+                    if (count > 0 && t != DeskTab.HISTORY) {
+                        Spacer(Modifier.width(6.dp))
+                        val hot = t == DeskTab.REQUESTS || t == DeskTab.NEEDS || t == DeskTab.CHATS
+                        Box(
+                            Modifier.clip(RoundedCornerShape(999.dp)).background(if (hot) IosColors.SellRed else IosColors.TextSecondary).padding(horizontal = 7.dp, vertical = 1.dp)
+                        ) { Text("$count", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                    }
                 }
-                DealStatus.PAYMENT_APPROVED, DealStatus.RELEASING -> Action("I've sent theirs", IosColors.BuyGreen) {
-                    onAction(
-                        PendingDealAction(
-                            deal = deal,
-                            status = DealStatus.COMPLETED,
-                            note = "Funds released",
-                            question = "Mark this deal as finished?",
-                            detail = "Only once ${deal.receiveLabel()} has actually left your account. This closes the deal for them.",
-                            confirmTitle = "Sent — close it"
-                        )
-                    )
-                }
-                DealStatus.DISPUTED -> Text(
-                    text = "Raised for review — settle this one with them directly.",
-                    color = IosColors.Warning,
-                    fontSize = 12.sp
-                )
-                else -> Unit
             }
+        }
 
-            Spacer(Modifier.weight(1f))
+        (state.error ?: state.notice)?.let { line ->
+            Text(
+                line,
+                color = if (state.error != null) IosColors.SellRed else IosColors.BuyGreen,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(horizontal = SettingsMetrics.pageInset, vertical = 4.dp).clickable { viewModel.dismissNotice() }
+            )
+        }
 
-            if (deal.status != DealStatus.COMPLETED && deal.status != DealStatus.CANCELLED) {
-                Action("Cancel", IosColors.SellRed) {
-                    onAction(
-                        PendingDealAction(
-                            deal = deal,
-                            status = DealStatus.CANCELLED,
-                            note = "Cancelled by Trade with Tanha — cancelled from the app",
-                            question = "Cancel this deal?",
-                            detail = "The member is told it is off. If they have already sent money, sort that out with them first.",
-                            confirmTitle = "Cancel the deal",
-                            isDestructive = true
+        LazyColumn(
+            contentPadding = PaddingValues(start = SettingsMetrics.pageInset, end = SettingsMetrics.pageInset, top = 6.dp, bottom = 48.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            if (tab == DeskTab.CHATS) {
+                if (state.threads.isEmpty()) item { Empty("No chats yet. When a member messages the desk from the Exchange, it appears here.") }
+                items(state.threads, key = { it.roomId }) { ThreadRow(it) { onOpenChat(it.roomId) } }
+            } else {
+                val deals = state.of(tab).let { if (tab == DeskTab.HISTORY) it else it.sortedBy { d -> d.createdAt } }
+                if (deals.isEmpty()) {
+                    item {
+                        Empty(
+                            when (tab) {
+                                DeskTab.REQUESTS -> "No new requests. A deal a member asks for waits here for you to accept or decline it."
+                                DeskTab.NEEDS -> "Nothing needs you. A payment lands here the moment a member taps I have paid."
+                                DeskTab.WAITING -> "Nobody is mid-payment."
+                                else -> "Nothing here yet."
+                            }
                         )
+                    }
+                }
+                items(deals, key = { it.id }) { deal ->
+                    DeskDealCard(
+                        deal = deal,
+                        fundLeft = state.rate?.fundLeftUsd(),
+                        working = state.workingId == deal.id,
+                        onAccept = { viewModel.accept(deal) },
+                        onPrompt = { prompt = it }
                     )
                 }
+            }
+        }
+    }
+
+    prompt?.let { p ->
+        DeskDialog(
+            prompt = p,
+            onDismiss = { prompt = null },
+            onConfirm = { text ->
+                when (p) {
+                    is DeskPrompt.Decline -> viewModel.decline(p.deal, text)
+                    is DeskPrompt.Cancel -> viewModel.cancel(p.deal, text)
+                    is DeskPrompt.Dispute -> viewModel.dispute(p.deal, text)
+                    is DeskPrompt.Arrived -> viewModel.confirmPayment(p.deal)
+                    is DeskPrompt.Release -> viewModel.release(p.deal, text)
+                    DeskPrompt.Fund -> text.filter { it.isDigit() }.toLongOrNull()?.let { viewModel.setFund(it) }
+                }
+                prompt = null
+            }
+        )
+    }
+}
+
+/** A question the desk is asked before a write: a reason, a reference, an amount, or a plain yes. */
+sealed interface DeskPrompt {
+    data class Decline(val deal: Deal) : DeskPrompt
+    data class Cancel(val deal: Deal) : DeskPrompt
+    data class Dispute(val deal: Deal) : DeskPrompt
+    data class Arrived(val deal: Deal) : DeskPrompt
+    data class Release(val deal: Deal) : DeskPrompt
+    data object Fund : DeskPrompt
+}
+
+@Composable
+private fun DeskBar(rate: ExchangeRate?, busy: Boolean, onToggle: (Boolean) -> Unit, onFund: () -> Unit) {
+    val open = rate?.isAcceptingDeals != false
+    val left = rate?.fundLeftUsd()
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = SettingsMetrics.pageInset, vertical = 4.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(IosColors.SecondaryBackground)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(Modifier.size(9.dp).clip(CircleShape).background(if (open) IosColors.BuyGreen else IosColors.SellRed))
+        Spacer(Modifier.width(8.dp))
+        Text(if (open) "Desk open" else "Desk closed", color = IosColors.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.width(6.dp))
+        Switch(
+            checked = open,
+            enabled = !busy && rate != null,
+            onCheckedChange = onToggle,
+            colors = SwitchDefaults.colors(checkedTrackColor = IosColors.BuyGreen)
+        )
+        Spacer(Modifier.weight(1f))
+        Column(
+            Modifier.clip(RoundedCornerShape(12.dp)).border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                .clickable(enabled = rate != null, onClick = onFund).padding(horizontal = 10.dp, vertical = 6.dp),
+            horizontalAlignment = Alignment.End
+        ) {
+            Text("Today's fund", color = IosColors.TextSecondary, fontSize = 11.sp)
+            Text(
+                if (left == null) "Set" else "${"%,d".format(left)} of ${"%,d".format(rate.dailyFundUsd)}",
+                color = IosColors.TextPrimary,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun Empty(text: String) {
+    Text(text, color = IosColors.TextSecondary, fontSize = 14.sp, modifier = Modifier.padding(vertical = 24.dp))
+}
+
+@Composable
+private fun ThreadRow(thread: DeskThread, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(IosColors.SecondaryBackground).clickable(onClick = onClick).padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(Modifier.size(42.dp).clip(CircleShape).background(IosColors.BuyGreen.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
+            Text(thread.memberName.trim().take(1).uppercase(), color = IosColors.BuyGreen, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(thread.memberName, color = IosColors.TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text(thread.lastMessage.ifBlank { "No messages yet" }, color = IosColors.TextSecondary, fontSize = 13.sp, maxLines = 1)
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            thread.lastMessageAt?.let { Text(timeOf(it), color = IosColors.TextSecondary, fontSize = 11.sp) }
+            if (thread.unseen) {
+                Spacer(Modifier.height(4.dp))
+                Box(Modifier.size(10.dp).clip(CircleShape).background(IosColors.SellRed))
             }
         }
     }
 }
 
 @Composable
-private fun Action(text: String, tint: Color, onClick: () -> Unit) {
-    Box(
-        Modifier
-            .clip(RoundedCornerShape(50))
-            .background(tint.copy(alpha = 0.15f))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 13.dp, vertical = 7.dp)
+private fun DeskDealCard(
+    deal: Deal,
+    fundLeft: Long?,
+    working: Boolean,
+    onAccept: () -> Unit,
+    onPrompt: (DeskPrompt) -> Unit
+) {
+    val clipboard = LocalClipboardManager.current
+    val uri = LocalUriHandler.current
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(IosColors.SecondaryBackground).padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Text(text, color = tint, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(deal.reference, color = IosColors.TextPrimary, fontSize = 13.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.width(8.dp))
+            Text(deal.userName.ifBlank { "Member" }, color = IosColors.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text(deal.status.title, color = IosColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        }
+        Text("${deal.payLabel()}  →  ${deal.receiveLabel()}", color = IosColors.TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+        Text(
+            "at ${ExchangeRate.formatPaisa(deal.lockedRatePaisa)} · opened ${timeOf(deal.createdAt)}" +
+                (deal.sellerAccount?.let { " · pays into ${it.method} ${it.masked}" } ?: ""),
+            color = IosColors.TextSecondary,
+            fontSize = 12.5.sp
+        )
+
+        deal.paymentReference?.let {
+            Info("Their transaction id", it) { clipboard.setText(AnnotatedString(it)) }
+        }
+        deal.paymentProofUrl?.let { url ->
+            AsyncImage(
+                model = url,
+                contentDescription = "Payment screenshot",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxWidth().height(160.dp).clip(RoundedCornerShape(12.dp)).clickable { uri.openUri(url) }
+            )
+        }
+        if (deal.status == DealStatus.RELEASING) {
+            deal.receivingAccount?.let { acc ->
+                Info("Send to · ${acc.method}", "${acc.accountTitle}\n${acc.accountNumber}") { clipboard.setText(AnnotatedString(acc.accountNumber)) }
+            }
+        }
+        deal.releaseReference?.let { Info("Sent with ref", it) { clipboard.setText(AnnotatedString(it)) } }
+        listOfNotNull(deal.approvedBy?.let { "Accepted by $it" }, deal.releasedBy?.let { "Sent by $it" })
+            .takeIf { it.isNotEmpty() }
+            ?.let { Text(it.joinToString(" · "), color = IosColors.TextSecondary, fontSize = 12.sp) }
+
+        if (working) {
+            CircularProgressIndicator(Modifier.size(22.dp).align(Alignment.CenterHorizontally), color = IosColors.BuyGreen, strokeWidth = 2.dp)
+            return@Column
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+            when (deal.status) {
+                DealStatus.AWAITING_APPROVAL -> {
+                    val short = fundLeft != null && fundLeft * 100 < deal.amountUsdCents
+                    Action(if (short) "Fund too low" else "Accept deal", IosColors.BuyGreen, enabled = !short, onClick = onAccept)
+                    Action("Decline", IosColors.SellRed) { onPrompt(DeskPrompt.Decline(deal)) }
+                }
+                DealStatus.PAYMENT_SENT -> {
+                    Action("Money arrived", IosColors.BuyGreen) { onPrompt(DeskPrompt.Arrived(deal)) }
+                    Action("Dispute", IosColors.SellRed) { onPrompt(DeskPrompt.Dispute(deal)) }
+                }
+                DealStatus.RELEASING -> {
+                    Action("Mark as sent", IosColors.BuyGreen) { onPrompt(DeskPrompt.Release(deal)) }
+                    Action("Dispute", IosColors.SellRed) { onPrompt(DeskPrompt.Dispute(deal)) }
+                }
+                DealStatus.AWAITING_PAYMENT, DealStatus.PAYMENT_APPROVED -> {
+                    Action("Cancel deal", IosColors.SellRed) { onPrompt(DeskPrompt.Cancel(deal)) }
+                }
+                else -> Unit
+            }
+        }
     }
 }
 
-/**
- * Every write on this screen moves somebody's money, so each one is described in
- * full before it happens rather than being a button that fires.
- */
-private data class PendingDealAction(
-    val deal: Deal,
-    val status: DealStatus,
-    val note: String,
-    val question: String,
-    val detail: String,
-    val confirmTitle: String,
-    val isDestructive: Boolean = false
-)
+@Composable
+private fun Info(label: String, value: String, onCopy: () -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.05f)).clickable(onClick = onCopy).padding(10.dp)
+    ) {
+        Text("$label · tap to copy", color = IosColors.TextSecondary, fontSize = 11.sp)
+        Text(value, color = IosColors.TextPrimary, fontSize = 14.sp, fontFamily = FontFamily.Monospace)
+    }
+}
+
+@Composable
+private fun Action(text: String, tint: Color, enabled: Boolean = true, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(tint.copy(alpha = if (enabled) 0.18f else 0.08f))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp)
+    ) { Text(text, color = if (enabled) tint else IosColors.TextSecondary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+}
+
+@Composable
+private fun DeskDialog(prompt: DeskPrompt, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    val (title, body, field, confirm) = when (prompt) {
+        is DeskPrompt.Decline -> Quad("Decline ${prompt.deal.reference}?", "The member is told, with your reason.", "Reason", "Decline")
+        is DeskPrompt.Cancel -> Quad("Cancel ${prompt.deal.reference}?", "The member is told, with your reason. Its dollars go back into today's fund.", "Reason", "Cancel deal")
+        is DeskPrompt.Dispute -> Quad("Move ${prompt.deal.reference} to review?", "Nothing moves until it is decided.", "What is wrong", "Move to review")
+        is DeskPrompt.Arrived -> Quad("Did ${prompt.deal.payLabel()} arrive?", "Check your bank or wallet app — never a screenshot or SMS. The member is then asked where to send theirs.", null, "It arrived")
+        is DeskPrompt.Release -> Quad("Sent ${prompt.deal.receiveLabel()}?", "Paste the transaction id or hash you sent it with. The member sees it.", "Transaction id or hash", "Mark as sent")
+        DeskPrompt.Fund -> Quad("Today's fund", "How many USDT the desk will deal today. Accepted deals come off it.", "USDT", "Save")
+    }
+    var text by remember { mutableStateOf(if (prompt is DeskPrompt.Decline) "The desk cannot take this deal right now." else "") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(body)
+                field?.let {
+                    OutlinedTextField(
+                        value = text,
+                        onValueChange = { v -> text = v },
+                        label = { Text(it) },
+                        singleLine = prompt !is DeskPrompt.Decline && prompt !is DeskPrompt.Cancel,
+                        keyboardOptions = if (prompt == DeskPrompt.Fund) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = field == null || text.isNotBlank(), onClick = { onConfirm(text.trim()) }) { Text(confirm) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Not yet") } }
+    )
+}
+
+private data class Quad(val a: String, val b: String, val c: String?, val d: String)
+
+private fun timeOf(date: java.util.Date): String = SimpleDateFormat("d MMM, h:mm a", Locale.getDefault()).format(date)

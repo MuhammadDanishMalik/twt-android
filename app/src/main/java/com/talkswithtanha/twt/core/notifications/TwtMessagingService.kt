@@ -87,6 +87,7 @@ class TwtMessagingService : FirebaseMessagingService() {
         post(
             channel, title, body, signalId, data[KEY_DEAL_ID].takeIf { data["desk"] != "1" },
             roomId = data[KEY_ROOM_ID].takeIf { kind == KIND_CHAT },
+            openDesk = data["desk"] == "1",
             silent = foreground
         )
     }
@@ -111,6 +112,7 @@ class TwtMessagingService : FirebaseMessagingService() {
         signalId: String?,
         dealId: String? = null,
         roomId: String? = null,
+        openDesk: Boolean = false,
         silent: Boolean = false
     ) {
         if (!canPost()) return
@@ -123,6 +125,8 @@ class TwtMessagingService : FirebaseMessagingService() {
             dealId?.let { putExtra(KEY_DEAL_ID, it) }
             // A reply in a private chat opens that chat.
             roomId?.let { putExtra(KEY_ROOM_ID, it) }
+            // A desk alert (a new request, a payment to check) opens the desk.
+            if (openDesk) putExtra("openDesk", true)
         }
         val pending = PendingIntent.getActivity(
             this,

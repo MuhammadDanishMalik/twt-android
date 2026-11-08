@@ -106,7 +106,7 @@ fun ChatListScreen(
             contentPadding = PaddingValues(horizontal = 20.dp),
             modifier = Modifier.padding(bottom = 100.dp)
         ) {
-            item { ChatSectionHeader("Community") }
+            item { ChatSectionHeader("Private") }
 
             item {
                 SettingsCard {

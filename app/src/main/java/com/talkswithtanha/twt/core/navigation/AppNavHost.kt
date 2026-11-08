@@ -185,7 +185,8 @@ fun AppNavHost(
                 onOpenMarketplace = { navController.navigate(AppRoute.Marketplace.route) },
                 onOpenSettings = { navController.navigate(AppRoute.Settings.route) },
                 onOpenSupport = { openSupportThread() },
-                onOpenChat = { navController.navigateToTab(AppRoute.ChatList.route) }
+                onOpenChat = { navController.navigateToTab(AppRoute.ChatList.route) },
+                onOpenDesk = { navController.navigate(AppRoute.AdminDeals.route) { launchSingleTop = true } }
             )
         }
 
@@ -393,7 +394,10 @@ fun AppNavHost(
         }
 
             sheetRoute(sharedScope, AppRoute.AdminDeals.route) {
-            AdminDealsScreen(onBack = { navController.popBackStack() })
+            AdminDealsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenChat = { roomId -> navController.navigate(AppRoute.ChatRoom.of(roomId, seller = true)) }
+            )
         }
 
             sheetRoute(sharedScope, AppRoute.AdminChats.route) {

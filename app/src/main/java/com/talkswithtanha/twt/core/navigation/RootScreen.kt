@@ -85,6 +85,8 @@ fun RootScreen(
     onPendingDealHandled: () -> Unit = {},
     pendingRoomId: String? = null,
     onPendingRoomHandled: () -> Unit = {},
+    pendingDesk: Boolean = false,
+    onPendingDeskHandled: () -> Unit = {},
     navController: NavHostController = rememberNavController(),
     viewModel: RootViewModel = hiltViewModel()
 ) {
@@ -156,6 +158,13 @@ fun RootScreen(
         if (gate != RootViewModel.Gate.Allowed) return@LaunchedEffect
         navController.navigate(AppRoute.DealDetail.of(dealId)) { launchSingleTop = true }
         onPendingDealHandled()
+    }
+
+    // A desk alert, held for the gate the same way.
+    LaunchedEffect(pendingDesk, gate) {
+        if (!pendingDesk || gate != RootViewModel.Gate.Allowed) return@LaunchedEffect
+        navController.navigate(AppRoute.AdminDeals.route) { launchSingleTop = true }
+        onPendingDeskHandled()
     }
 
     // A reply in the member's private chat, held for the gate the same way.

@@ -231,6 +231,9 @@ internal fun dealFrom(document: DocumentSnapshot): Deal? {
         cancelReason = document.get("cancelReason").asNonBlankString(),
         paymentProofUrl = document.get("paymentProofUrl").asNonBlankString(),
         releaseProofUrl = document.get("releaseProofUrl").asNonBlankString(),
+        approvedBy = document.get("approvedBy").asNonBlankString(),
+        releasedBy = document.get("releasedBy").asNonBlankString(),
+        releasedAt = document.getTimestamp("releasedAt")?.toDate(),
         releaseReference = document.get("releaseReference").asNonBlankString()
     )
 }

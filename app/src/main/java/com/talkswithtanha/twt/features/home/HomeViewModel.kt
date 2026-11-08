@@ -21,6 +21,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -38,8 +39,37 @@ class HomeViewModel @Inject constructor(
     exchangeRates: ExchangeRateRepository,
     private val tracker: FollowedSignalTracker,
     private val banners: com.talkswithtanha.twt.core.data.BannerRepository,
-    supportConfig: com.talkswithtanha.twt.core.data.SupportConfigRepository
+    supportConfig: com.talkswithtanha.twt.core.data.SupportConfigRepository,
+    adminRepository: com.talkswithtanha.twt.core.data.AdminRepository,
+    desk: com.talkswithtanha.twt.core.data.DeskRepository
 ) : ViewModel() {
+
+    /**
+     * The exchange desk's live counts, for staff who hold the marketplace —
+     * the dealer above all. Null for everybody else, who never sees the card.
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val deskSummary: StateFlow<DeskSummary?> = session.currentUser
+        .flatMapLatest { u ->
+            if (u == null || !u.can(com.talkswithtanha.twt.core.model.StaffArea.MARKETPLACE) || !com.talkswithtanha.twt.BuildConfig.MARKETPLACE_ENABLED) {
+                kotlinx.coroutines.flow.flowOf(null)
+            } else {
+                kotlinx.coroutines.flow.combine(adminRepository.observeAllDeals(), desk.observeThreads()) { deals, threads ->
+                    val list = (deals as? com.talkswithtanha.twt.core.data.Snapshot.Data)?.value.orEmpty()
+                    DeskSummary(
+                        requests = list.count { it.status == com.talkswithtanha.twt.core.model.DealStatus.AWAITING_APPROVAL },
+                        needsYou = list.count {
+                            it.status == com.talkswithtanha.twt.core.model.DealStatus.PAYMENT_SENT ||
+                                it.status == com.talkswithtanha.twt.core.model.DealStatus.RELEASING
+                        },
+                        unreadChats = (threads as? com.talkswithtanha.twt.core.data.Snapshot.Data)?.value.orEmpty().count { it.unseen },
+                        deskOnly = u.role == com.talkswithtanha.twt.core.model.UserRole.ADMIN &&
+                            u.staffAccess == listOf(com.talkswithtanha.twt.core.model.StaffArea.MARKETPLACE)
+                    )
+                }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** The WhatsApp number and the rest, as the panel sets them, for "tap to renew". */
     val support: StateFlow<com.talkswithtanha.twt.core.model.SupportConfig> = supportConfig.observeConfig()
@@ -95,3 +125,6 @@ class HomeViewModel @Inject constructor(
         }
     }
 }
+
+/** What the desk card on Home says: how much is waiting on the dealer. */
+data class DeskSummary(val requests: Int, val needsYou: Int, val unreadChats: Int, val deskOnly: Boolean)

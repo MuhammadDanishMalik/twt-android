@@ -68,18 +68,8 @@ class ChatListViewModel @Inject constructor(
     val rooms: StateFlow<List<ChatRoomSummary>> = session.currentUser
         .map { user ->
             buildList {
-                add(
-                    ChatRoomSummary(
-                        roomId = FirestorePaths.ChatRoom.COMMUNITY,
-                        title = "Community",
-                        subtitle = "Everyone on TWT, with Tanha and his team",
-                        requiresAccess = false,
-                        icon = Icons.Filled.Groups
-                    )
-                )
-                // One community for everybody, the same room the admin panel
-                // reads. A second, premium-only room split the conversation and
-                // its messages never reached Tanha's Messages page.
+                // No community room: members talk under Tanha's posts in the
+                // Feed, where only he and the team post and everybody comments.
                 user?.let {
                     add(
                         ChatRoomSummary(
@@ -124,6 +114,7 @@ class ChatRoomViewModel @Inject constructor(
     marketplaceConfig: com.talkswithtanha.twt.core.data.MarketplaceConfigRepository,
     private val badges: com.talkswithtanha.twt.core.badges.Badges,
     private val uploader: com.talkswithtanha.twt.core.images.CloudinaryUploader,
+    private val desk: com.talkswithtanha.twt.core.data.DeskRepository,
     supportConfig: com.talkswithtanha.twt.core.data.SupportConfigRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -133,7 +124,10 @@ class ChatRoomViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** The room is on screen: what is in it has been read. */
-    fun markRead() = badges.markRoomRead(roomId)
+    fun markRead() {
+        badges.markRoomRead(roomId)
+        markDeskSeen()
+    }
 
     /** The dealer the seller chat is with: photo, name and badge from the panel. */
     val seller: StateFlow<com.talkswithtanha.twt.core.model.MarketplaceSeller> = marketplaceConfig.observeSeller()
@@ -155,6 +149,29 @@ class ChatRoomViewModel @Inject constructor(
 
     /** The member's own thread with the exchange desk. */
     private val isDealerRoom: Boolean = roomId.startsWith(FirestorePaths.ChatRoom.DEALER_PREFIX)
+
+    /**
+     * The desk answering a member's exchange chat (the dealer on his phone),
+     * rather than the member in their own: the header names the member,
+     * replies go out under the dealer's name, and each one pushes to the
+     * member and takes the thread out of the desk's waiting list.
+     */
+    val isDeskView: Boolean
+        get() = isDealerRoom && session.currentUser.value?.let { roomId != FirestorePaths.ChatRoom.dealer(it.id) } == true
+
+    /** Whose exchange chat the desk has open. */
+    val deskMemberId: String = roomId.removePrefix(FirestorePaths.ChatRoom.DEALER_PREFIX)
+
+    private suspend fun afterDeskReply(preview: String) {
+        if (!isDeskView) return
+        runCatching { desk.markReplied(roomId, preview) }
+        desk.notifyMember(roomId, preview, seller.value.displayName)
+    }
+
+    /** The desk has the thread on screen: it leaves the unread count. */
+    fun markDeskSeen() {
+        if (isDeskView) viewModelScope.launch { desk.markSeen(roomId) }
+    }
 
     val isSupportRoom: Boolean = roomId.startsWith(FirestorePaths.ChatRoom.SUPPORT_PREFIX)
 
@@ -208,11 +225,12 @@ class ChatRoomViewModel @Inject constructor(
                     roomId = roomId,
                     text = url,
                     senderId = user.id,
-                    senderName = user.fullName,
+                    senderName = if (isDeskView) seller.value.displayName else user.fullName,
                     replyTo = null,
                     note = null,
                     senderRole = user.chatRole
                 )
+                afterDeskReply("📷 Photo")
             }.onFailure { _error.value = "That photo did not send. Try again." }
             _sendingPhoto.value = false
         }
@@ -468,13 +486,14 @@ class ChatRoomViewModel @Inject constructor(
                     roomId = roomId,
                     text = text,
                     senderId = user.id,
-                    senderName = user.fullName,
+                    senderName = if (isDeskView) seller.value.displayName else user.fullName,
                     replyTo = reply?.let {
                         ChatMessage.ReplyReference(it.senderName, it.text)
                     },
                     note = note,
                     senderRole = user.chatRole
                 )
+                afterDeskReply(text.ifEmpty { "Shared a lesson note" })
                 // A staff reply takes the thread out of the waiting queue, the
                 // same as answering it from the admin panel.
                 if (isSupportRoom && !ownThread && user.isStaff) {

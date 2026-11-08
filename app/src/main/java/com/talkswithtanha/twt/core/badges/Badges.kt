@@ -86,7 +86,6 @@ class Badges @Inject constructor(
     private val roomIds = session.currentUser.map { u ->
         if (u == null) emptyList()
         else listOfNotNull(
-            FirestorePaths.ChatRoom.COMMUNITY,
             FirestorePaths.ChatRoom.support(u.id),
             // The exchange desk's thread, in builds that have the exchange.
             FirestorePaths.ChatRoom.dealer(u.id).takeIf { com.talkswithtanha.twt.BuildConfig.MARKETPLACE_ENABLED }

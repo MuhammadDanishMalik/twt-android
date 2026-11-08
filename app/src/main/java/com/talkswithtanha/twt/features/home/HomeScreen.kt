@@ -89,8 +89,20 @@ fun HomeScreen(
     onOpenSupport: () -> Unit,
     /** The Chat tab, for a banner that points there. */
     onOpenChat: () -> Unit = {},
+    /** The exchange desk, for staff who hold the marketplace. */
+    onOpenDesk: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
+    val desk by viewModel.deskSummary.collectAsStateWithLifecycle()
+    // The dealer's account is the desk: it opens on the desk once per launch,
+    // and Back from there is the ordinary app.
+    var deskOpened by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(desk?.deskOnly) {
+        if (desk?.deskOnly == true && !deskOpened) {
+            deskOpened = true
+            onOpenDesk()
+        }
+    }
     val banners by viewModel.activeBanners.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     val user by viewModel.user.collectAsStateWithLifecycle()
@@ -237,8 +249,16 @@ fun HomeScreen(
             }
 
 
+            desk?.let { summary ->
+                item {
+                    StaggeredAppear(1) {
+                        DeskCard(summary, onOpenDesk, Modifier.padding(horizontal = 16.dp))
+                    }
+                }
+            }
+
             // Free members: what a code opens, and the way to it.
-            if (isPro == false) {
+            if (isPro == false && desk?.deskOnly != true) {
                 item {
                     StaggeredAppear(2) {
                         ProLockCard(
@@ -506,3 +526,37 @@ private fun RenewOption(title: String, subtitle: String, tint: Color, onClick: (
 /** `923087050116` → `92 308 7050116`, as people read a Pakistani mobile. */
 private fun String.chunkedPhone(): String =
     if (length == 12 && startsWith("92")) "${substring(0, 2)} ${substring(2, 5)} ${substring(5)}" else this
+
+/** The exchange desk at a glance, for the dealer and staff who hold the marketplace. */
+@Composable
+private fun DeskCard(summary: DeskSummary, onOpen: () -> Unit, modifier: Modifier = Modifier) {
+    val waiting = summary.requests + summary.needsYou + summary.unreadChats
+    androidx.compose.foundation.layout.Row(
+        modifier
+            .fillMaxWidth()
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
+            .background(if (waiting > 0) Color(0xFF14361D) else Color(0xFF1C1C1E))
+            .clickable(onClick = onOpen)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+            androidx.compose.material3.Text("EXCHANGE DESK", color = Color(0xFF7BD88F), fontSize = 11.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+            androidx.compose.material3.Text(
+                when {
+                    waiting == 0 -> "All caught up"
+                    else -> listOfNotNull(
+                        summary.requests.takeIf { it > 0 }?.let { "$it new request${if (it == 1) "" else "s"}" },
+                        summary.needsYou.takeIf { it > 0 }?.let { "$it need you" },
+                        summary.unreadChats.takeIf { it > 0 }?.let { "$it unread chat${if (it == 1) "" else "s"}" }
+                    ).joinToString(" · ")
+                },
+                color = Color.White,
+                fontSize = 17.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+            )
+            androidx.compose.material3.Text("Accept deals, confirm payments, send funds, chat", color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp)
+        }
+        androidx.compose.material3.Text("Open", color = Color.White, fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+    }
+}

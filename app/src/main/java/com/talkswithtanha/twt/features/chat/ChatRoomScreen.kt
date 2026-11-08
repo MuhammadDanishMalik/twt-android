@@ -174,6 +174,12 @@ fun ChatRoomScreen(
             .imePadding()
     ) {
         when {
+            // The dealer answering a member: the member's name on top, not his own.
+            viewModel.isDeskView -> RoomHeader(
+                title = state.messages.lastOrNull { it.senderId == viewModel.deskMemberId }?.senderName ?: "Exchange chat",
+                subtitle = activity.line() ?: "Exchange chat · replies go out as ${sellerProfile.displayName}",
+                onBack = onBack
+            )
             viewModel.isSellerChat -> SellerHeader(sellerProfile, activity.line(), onBack)
             viewModel.isSupportRoom -> SupportHeader(tanhaPhoto, activity.line(), onBack)
             else -> RoomHeader(
@@ -257,7 +263,7 @@ fun ChatRoomScreen(
 
         // Only while the thread is still opening. Once a conversation is under
         // way the canned lines are noise between the member and the keyboard.
-        if (viewModel.isSellerChat && state.messages.isEmpty()) {
+        if (viewModel.isSellerChat && !viewModel.isDeskView && state.messages.isEmpty()) {
             QuickReplyBar(
                 rate = state.exchangeRate,
                 onSelect = viewModel::useQuickReply

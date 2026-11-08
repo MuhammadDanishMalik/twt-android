@@ -45,6 +45,7 @@ class MainActivity : ComponentActivity() {
     /** A deal push tapped: the deal to open once the gate allows it. */
     private var pendingDealId by mutableStateOf<String?>(null)
     private var pendingRoomId by mutableStateOf<String?>(null)
+    private var pendingDesk by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,6 +54,7 @@ class MainActivity : ComponentActivity() {
         pendingSignalId = intent.signalId()
         pendingDealId = intent.dealId()
         pendingRoomId = intent.roomId()
+        pendingDesk = intent.getBooleanExtra("openDesk", false)
 
         // Every view model below this point depends on Firebase, so a missing
         // `google-services.json` has to be caught before the first one is
@@ -69,7 +71,9 @@ class MainActivity : ComponentActivity() {
                         pendingDealId = pendingDealId,
                         onPendingDealHandled = { pendingDealId = null },
                         pendingRoomId = pendingRoomId,
-                        onPendingRoomHandled = { pendingRoomId = null }
+                        onPendingRoomHandled = { pendingRoomId = null },
+                        pendingDesk = pendingDesk,
+                        onPendingDeskHandled = { pendingDesk = false }
                     )
                 } else {
                     NotConfiguredScreen()
@@ -84,6 +88,7 @@ class MainActivity : ComponentActivity() {
         pendingSignalId = intent.signalId()
         pendingDealId = intent.dealId()
         pendingRoomId = intent.roomId()
+        pendingDesk = intent.getBooleanExtra("openDesk", false)
     }
 
     /** `roomId` from a chat push: only a private thread, the kinds the panel pushes. */

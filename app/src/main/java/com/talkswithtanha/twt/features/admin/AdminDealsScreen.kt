@@ -159,7 +159,8 @@ fun AdminDealsScreen(
             onFund = { prompt = DeskPrompt.Fund }
         )
 
-        if (state.doneToday.isNotEmpty()) {
+        // The dealer's Home has its own Done today tile.
+        if (!deskMode && state.doneToday.isNotEmpty()) {
             Text(
                 "Done today: " + state.doneToday.joinToString(" · ") { "${it.first} ${it.second}" },
                 color = IosColors.TextSecondary,

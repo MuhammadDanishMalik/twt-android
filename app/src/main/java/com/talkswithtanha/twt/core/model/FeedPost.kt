@@ -99,7 +99,13 @@ data class LinkCard(
  * they are simply not drawn any more.
  */
 enum class Reaction(val stored: String, val glyph: String, val label: String, val setupsOnly: Boolean = false) {
+    // WhatsApp's row first, then the two a trader uses.
     USEFUL("useful", "👍", "Useful"),
+    LOVE("love", "❤️", "Love"),
+    LAUGH("laugh", "😂", "Haha"),
+    WOW("wow", "😮", "Wow"),
+    SAD("sad", "😢", "Sad"),
+    THANKS("thanks", "🙏", "Thanks"),
     TOOK("took", "🎯", "Took it", setupsOnly = true),
     WATCHING("watching", "👀", "Watching");
 

@@ -6,6 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,6 +42,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -112,6 +115,7 @@ data class CardActions(
     val onDelete: () -> Unit = {}
 )
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun FeedCard(
     post: FeedPost,
@@ -130,24 +134,131 @@ fun FeedCard(
     /** On a post's own page: the whole text, no "Show more". */
     expanded: Boolean = false
 ) {
-    Column(
+    val haptics = LocalHapticFeedback.current
+    // WhatsApp's way: hold the card for the reaction bar; what people chose
+    // hangs off the card's bottom edge as one small bubble.
+    var picking by remember { mutableStateOf(false) }
+    // Where the card sits on screen, so the bar opens right above it.
+    var cardTop by remember { mutableStateOf(0f) }
+    val offered = Reaction.entries.filter { !it.setupsOnly || post.type == PostType.SETUP }
+    val chosen = offered.map { it to (post.reactionCounts[it.stored] ?: 0).coerceAtLeast(0) }
+        .filter { it.second > 0 }.sortedByDescending { it.second }
+    Box(
         modifier
             .fillMaxWidth()
-            .clip(CardShape)
-            .background(if (post.type == PostType.ALERT) Color(0xFF1A1206) else CardFill)
-            .border(0.8.dp, Color.White.copy(alpha = 0.09f), CardShape)
-            .edgeShine(CardShape, strength = 0.5f)
-            .clickable(onClick = actions.onOpen)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(bottom = if (chosen.isNotEmpty()) 14.dp else 0.dp)
+            .onGloballyPositioned { cardTop = it.positionInWindow().y }
     ) {
-        PostHeader(post, unread, updatedBadge, canModerate, actions)
-        if (post.type == PostType.SETUP) {
-            SetupBody(post, signal, quote, isFollowingSignal, updates, actions, expanded)
-        } else {
-            PostBody(post, actions, expanded)
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(CardShape)
+                .background(if (post.type == PostType.ALERT) Color(0xFF1A1206) else CardFill)
+                .border(0.8.dp, Color.White.copy(alpha = 0.09f), CardShape)
+                .edgeShine(CardShape, strength = 0.5f)
+                .combinedClickable(
+                    onClick = actions.onOpen,
+                    onLongClick = {
+                        Haptics.sheetOpen(haptics)
+                        picking = true
+                    }
+                )
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            PostHeader(post, unread, updatedBadge, canModerate, actions)
+            if (post.type == PostType.SETUP) {
+                SetupBody(post, signal, quote, isFollowingSignal, updates, actions, expanded)
+            } else {
+                PostBody(post, actions, expanded)
+            }
+            ActionBar(post, savedIn, collections, actions)
         }
-        ActionBar(post, myReaction, savedIn, collections, actions)
+
+        if (chosen.isNotEmpty()) {
+            ReactionStack(
+                glyphs = chosen.map { it.first.glyph },
+                total = chosen.sumOf { it.second },
+                mineIncluded = myReaction != null,
+                modifier = Modifier.align(Alignment.BottomEnd).offset(x = (-18).dp, y = 14.dp)
+            ) { picking = true }
+        }
+
+        if (picking) {
+            ReactionOverlay(
+                anchorY = cardTop,
+                offered = offered,
+                mine = myReaction,
+                onDismiss = { picking = false },
+                onPick = { r ->
+                    picking = false
+                    Haptics.tap(haptics)
+                    // The same one again takes it back, as on WhatsApp.
+                    actions.onReact(r)
+                }
+            )
+        }
+    }
+}
+
+/**
+ * The reaction bar over a held card, in its own full-screen layer.
+ *
+ * A dialog rather than a popup: nothing under it can take a tap, so a press
+ * meant for an emoji never lands on a filter chip or the next card. Taps are
+ * ignored for a moment after it opens, so the finger lifting off the card
+ * that opened it cannot choose an emoji by accident.
+ */
+@Composable
+private fun ReactionOverlay(anchorY: Float, offered: List<Reaction>, mine: Reaction?, onDismiss: () -> Unit, onPick: (Reaction) -> Unit) {
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    var armed by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(350)
+        armed = true
+    }
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
+    ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.35f))
+                .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) {
+                    if (armed) onDismiss()
+                }
+        ) {
+            val top = with(density) { (anchorY.toDp() - 64.dp).coerceAtLeast(56.dp) }
+            Box(Modifier.fillMaxWidth().padding(top = top), contentAlignment = Alignment.TopCenter) {
+                ReactionBar(offered, mine) { if (armed) onPick(it) }
+            }
+        }
+    }
+}
+
+/** The row that pops up over a held card: one tap reacts, the ringed one is yours. */
+@Composable
+private fun ReactionBar(offered: List<Reaction>, mine: Reaction?, onPick: (Reaction) -> Unit) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(Color(0xFF232325))
+            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        offered.forEach { r ->
+            Box(
+                Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(if (mine == r) Color.White.copy(alpha = 0.18f) else Color.Transparent)
+                    .clickable { onPick(r) },
+                contentAlignment = Alignment.Center
+            ) { Text(r.glyph, fontSize = 26.sp) }
+        }
     }
 }
 
@@ -734,52 +845,11 @@ private fun SetupAction(label: String, on: Boolean = false, onClick: () -> Unit)
 // ── Actions ─────────────────────────────────────────────────────────────────
 
 @Composable
-private fun ActionBar(post: FeedPost, mine: Reaction?, savedIn: List<String>?, collections: List<String>, actions: CardActions) {
+private fun ActionBar(post: FeedPost, savedIn: List<String>?, collections: List<String>, actions: CardActions) {
     val haptics = LocalHapticFeedback.current
     var saveMenu by remember { mutableStateOf(false) }
-    var picking by remember { mutableStateOf(false) }
     val isSaved = savedIn != null
-    val offered = Reaction.entries.filter { !it.setupsOnly || post.type == PostType.SETUP }
-    // WhatsApp's way: one small react button, a picker that pops up from it,
-    // and what people chose stacked in a pill at the bottom right.
-    val chosen = offered.map { it to (post.reactionCounts[it.stored] ?: 0).coerceAtLeast(0) }.filter { it.second > 0 }.sortedByDescending { it.second }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Box {
-            Row(
-                Modifier
-                    .clip(RoundedCornerShape(50))
-                    .background(if (mine != null) IosColors.BuyGreen.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.05f))
-                    .bouncyClick {
-                        Haptics.tap(haptics)
-                        picking = true
-                    }
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(mine?.glyph ?: "🙂", fontSize = 15.sp)
-                Spacer(Modifier.width(4.dp))
-                Text(if (mine != null) mine.label else "React", color = if (mine != null) IosColors.BuyGreen else IosColors.TextSecondary, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, fontFamily = WebFonts.Body)
-            }
-            DropdownMenu(expanded = picking, onDismissRequest = { picking = false }, containerColor = Color(0xFF1F1F1F), shape = RoundedCornerShape(28.dp)) {
-                Row(Modifier.padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    offered.forEach { r ->
-                        Text(
-                            r.glyph,
-                            fontSize = 26.sp,
-                            modifier = Modifier
-                                .clip(CircleShape)
-                                .background(if (mine == r) Color.White.copy(alpha = 0.14f) else Color.Transparent)
-                                .clickable {
-                                    picking = false
-                                    Haptics.tap(haptics)
-                                    actions.onReact(r)
-                                }
-                                .padding(8.dp)
-                        )
-                    }
-                }
-            }
-        }
         Spacer(Modifier.weight(1f))
         if (post.commentsEnabled) {
             Row(Modifier.clip(RoundedCornerShape(50)).clickable(onClick = actions.onOpen).padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -811,15 +881,14 @@ private fun ActionBar(post: FeedPost, mine: Reaction?, savedIn: List<String>?, c
                 }
             }
         }
-        if (chosen.isNotEmpty()) ReactionStack(chosen.map { it.first.glyph }, chosen.sumOf { it.second }, mine != null) { picking = true }
     }
 }
 
 /** What people reacted with, stacked and overlapping, with the total: WhatsApp's pill. */
 @Composable
-private fun ReactionStack(glyphs: List<String>, total: Int, mineIncluded: Boolean, onClick: () -> Unit) {
+private fun ReactionStack(glyphs: List<String>, total: Int, mineIncluded: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Row(
-        Modifier
+        modifier
             .clip(RoundedCornerShape(50))
             .background(Color(0xFF2A2A2C))
             .border(1.dp, if (mineIncluded) IosColors.BuyGreen.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.10f), RoundedCornerShape(50))

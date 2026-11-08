@@ -116,8 +116,23 @@ class ChatRoomViewModel @Inject constructor(
     private val uploader: com.talkswithtanha.twt.core.images.CloudinaryUploader,
     private val desk: com.talkswithtanha.twt.core.data.DeskRepository,
     supportConfig: com.talkswithtanha.twt.core.data.SupportConfigRepository,
+    dealRepository: com.talkswithtanha.twt.core.data.DealRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
+
+    /**
+     * The member's deals still in progress, pinned over the exchange chat for
+     * both sides, so whoever is typing knows which deal, at which step.
+     */
+    val openDeals: StateFlow<List<com.talkswithtanha.twt.core.model.Deal>> = run {
+        val id: String = checkNotNull(savedStateHandle[AppRoute.ChatRoom.ARG])
+        if (!id.startsWith(FirestorePaths.ChatRoom.DEALER_PREFIX)) kotlinx.coroutines.flow.flowOf(emptyList())
+        else dealRepository.observeDeals(id.removePrefix(FirestorePaths.ChatRoom.DEALER_PREFIX)).map { snap ->
+            (snap as? com.talkswithtanha.twt.core.data.Snapshot.Data)?.value.orEmpty()
+                .filter { !it.status.isTerminal }
+                .sortedByDescending { it.createdAt }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** Tanha's photo, for his private chat's header and the seen mark. */
     val tanhaPhoto: StateFlow<String?> = supportConfig.observeConfig().map { it.tanhaPhotoUrl }

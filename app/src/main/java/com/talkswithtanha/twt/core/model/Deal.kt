@@ -38,6 +38,8 @@ data class Deal(
     val paymentProofUrl: String? = null,
     /** The desk's screenshot of sending the member's funds. */
     val releaseProofUrl: String? = null,
+    /** The desk's screenshot of the member's money arriving (its bank or wallet message). */
+    val receiptProofUrl: String? = null,
     /** The transaction id or hash the desk sent the funds with. */
     val releaseReference: String? = null,
     /** Who on the desk accepted the request, and who sent the funds. */

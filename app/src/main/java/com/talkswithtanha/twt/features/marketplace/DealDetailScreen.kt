@@ -114,7 +114,7 @@ fun DealDetailScreen(
 
     val deal = state.deal
     val seller by viewModel.seller.collectAsStateWithLifecycle()
-    val openChat = { deal?.let { onOpenChat(com.talkswithtanha.twt.core.firebase.FirestorePaths.ChatRoom.support(it.userId)) }; Unit }
+    val openChat = { deal?.let { onOpenChat(com.talkswithtanha.twt.core.firebase.FirestorePaths.ChatRoom.dealer(it.userId)) }; Unit }
 
     LaunchedEffect(state.error) {
         if (state.error != null) Haptics.failure(haptics)
@@ -261,8 +261,23 @@ fun DealDetailScreen(
             if (dealOpen && !notificationsOn) {
                 item { NotificationsNudge(onTurnOn = askForNotifications, modifier = Modifier.staggeredAppear(3)) }
             }
+            // Where the deal is, in four steps, the same bar the desk sees.
+            item { com.talkswithtanha.twt.features.admin.DealSteps(deal) }
+            // Always there, whatever the step: the chat with the desk.
+            item {
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(IosColors.BuyGreen.copy(alpha = 0.14f))
+                        .clickable { openChat() }.padding(vertical = 13.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Outlined.Chat, contentDescription = null, tint = IosColors.BuyGreen, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Chat with the desk about this deal", color = IosColors.BuyGreen, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
             item { SummaryCard(deal, Modifier.staggeredAppear(3)) }
-            if (deal.paymentProofUrl != null || deal.releaseProofUrl != null) {
+            if (deal.paymentProofUrl != null || deal.receiptProofUrl != null || deal.releaseProofUrl != null) {
                 item { ProofsCard(deal, Modifier.staggeredAppear(3)) }
             }
             item { DealerRow(seller, Modifier.staggeredAppear(4), openChat) }
@@ -946,6 +961,7 @@ private fun timeOnly(epochMillis: Long): String =
 private fun ProofsCard(deal: Deal, modifier: Modifier = Modifier) {
     val shots = listOfNotNull(
         deal.paymentProofUrl?.let { "Your payment" to it },
+        deal.receiptProofUrl?.let { "Desk received it" to it },
         deal.releaseProofUrl?.let { "Sent by the desk" to it }
     )
     var viewing by remember { mutableStateOf<Int?>(null) }

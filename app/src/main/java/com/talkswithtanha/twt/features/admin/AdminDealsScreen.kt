@@ -283,7 +283,29 @@ fun AdminDealsScreen(
         )
     }
 
-    prompt?.let { p ->
+    when (val p = prompt) {
+        is DeskPrompt.Arrived -> DeskProofDialog(
+            title = "Did ${p.deal.payLabel()} arrive?",
+            body = "Check your own bank or wallet app — never the member's screenshot or an SMS. Attach a screenshot of the message showing the money arrived. The member sees it too.",
+            shotLabel = "Add the payment-received screenshot",
+            referenceLabel = null,
+            confirmLabel = "It arrived",
+            onDismiss = { prompt = null },
+            onConfirm = { _, proof -> prompt = null; viewModel.confirmPayment(p.deal, proof) }
+        )
+        is DeskPrompt.Release -> DeskProofDialog(
+            title = "Sent ${p.deal.receiveLabel()}?",
+            body = "Attach the screenshot of your transfer and paste its transaction id or hash. The member sees both.",
+            shotLabel = "Add the money-sent screenshot",
+            referenceLabel = "Transaction id or hash",
+            confirmLabel = "Mark as sent",
+            onDismiss = { prompt = null },
+            onConfirm = { ref, proof -> prompt = null; viewModel.release(p.deal, ref, proof) }
+        )
+        else -> Unit
+    }
+
+    prompt?.takeIf { it !is DeskPrompt.Arrived && it !is DeskPrompt.Release }?.let { p ->
         DeskDialog(
             prompt = p,
             onDismiss = { prompt = null },
@@ -292,8 +314,7 @@ fun AdminDealsScreen(
                     is DeskPrompt.Decline -> viewModel.decline(p.deal, text)
                     is DeskPrompt.Cancel -> viewModel.cancel(p.deal, text)
                     is DeskPrompt.Dispute -> viewModel.dispute(p.deal, text)
-                    is DeskPrompt.Arrived -> viewModel.confirmPayment(p.deal)
-                    is DeskPrompt.Release -> viewModel.release(p.deal, text)
+                    is DeskPrompt.Arrived, is DeskPrompt.Release -> Unit
                     DeskPrompt.Fund -> text.filter { it.isDigit() }.toLongOrNull()?.let { viewModel.setFund(it) }
                 }
                 prompt = null
@@ -435,13 +456,26 @@ private fun DeskDealCard(
         deal.paymentReference?.let {
             Info("Their transaction id", it) { clipboard.setText(AnnotatedString(it)) }
         }
-        deal.paymentProofUrl?.let { url ->
-            AsyncImage(
-                model = url,
-                contentDescription = "Payment screenshot",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxWidth().height(160.dp).clip(RoundedCornerShape(12.dp)).clickable { uri.openUri(url) }
-            )
+        // Every screenshot on the deal, so both sides can see what happened.
+        val shots = listOfNotNull(
+            deal.paymentProofUrl?.let { "Member paid" to it },
+            deal.receiptProofUrl?.let { "You received" to it },
+            deal.releaseProofUrl?.let { "You sent" to it }
+        )
+        if (shots.isNotEmpty()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                shots.forEach { (label, url) ->
+                    Column(Modifier.weight(1f)) {
+                        AsyncImage(
+                            model = url,
+                            contentDescription = label,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxWidth().height(if (shots.size == 1) 160.dp else 110.dp).clip(RoundedCornerShape(12.dp)).clickable { uri.openUri(url) }
+                        )
+                        Text(label, color = IosColors.TextSecondary, fontSize = 11.sp, modifier = Modifier.padding(top = 3.dp))
+                    }
+                }
+            }
         }
         if (deal.status == DealStatus.RELEASING) {
             deal.receivingAccount?.let { acc ->

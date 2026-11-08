@@ -314,8 +314,8 @@ class AdminDealsViewModel @Inject constructor(
         }
     fun decline(deal: Deal, reason: String) = run(deal.id, "${deal.reference} declined.") { desk.decline(deal.id, reason) }
     fun cancel(deal: Deal, reason: String) = run(deal.id, "${deal.reference} cancelled.") { desk.cancel(deal.id, reason) }
-    fun confirmPayment(deal: Deal) = run(deal.id, "${deal.reference}: payment confirmed.") { desk.confirmPayment(deal.id, me) }
-    fun release(deal: Deal, reference: String) = run(deal.id, "${deal.reference} completed. The member was told.") { desk.release(deal.id, reference, me) }
+    fun confirmPayment(deal: Deal, proof: ByteArray) = run(deal.id, "${deal.reference}: payment confirmed, with your screenshot.") { desk.confirmPayment(deal.id, me, proof) }
+    fun release(deal: Deal, reference: String, proof: ByteArray) = run(deal.id, "${deal.reference} completed. The member was told.") { desk.release(deal.id, reference, me, proof) }
     fun dispute(deal: Deal, reason: String) = run(deal.id, "${deal.reference} moved to review.") { desk.dispute(deal.id, reason) }
     fun setTakingDeals(on: Boolean) = run("desk", if (on) "Desk open for new deals." else "Desk closed for new deals.") { desk.setTakingDeals(on, me) }
     fun setFund(amount: Long) = run("desk", "Today's fund set to ${"%,d".format(amount)} USDT.") { desk.setDailyFund(amount, me) }

@@ -235,14 +235,16 @@ fun AppNavHost(
                     onBack = { navController.popBackStack() },
                     onOpenLesson = { videoId, title, start ->
                         navController.navigate(AppRoute.Lesson.of(videoId, title, start))
-                    }
+                    },
+                    onOpenDeal = { navController.navigate(AppRoute.DealDetail.of(it)) { launchSingleTop = true } }
                 )
             } else ProGate("The member rooms", "Talk trades with Tanha and the other members, live.") {
                 ChatRoomScreen(
                     onBack = { navController.popBackStack() },
                     onOpenLesson = { videoId, title, start ->
                         navController.navigate(AppRoute.Lesson.of(videoId, title, start))
-                    }
+                    },
+                    onOpenDeal = { navController.navigate(AppRoute.DealDetail.of(it)) { launchSingleTop = true } }
                 )
             }
         }

@@ -51,7 +51,8 @@ class DeskRefusal(message: String) : Exception(message)
  */
 @Singleton
 class DeskRepository @Inject constructor(
-    private val db: FirebaseFirestore
+    private val db: FirebaseFirestore,
+    private val uploader: com.talkswithtanha.twt.core.images.CloudinaryUploader
 ) {
     private val deals get() = db.collection(FirestorePaths.Collection.DEALS)
     private val rateDoc get() = db.collection(FirestorePaths.Collection.CONFIG).document("exchangeRate")
@@ -181,21 +182,29 @@ class DeskRepository @Inject constructor(
         }.await()
     }
 
-    /** "The money arrived." The member is then asked where to send theirs. */
-    suspend fun confirmPayment(dealId: String, by: String) {
+    /**
+     * "The money arrived", with the desk's proof: a screenshot of the bank or
+     * wallet message on the dealer's own phone. The member sees it too, then
+     * is asked where to send theirs.
+     */
+    suspend fun confirmPayment(dealId: String, by: String, proof: ByteArray) {
+        val url = uploader.uploadImageOrThrow(proof)
         deals.document(dealId).update(
             mapOf(
                 "status" to DealStatus.PAYMENT_APPROVED.stored,
+                "receiptProofUrl" to url,
                 "events" to event(DealStatus.PAYMENT_APPROVED, "Payment confirmed by $by")
             )
         ).await()
     }
 
     /** "I have sent their funds", with the transaction id or hash they went with. */
-    suspend fun release(dealId: String, reference: String, by: String) {
+    suspend fun release(dealId: String, reference: String, by: String, proof: ByteArray) {
+        val url = uploader.uploadImageOrThrow(proof)
         deals.document(dealId).update(
             mapOf(
                 "status" to DealStatus.COMPLETED.stored,
+                "releaseProofUrl" to url,
                 "releaseReference" to reference,
                 "releasedBy" to by,
                 "releasedAt" to Timestamp(Date()),

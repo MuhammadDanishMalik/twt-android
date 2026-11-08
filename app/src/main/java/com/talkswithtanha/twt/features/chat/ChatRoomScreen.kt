@@ -95,8 +95,11 @@ fun ChatRoomScreen(
     onBack: () -> Unit,
     /** Opens a shared note's lesson at the moment it was taken. */
     onOpenLesson: (videoId: String, title: String, startSeconds: Int) -> Unit = { _, _, _ -> },
+    /** A pinned deal, opened by the member. */
+    onOpenDeal: (String) -> Unit = {},
     viewModel: ChatRoomViewModel = hiltViewModel()
 ) {
+    val openDeals by viewModel.openDeals.collectAsStateWithLifecycle()
     val state by viewModel.state.collectAsStateWithLifecycle()
     // Read as it arrives while the room is open, and once more on leaving.
     LaunchedEffect(state.messages.lastOrNull()?.id) { viewModel.markRead() }
@@ -191,6 +194,20 @@ fun ChatRoomScreen(
                 },
                 onBack = onBack
             )
+        }
+
+        if (openDeals.isNotEmpty()) {
+            ChatDealStack(openDeals, forDesk = viewModel.isDeskView) { deal ->
+                if (viewModel.isDeskView) {
+                    // The desk acts from its queues: back to Home, on the right one.
+                    com.talkswithtanha.twt.features.admin.DeskShell.selected.value = when (deal.status) {
+                        com.talkswithtanha.twt.core.model.DealStatus.AWAITING_APPROVAL -> com.talkswithtanha.twt.features.admin.DeskTab.REQUESTS
+                        com.talkswithtanha.twt.core.model.DealStatus.AWAITING_PAYMENT, com.talkswithtanha.twt.core.model.DealStatus.PAYMENT_APPROVED -> com.talkswithtanha.twt.features.admin.DeskTab.WAITING
+                        else -> com.talkswithtanha.twt.features.admin.DeskTab.NEEDS
+                    }
+                    onBack()
+                } else onOpenDeal(deal.id)
+            }
         }
 
         if (!pinsHidden) {
@@ -1199,5 +1216,39 @@ private fun chatDateLabel(date: Date): String {
         isSameDay(date, today.time) -> "Today"
         isSameDay(date, yesterday.time) -> "Yesterday"
         else -> SimpleDateFormat("EEE, MMM d", Locale.getDefault()).format(date)
+    }
+}
+
+
+/**
+ * The deals in progress between this member and the desk, pinned over the
+ * chat as a stack: the newest on top with its steps, any others peeking out
+ * behind it. A tap opens it (the member) or its queue (the desk).
+ */
+@Composable
+private fun ChatDealStack(deals: List<com.talkswithtanha.twt.core.model.Deal>, forDesk: Boolean, onOpen: (com.talkswithtanha.twt.core.model.Deal) -> Unit) {
+    val top = deals.first()
+    val behind = (deals.size - 1).coerceAtMost(2)
+    Box(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = (6 + behind * 5).dp)) {
+        for (i in behind downTo 1) {
+            Box(
+                Modifier.matchParentSize().padding(horizontal = (i * 8).dp).offset(y = (i * 5).dp)
+                    .clip(RoundedCornerShape(16.dp)).background(Color(0xFF1C1C1E).copy(alpha = 1f - i * 0.25f))
+            )
+        }
+        Column(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF232326))
+                .border(1.dp, IosColors.BuyGreen.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
+                .clickable { onOpen(top) }.padding(horizontal = 14.dp, vertical = 10.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(top.reference, color = IosColors.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                Spacer(Modifier.width(8.dp))
+                Text("${top.payLabel()} → ${top.receiveLabel()}", color = IosColors.TextPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1)
+                Text(if (forDesk) "Open queue ›" else "Open ›", color = IosColors.BuyGreen, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            }
+            com.talkswithtanha.twt.features.admin.DealSteps(top)
+            if (deals.size > 1) Text("+${deals.size - 1} more deal${if (deals.size > 2) "s" else ""} in progress", color = IosColors.TextSecondary, fontSize = 11.sp)
+        }
     }
 }

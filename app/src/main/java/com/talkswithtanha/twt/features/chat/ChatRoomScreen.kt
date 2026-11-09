@@ -1,5 +1,9 @@
 package com.talkswithtanha.twt.features.chat
 
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.combinedClickable
 import kotlinx.coroutines.launch
 import com.talkswithtanha.twt.core.designsystem.components.ImageViewer
@@ -330,7 +334,10 @@ fun ChatRoomScreen(
                     pickingNote = true
                 }
             },
-            onSend = viewModel::send
+            onSend = viewModel::send,
+            // Voice in the private threads: the desk's and Tanha's.
+            voiceEnabled = photosAllowed,
+            onVoice = viewModel::sendVoice
         )
     }
 
@@ -1108,11 +1115,46 @@ private fun ChatInputBar(
     onDraftChange: (String) -> Unit,
     onAttach: () -> Unit,
     onSend: () -> Unit,
-    photoMode: Boolean = false
+    photoMode: Boolean = false,
+    voiceEnabled: Boolean = false,
+    onVoice: (com.talkswithtanha.twt.core.voice.VoiceRecorder.Recording) -> Unit = {}
 ) {
     val haptics = LocalHapticFeedback.current
     // A note can be sent on its own, without any text.
     val canSend = enabled && (draft.isNotBlank() || hasAttachment)
+    // Nothing typed: the send button is a mic. Hold to record, let go to
+    // send, slide left to cancel — as on WhatsApp.
+    val showMic = voiceEnabled && enabled && !canSend
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val recorder = remember { com.talkswithtanha.twt.core.voice.VoiceRecorder(context) }
+    var recording by remember { mutableStateOf(false) }
+    var seconds by remember { mutableStateOf(0) }
+    var drag by remember { mutableStateOf(0f) }
+    var micNote by remember { mutableStateOf<String?>(null) }
+    val askMic = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted -> micNote = if (granted) "Hold the mic to record." else "Allow the microphone in Settings to send voice notes." }
+    androidx.compose.runtime.LaunchedEffect(recording) {
+        while (recording) {
+            seconds = recorder.elapsedSeconds
+            if (seconds >= 300) { recorder.stop()?.let(onVoice); recording = false }
+            kotlinx.coroutines.delay(200)
+        }
+    }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { if (recording) recorder.cancel() } }
+    val cancelPx = with(androidx.compose.ui.platform.LocalDensity.current) { 110.dp.toPx() }
+    val start by androidx.compose.runtime.rememberUpdatedState {
+        if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO)
+            != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            askMic.launch(android.Manifest.permission.RECORD_AUDIO)
+        } else if (recorder.start()) {
+            micNote = null
+            seconds = 0
+            recording = true
+            Haptics.tap(haptics)
+        }
+    }
 
     Row(
         Modifier
@@ -1142,7 +1184,20 @@ private fun ChatInputBar(
             )
         }
 
-        Box(
+        if (recording) Row(
+            Modifier.weight(1f).height(40.dp).padding(horizontal = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(Modifier.size(10.dp).clip(CircleShape).background(IosColors.SellRed))
+            Spacer(Modifier.width(8.dp))
+            Text("%d:%02d".format(seconds / 60, seconds % 60), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.width(12.dp))
+            Text(
+                if (drag < -cancelPx) "Let go to delete" else "‹  Slide to cancel",
+                color = if (drag < -cancelPx) IosColors.SellRed else IosColors.TextSecondary,
+                fontSize = 14.sp
+            )
+        } else Box(
             Modifier
                 .weight(1f)
                 .clip(RoundedCornerShape(20.dp))
@@ -1170,7 +1225,40 @@ private fun ChatInputBar(
             )
         }
 
-        Box(
+        if (showMic || recording) {
+            Box(
+                Modifier
+                    .offset { androidx.compose.ui.unit.IntOffset(drag.toInt().coerceAtMost(0), 0) }
+                    .size(if (recording) 48.dp else 36.dp)
+                    .clip(CircleShape)
+                    .background(if (drag < -cancelPx) IosColors.SellRed else IosColors.BuyGreen)
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown()
+                            down.consume()
+                            start()
+                            var cancelled = false
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                drag = change.position.x - down.position.x
+                                cancelled = drag < -cancelPx
+                                if (!change.pressed) break
+                                change.consume()
+                            }
+                            drag = 0f
+                            if (recording) {
+                                recording = false
+                                if (cancelled) recorder.cancel()
+                                else recorder.stop()?.let(onVoice) ?: run { micNote = "Hold a little longer to record." }
+                            }
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Filled.Mic, contentDescription = "Hold to record a voice note", tint = Color.Black, modifier = Modifier.size(20.dp))
+            }
+        } else Box(
             Modifier
                 .size(36.dp)
                 .clip(CircleShape)
@@ -1188,6 +1276,9 @@ private fun ChatInputBar(
                 modifier = Modifier.size(18.dp)
             )
         }
+    }
+    micNote?.let {
+        Text(it, color = IosColors.TextSecondary, fontSize = 12.sp, modifier = Modifier.fillMaxWidth().background(Color(0xFF1C1C1E)).padding(start = 16.dp, bottom = 6.dp))
     }
 }
 

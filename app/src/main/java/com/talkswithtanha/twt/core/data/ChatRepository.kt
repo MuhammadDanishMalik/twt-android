@@ -70,7 +70,10 @@ interface ChatRepository {
         senderName: String,
         replyTo: ChatMessage.ReplyReference? = null,
         note: ChatMessage.NoteAttachment? = null,
-        senderRole: String? = null
+        senderRole: String? = null,
+        /** A voice note: its uploaded link and length. */
+        audioUrl: String? = null,
+        audioSeconds: Int = 0
     )
 
     /** Every member's support thread, newest first — the staff inbox. */
@@ -176,7 +179,9 @@ class FirebaseChatRepository @Inject constructor(
         senderName: String,
         replyTo: ChatMessage.ReplyReference?,
         note: ChatMessage.NoteAttachment?,
-        senderRole: String?
+        senderRole: String?,
+        audioUrl: String?,
+        audioSeconds: Int
     ) {
         val payload = mutableMapOf<String, Any>(
             M.TEXT to text,
@@ -206,6 +211,11 @@ class FirebaseChatRepository @Inject constructor(
             )
         }
         senderRole?.let { payload[M.SENDER_ROLE] = it }
+        audioUrl?.let {
+            payload[M.TYPE] = "voice_note"
+            payload[M.AUDIO_URL] = it
+            payload[M.AUDIO_DURATION] = audioSeconds
+        }
         messages(roomId).add(payload).await()
     }
 

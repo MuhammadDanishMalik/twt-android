@@ -223,6 +223,39 @@ class ChatRoomViewModel @Inject constructor(
      * message carries its link: the chat already shows any image link in a
      * message as the picture.
      */
+    /** A voice note held and recorded in the chat box, WhatsApp-style. */
+    fun sendVoice(recording: com.talkswithtanha.twt.core.voice.VoiceRecorder.Recording) {
+        val user = session.currentUser.value ?: return
+        if (_sendingPhoto.value) return
+        _sendingPhoto.value = true
+        viewModelScope.launch {
+            runCatching {
+                val result = uploader.uploadVoiceNote(recording.file)
+                recording.file.delete()
+                val url = (result as? com.talkswithtanha.twt.core.images.UploadResult.Success)?.url
+                    ?: error("upload failed")
+                val preview = "🎙 Voice note"
+                if (isSupportRoom && roomId == FirestorePaths.ChatRoom.support(user.id)) {
+                    chatRepository.ensureSupportRoom(uid = user.id, userName = user.fullName, userEmail = user.email, lastMessage = preview)
+                }
+                if (isDealerRoom && roomId == FirestorePaths.ChatRoom.dealer(user.id)) {
+                    chatRepository.ensureDealerRoom(uid = user.id, userName = user.fullName, userEmail = user.email, lastMessage = preview)
+                }
+                chatRepository.send(
+                    roomId = roomId,
+                    text = preview,
+                    senderId = user.id,
+                    senderName = if (isDeskView) seller.value.displayName else user.fullName,
+                    senderRole = user.chatRole,
+                    audioUrl = url,
+                    audioSeconds = recording.seconds
+                )
+                afterDeskReply(preview)
+            }.onFailure { _error.value = "That voice note did not send. Try again." }
+            _sendingPhoto.value = false
+        }
+    }
+
     fun sendPhoto(jpeg: ByteArray) {
         val user = session.currentUser.value ?: return
         if (_sendingPhoto.value) return

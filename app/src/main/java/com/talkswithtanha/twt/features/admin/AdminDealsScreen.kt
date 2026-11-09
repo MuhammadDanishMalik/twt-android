@@ -250,6 +250,7 @@ fun AdminDealsScreen(
                         working = state.workingId == deal.id,
                         onAccept = { accepting = deal },
                         onChangeAccount = { changingFor = deal },
+                        onChat = { onOpenChat(com.talkswithtanha.twt.core.firebase.FirestorePaths.ChatRoom.dealer(deal.userId)) },
                         onPrompt = { prompt = it }
                     )
                 }
@@ -431,6 +432,7 @@ private fun DeskDealCard(
     working: Boolean,
     onAccept: () -> Unit,
     onChangeAccount: () -> Unit = {},
+    onChat: () -> Unit = {},
     onPrompt: (DeskPrompt) -> Unit
 ) {
     val clipboard = LocalClipboardManager.current
@@ -503,6 +505,8 @@ private fun DeskDealCard(
             DealStatus.PAYMENT_APPROVED -> Text("Waiting for the member's receiving account.", color = IosColors.TextSecondary, fontSize = 13.sp)
             else -> Unit
         }
+        // Always there: talk to the member — text, photos or a voice note.
+        Action("💬 Chat with ${deal.userName.ifBlank { "the member" }.substringBefore(' ')}", IosColors.Accent, onClick = onChat)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             when (deal.status) {
                 DealStatus.AWAITING_APPROVAL -> Action("Decline", IosColors.SellRed) { onPrompt(DeskPrompt.Decline(deal)) }

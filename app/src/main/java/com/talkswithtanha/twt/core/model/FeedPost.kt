@@ -132,7 +132,9 @@ data class FeedComment(
     val replyCount: Int = 0,
     val isAuthorReply: Boolean = false,
     val audioUrl: String? = null,
-    val audioDurationSec: Int = 0
+    val audioDurationSec: Int = 0,
+    /** A photo with the comment, uploaded from the gallery. */
+    val imageUrl: String? = null
 )
 
 /** One change the desk made to a live trade, newest first on the setup card. */

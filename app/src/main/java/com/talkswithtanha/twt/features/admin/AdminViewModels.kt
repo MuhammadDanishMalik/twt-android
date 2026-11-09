@@ -109,8 +109,20 @@ data class AdminSignalsUiState(
 @HiltViewModel
 class AdminSignalsViewModel @Inject constructor(
     private val repository: AdminRepository,
-    signalRepository: SignalRepository
+    signalRepository: SignalRepository,
+    private val session: SessionRepository,
+    private val uploader: com.talkswithtanha.twt.core.images.CloudinaryUploader
 ) : ViewModel() {
+
+    /** The chart, from the gallery, uploaded as soon as it is picked. */
+    fun uploadChart(bytes: ByteArray) = viewModelScope.launch {
+        working.value = "chart"
+        failure.value = null
+        runCatching { uploader.uploadImageOrThrow(bytes) }
+            .onSuccess { url -> draftState.value = draftState.value.copy(chartImageUrl = url) }
+            .onFailure { failure.value = "The chart did not upload. Check your connection and try again." }
+        working.value = null
+    }
 
     private val working = MutableStateFlow<String?>(null)
     private val failure = MutableStateFlow<String?>(null)
@@ -139,7 +151,7 @@ class AdminSignalsViewModel @Inject constructor(
         if (!draft.isComplete) return@launch
         working.value = "post"
         failure.value = null
-        runCatching { repository.createSignal(draft) }
+        runCatching { repository.createSignal(draft, session.currentUser.value) }
             .onSuccess {
                 draftState.value = SignalDraft()
                 onDone()
@@ -338,8 +350,13 @@ data class AdminBannersUiState(
 
 @HiltViewModel
 class AdminBannersViewModel @Inject constructor(
-    private val repository: AdminRepository
+    private val repository: AdminRepository,
+    private val uploader: com.talkswithtanha.twt.core.images.CloudinaryUploader
 ) : ViewModel() {
+
+    fun uploadImage(bytes: ByteArray, onDone: (String?) -> Unit) = viewModelScope.launch {
+        onDone(runCatching { uploader.uploadImageOrThrow(bytes) }.getOrNull())
+    }
 
     private val failure = MutableStateFlow<String?>(null)
 

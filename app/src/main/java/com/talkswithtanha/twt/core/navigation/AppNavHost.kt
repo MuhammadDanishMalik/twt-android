@@ -193,7 +193,12 @@ fun AppNavHost(
         }
 
             screen(sharedScope, AppRoute.Signals.route) {
-            SignalsScreen(onOpenSignal = { navController.navigate(AppRoute.SignalDetail.of(it)) })
+            SignalsScreen(
+                onOpenSignal = { navController.navigate(AppRoute.SignalDetail.of(it)) },
+                onPost = { analysis ->
+                    navController.navigate(if (analysis) AppRoute.AdminPostAnalysis.route else AppRoute.AdminPostSignal.route)
+                }
+            )
         }
 
             screen(sharedScope, AppRoute.ChatList.route) {
@@ -387,6 +392,10 @@ fun AppNavHost(
                 onDeals = { navController.navigate(AppRoute.AdminDeals.route) },
                 onBanners = { navController.navigate(AppRoute.AdminBanners.route) }
             )
+        }
+
+            sheetRoute(sharedScope, AppRoute.AdminPostAnalysis.route) {
+            PostSignalScreen(onClose = { navController.popBackStack() }, analysis = true)
         }
 
             sheetRoute(sharedScope, AppRoute.AdminPostSignal.route) {

@@ -64,10 +64,14 @@ import com.talkswithtanha.twt.features.settings.SheetHeader
 @Composable
 fun PostSignalScreen(
     onClose: () -> Unit,
+    /** Analysis: a chart and a read, no levels. */
+    analysis: Boolean = false,
     viewModel: AdminSignalsViewModel = hiltViewModel()
 ) {
     val draft by viewModel.draft.collectAsStateWithLifecycle()
     val state by viewModel.state.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(analysis) { viewModel.edit { it.copy(isAnalysis = analysis) } }
+    val pickChart = com.talkswithtanha.twt.core.designsystem.components.rememberGalleryPhotoPicker { viewModel.uploadChart(it) }
 
     Column(
         Modifier
@@ -76,7 +80,7 @@ fun PostSignalScreen(
             .statusBarsPadding()
             .imePadding()
     ) {
-        SheetHeader("Post a signal", onClose)
+        SheetHeader(if (analysis) "Post analysis" else "Post a signal", onClose)
 
         Column(
             Modifier
@@ -87,6 +91,7 @@ fun PostSignalScreen(
             // Two big buttons rather than a dropdown. It is the one field that
             // must not be got wrong, and the one most likely to be tapped in a
             // hurry.
+            if (analysis) GroupLabel("Bias")
             Row(
                 Modifier.padding(top = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -129,6 +134,7 @@ fun PostSignalScreen(
                 onSelect = { asset -> viewModel.edit { it.copy(asset = asset) } }
             )
 
+            if (!analysis) {
             GroupLabel("Levels")
             LabelledField("Entry", draft.entryPrice, "2,318.40", numeric = true) { value ->
                 viewModel.edit { it.copy(entryPrice = value) }
@@ -151,18 +157,57 @@ fun PostSignalScreen(
                 }
             }
 
+            }
+
             GroupLabel("Terms")
             LabelledField("Timeframe", draft.timeframe, "H1") { value -> viewModel.edit { it.copy(timeframe = value) } }
-            LabelledField("Risk / reward", draft.riskReward, "1:2") { value ->
-                viewModel.edit { it.copy(riskReward = value) }
+            if (!analysis) {
+                LabelledField("Risk / reward", draft.riskReward, "1:2") { value ->
+                    viewModel.edit { it.copy(riskReward = value) }
+                }
+                ChipRow(
+                    options = TradeStyle.entries.map { it.stored to it },
+                    selected = draft.tradeStyle,
+                    onSelect = { style -> viewModel.edit { it.copy(tradeStyle = style) } }
+                )
             }
-            ChipRow(
-                options = TradeStyle.entries.map { it.stored to it },
-                selected = draft.tradeStyle,
-                onSelect = { style -> viewModel.edit { it.copy(tradeStyle = style) } }
-            )
 
-            GroupLabel("Note (optional)")
+            // The chart, from the gallery only.
+            GroupLabel(if (analysis) "Chart" else "Chart (optional)")
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(if (draft.chartImageUrl == null) 120.dp else 220.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xFF171717))
+                    .clickable(enabled = state.workingId != "chart") { pickChart() },
+                contentAlignment = Alignment.Center
+            ) {
+                val url = draft.chartImageUrl
+                when {
+                    state.workingId == "chart" -> Text("Uploading…", color = IosColors.TextSecondary, fontSize = 14.sp)
+                    url != null -> coil3.compose.AsyncImage(
+                        model = url,
+                        contentDescription = "Chart",
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("＋", color = IosColors.BuyGreen, fontSize = 24.sp)
+                        Text("Add the chart from your gallery", color = IosColors.BuyGreen, fontSize = 14.sp)
+                    }
+                }
+            }
+            if (draft.chartImageUrl != null) {
+                Text(
+                    "Tap the chart to change it · Remove",
+                    color = IosColors.TextSecondary,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(top = 6.dp).clickable { viewModel.edit { it.copy(chartImageUrl = null) } }
+                )
+            }
+
+            GroupLabel(if (analysis) "The read" else "Note (optional)")
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -218,7 +263,7 @@ fun PostSignalScreen(
             )
 
             TwtButton(
-                text = if (state.workingId == "post") "Posting…" else "Post signal",
+                text = if (state.workingId == "post") "Posting…" else if (analysis) "Post analysis" else "Post signal",
                 enabled = draft.isComplete && state.workingId == null,
                 loading = state.workingId == "post",
                 onClick = { viewModel.post(onClose) },

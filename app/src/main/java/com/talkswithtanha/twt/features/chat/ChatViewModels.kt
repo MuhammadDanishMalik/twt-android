@@ -190,6 +190,17 @@ class ChatRoomViewModel @Inject constructor(
 
     val isSupportRoom: Boolean = roomId.startsWith(FirestorePaths.ChatRoom.SUPPORT_PREFIX)
 
+    /**
+     * Staff may take down anybody's message or photo here: those holding the
+     * chats area anywhere, and the desk in its own exchange threads. The
+     * rules say the same.
+     */
+    val canModerate: Boolean
+        get() = session.currentUser.value?.let { u ->
+            u.can(com.talkswithtanha.twt.core.model.StaffArea.CHATS) ||
+                (roomId.startsWith(FirestorePaths.ChatRoom.DEALER_PREFIX) && u.can(com.talkswithtanha.twt.core.model.StaffArea.MARKETPLACE))
+        } == true
+
     /** Whose private thread this is. Anyone else writing in it is staff. */
     val supportMemberId: String? =
         if (isSupportRoom) roomId.removePrefix(FirestorePaths.ChatRoom.SUPPORT_PREFIX) else null

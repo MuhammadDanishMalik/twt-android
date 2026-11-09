@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.admin
 
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -189,7 +190,8 @@ fun AdminBannersScreen(
             onDelete = {
                 viewModel.delete(it)
                 editing = null
-            }
+            },
+            onUpload = { bytes, done -> viewModel.uploadImage(bytes, done) }
         )
     }
 }
@@ -199,9 +201,15 @@ private fun BannerEditor(
     banner: AdminBanner,
     onDismiss: () -> Unit,
     onSave: (AdminBanner) -> Unit,
-    onDelete: (AdminBanner) -> Unit
+    onDelete: (AdminBanner) -> Unit,
+    onUpload: (ByteArray, (String?) -> Unit) -> Unit = { _, done -> done(null) }
 ) {
     var draft by remember(banner.id) { mutableStateOf(banner) }
+    var uploading by remember { mutableStateOf(false) }
+    val pick = com.talkswithtanha.twt.core.designsystem.components.rememberGalleryPhotoPicker { bytes ->
+        uploading = true
+        onUpload(bytes) { url -> uploading = false; if (url != null) draft = draft.copy(imageUrl = url) }
+    }
 
     Column(
         Modifier
@@ -220,7 +228,28 @@ private fun BannerEditor(
         ) {
             Field("Title", draft.title) { draft = draft.copy(title = it) }
             Field("Subtitle", draft.subtitle) { draft = draft.copy(subtitle = it) }
-            Field("Image URL", draft.imageUrl) { draft = draft.copy(imageUrl = it) }
+            // From the gallery, uploaded; no pasted links.
+            Box(
+                Modifier
+                    .padding(top = 14.dp)
+                    .fillMaxWidth()
+                    .height(150.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xFF171717))
+                    .clickable(enabled = !uploading) { pick() },
+                contentAlignment = Alignment.Center
+            ) {
+                when {
+                    uploading -> Text("Uploading…", color = IosColors.TextSecondary)
+                    draft.imageUrl.isNotBlank() -> coil3.compose.AsyncImage(
+                        model = draft.imageUrl,
+                        contentDescription = "Banner image",
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    else -> Text("＋  Banner image from gallery", color = IosColors.BuyGreen)
+                }
+            }
 
             Text(
                 text = "WHEN TAPPED",

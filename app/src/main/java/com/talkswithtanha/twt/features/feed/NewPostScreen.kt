@@ -1,5 +1,11 @@
 package com.talkswithtanha.twt.features.feed
 
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.ui.input.pointer.pointerInput
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -88,7 +94,16 @@ fun NewPostScreen(
 
     var text by remember { mutableStateOf("") }
     var images by remember { mutableStateOf(listOf<String>()) }
-    var pendingImage by remember { mutableStateOf("") }
+    var uploadingImage by remember { mutableStateOf(false) }
+    var imageError by remember { mutableStateOf<String?>(null) }
+    val pickImage = com.talkswithtanha.twt.core.designsystem.components.rememberGalleryPhotoPicker { bytes ->
+        uploadingImage = true
+        imageError = null
+        viewModel.uploadImage(bytes) { url ->
+            uploadingImage = false
+            if (url != null) images = images + url else imageError = "That photo did not upload. Try again."
+        }
+    }
     var videoUrl by remember { mutableStateOf("") }
     var pair by remember { mutableStateOf("") }
     var isPosting by remember { mutableStateOf(false) }
@@ -287,7 +302,10 @@ fun NewPostScreen(
                         micPermission.launch(Manifest.permission.RECORD_AUDIO)
                     }
                 },
-                onStop = {
+                onStop = stop@{
+                    // Let go after the permission prompt, or after the
+                    // five-minute cap already stopped it: nothing to finish.
+                    if (!isRecording) return@stop
                     val done = recorder.stop()
                     isRecording = false
                     if (done == null) {
@@ -301,6 +319,12 @@ fun NewPostScreen(
                             voiceError = error
                         }
                     }
+                },
+                onCancel = cancel@{
+                    if (!isRecording) return@cancel
+                    recorder.cancel()
+                    isRecording = false
+                    voiceError = null
                 },
                 onDiscard = {
                     VoicePlayer.stop()
@@ -363,27 +387,26 @@ fun NewPostScreen(
                 }
             }
 
-            Label("IMAGE LINK")
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                LinkField(
-                    value = pendingImage,
-                    hint = "https://…",
-                    modifier = Modifier.weight(1f)
-                ) { pendingImage = it }
-                Spacer(Modifier.size(10.dp))
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(if (pendingImage.isNotBlank()) IosColors.Accent else Color(0xFF222222))
-                        .clickable(enabled = pendingImage.isNotBlank()) {
-                            images = images + pendingImage.trim()
-                            pendingImage = ""
-                        }
-                        .padding(horizontal = 16.dp, vertical = 11.dp)
-                ) {
-                    Text("Add", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                }
+            // Pictures come from the gallery and are uploaded; a pasted link
+            // is how a post ends up pointing at an image that later vanishes.
+            Label("PHOTOS")
+            Box(
+                Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(if (uploadingImage) Color(0xFF222222) else IosColors.Accent)
+                    .clickable(enabled = !uploadingImage && images.size < 4) { pickImage() }
+                    .padding(horizontal = 16.dp, vertical = 11.dp)
+            ) {
+                Text(
+                    when {
+                        uploadingImage -> "Uploading…"
+                        images.size >= 4 -> "Four photos is the most"
+                        else -> "＋  Add from gallery"
+                    },
+                    color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold
+                )
             }
+            imageError?.let { Text(it, color = IosColors.SellRed, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp)) }
 
             Label("VIDEO LINK (OPTIONAL)")
             LinkField(value = videoUrl, hint = "YouTube or a direct link") { videoUrl = it }
@@ -475,6 +498,7 @@ private fun VoiceComposer(
     onTitleChange: (String) -> Unit,
     onStart: () -> Unit,
     onStop: () -> Unit,
+    onCancel: () -> Unit = {},
     onDiscard: () -> Unit
 ) {
     Column(
@@ -485,33 +509,8 @@ private fun VoiceComposer(
             .padding(13.dp)
     ) {
         when {
-            // ── Recording ────────────────────────────────────────────────
-            isRecording -> Row(verticalAlignment = Alignment.CenterVertically) {
-                RecordingDot()
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = formatVoiceDuration(elapsed),
-                        color = Color.White,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Recording — up to ${MAX_VOICE_SECONDS / 60} minutes",
-                        color = IosColors.TextSecondary,
-                        fontSize = 12.sp
-                    )
-                }
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(Color.White)
-                        .clickable(onClick = onStop)
-                        .padding(horizontal = 18.dp, vertical = 10.dp)
-                ) {
-                    Text("Stop", color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                }
-            }
+            // ── Recording: held, like WhatsApp ──────────────────────────
+            isRecording -> HoldToRecordBar(true, elapsed, onStart, onStop, onCancel)
 
             isUploading -> Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(
@@ -582,34 +581,8 @@ private fun VoiceComposer(
             }
 
             // ── Idle ─────────────────────────────────────────────────────
-            else -> Row(
-                Modifier.fillMaxWidth().clickable(onClick = onStart),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    Modifier
-                        .size(38.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(IosColors.SellRed.copy(alpha = 0.16f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(
-                        Modifier
-                            .size(13.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(IosColors.SellRed)
-                    )
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("Record a voice note", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        text = "Members hear you before the open.",
-                        color = IosColors.TextSecondary,
-                        fontSize = 12.sp
-                    )
-                }
-            }
+            // ── Idle: hold the mic to record ─────────────────────────────
+            else -> HoldToRecordBar(false, 0, onStart, onStop, onCancel)
         }
 
         if (error != null) {
@@ -673,5 +646,82 @@ private fun LinkField(
             cursorBrush = SolidColor(Color.White),
             modifier = Modifier.fillMaxWidth()
         )
+    }
+}
+
+
+/**
+ * WhatsApp's voice button: hold the mic to record, let go to finish, slide
+ * left to throw it away. The timer and a pulsing dot run while it is held.
+ */
+@Composable
+private fun HoldToRecordBar(
+    recording: Boolean,
+    elapsed: Int,
+    onStart: () -> Unit,
+    onStop: () -> Unit,
+    onCancel: () -> Unit
+) {
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val cancelPx = with(density) { 110.dp.toPx() }
+    var drag by remember { mutableStateOf(0f) }
+    val start by androidx.compose.runtime.rememberUpdatedState(onStart)
+    val stop by androidx.compose.runtime.rememberUpdatedState(onStop)
+    val cancel by androidx.compose.runtime.rememberUpdatedState(onCancel)
+    val willCancel = drag < -cancelPx
+    val micScale by androidx.compose.animation.core.animateFloatAsState(if (recording) 1.35f else 1f, label = "mic")
+
+    Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (recording) {
+            RecordingDot()
+            Spacer(Modifier.width(10.dp))
+            Text(formatVoiceDuration(elapsed), color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.width(14.dp))
+            Text(
+                if (willCancel) "Let go to delete" else "‹  Slide to cancel",
+                color = if (willCancel) IosColors.SellRed else IosColors.TextSecondary,
+                fontSize = 14.sp,
+                modifier = Modifier.weight(1f).offset { androidx.compose.ui.unit.IntOffset((drag / 2).toInt().coerceAtMost(0), 0) }
+            )
+        } else {
+            Column(Modifier.weight(1f)) {
+                Text("Hold the mic to record", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Text("Let go to finish · slide left to cancel", color = IosColors.TextSecondary, fontSize = 12.sp)
+            }
+        }
+        Box(
+            Modifier
+                .offset { androidx.compose.ui.unit.IntOffset(drag.toInt().coerceAtMost(0), 0) }
+                .size(52.dp)
+                .graphicsLayer { scaleX = micScale; scaleY = micScale }
+                .clip(androidx.compose.foundation.shape.CircleShape)
+                .background(if (willCancel) IosColors.SellRed else IosColors.BuyGreen)
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown()
+                        down.consume()
+                        start()
+                        var cancelled = false
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            drag = change.position.x - down.position.x
+                            cancelled = drag < -cancelPx
+                            if (!change.pressed) break
+                            change.consume()
+                        }
+                        drag = 0f
+                        if (cancelled) cancel() else stop()
+                    }
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            androidx.compose.material3.Icon(
+                androidx.compose.material.icons.Icons.Filled.Mic,
+                contentDescription = "Hold to record",
+                tint = Color.Black,
+                modifier = Modifier.size(24.dp)
+            )
+        }
     }
 }

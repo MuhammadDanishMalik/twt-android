@@ -72,6 +72,8 @@ import com.talkswithtanha.twt.features.signals.live.LiveAnalysisTab
 @Composable
 fun SignalsScreen(
     onOpenSignal: (String) -> Unit,
+    /** Staff only: true for an analysis. */
+    onPost: (analysis: Boolean) -> Unit = {},
     viewModel: SignalsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -123,6 +125,7 @@ fun SignalsScreen(
     // an empty frame where the analysis should be is worse than one fewer card.
     val analysed = shown.filter { it.isAnalysis || it.teamImages.isNotEmpty() }
 
+    Box(Modifier.fillMaxSize()) {
     Column(
         Modifier
             .fillMaxSize()
@@ -289,6 +292,26 @@ fun SignalsScreen(
         }
             }
         }
+    }
+
+    // Staff who hold signals post from here, the screen they read: a signal
+    // from Trades and Live, an analysis from Analysis.
+    val canPost by viewModel.canPost.collectAsStateWithLifecycle()
+    if (canPost) {
+        val analysisTab = tab == 2
+        Row(
+            Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 20.dp, bottom = 120.dp)
+                .clip(RoundedCornerShape(28.dp))
+                .background(IosColors.Accent)
+                .clickable { onPost(analysisTab) }
+                .padding(horizontal = 18.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("＋  " + if (analysisTab) "Post analysis" else "Post signal", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+        }
+    }
     }
 }
 

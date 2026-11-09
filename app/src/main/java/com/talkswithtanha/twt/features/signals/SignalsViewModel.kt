@@ -28,8 +28,14 @@ data class SignalsUiState(
 @HiltViewModel
 class SignalsViewModel @Inject constructor(
     signalRepository: SignalRepository,
-    private val tracker: FollowedSignalTracker
+    private val tracker: FollowedSignalTracker,
+    session: com.talkswithtanha.twt.core.session.SessionRepository
 ) : ViewModel() {
+
+    /** Staff who hold signals: the screen offers Post signal and Post analysis. */
+    val canPost: StateFlow<Boolean> = session.currentUser
+        .map { it?.can(com.talkswithtanha.twt.core.model.StaffArea.SIGNALS) == true }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     val state: StateFlow<SignalsUiState> = combine(
         signalRepository.observeSignals(),

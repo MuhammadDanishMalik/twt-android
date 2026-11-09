@@ -80,13 +80,21 @@ data class SignalDraft(
     val riskReward: String = "",
     val tradeStyle: TradeStyle = TradeStyle.SCALP,
     val notes: String = "",
-    val isPublished: Boolean = true
+    val isPublished: Boolean = true,
+    /** A chart and a read, with no entry, stop or targets (the Analysis tab). */
+    val isAnalysis: Boolean = false,
+    /** Uploaded from the gallery; never a pasted link. */
+    val chartImageUrl: String? = null
 ) {
     val isComplete: Boolean
-        get() = pair.isNotBlank() &&
-            entryPrice.isNotBlank() &&
-            stopLoss.isNotBlank() &&
-            takeProfits.any { it.isNotBlank() }
+        get() = if (isAnalysis) {
+            pair.isNotBlank() && (notes.isNotBlank() || chartImageUrl != null)
+        } else {
+            pair.isNotBlank() &&
+                entryPrice.isNotBlank() &&
+                stopLoss.isNotBlank() &&
+                takeProfits.any { it.isNotBlank() }
+        }
 }
 
 /** A home-screen carousel banner, as the admin area edits it. */
@@ -151,8 +159,9 @@ class FirebaseAdminRepository @Inject constructor(
                 S.PIPS_GAINED to null,
                 S.IS_PUBLISHED to draft.isPublished,
                 S.TRADE_STYLE to draft.tradeStyle.stored,
-                S.CHART_IMAGE_URL to null,
-                S.SCREENSHOTS to emptyList<String>(),
+                S.CHART_IMAGE_URL to draft.chartImageUrl,
+                S.SCREENSHOTS to listOfNotNull(draft.chartImageUrl),
+                com.talkswithtanha.twt.core.firebase.FirestorePaths.SignalField.IS_ANALYSIS to draft.isAnalysis,
                 // Server time, not the phone's: a device with a wrong clock
                 // would otherwise pin the signal to the top of every feed.
                 S.TIMESTAMP to FieldValue.serverTimestamp(),
@@ -165,7 +174,7 @@ class FirebaseAdminRepository @Inject constructor(
         // Into the feed, where members already are. Best effort on purpose: a
         // feed that refuses the post must not lose the trade, which is already
         // written and already visible in the Signals tab.
-        if (author != null && draft.isPublished) {
+        if (author != null && draft.isPublished && !draft.isAnalysis) {
             runCatching {
                 feed.shareSignal(
                     Signal(

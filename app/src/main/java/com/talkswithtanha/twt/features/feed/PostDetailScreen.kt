@@ -1,5 +1,7 @@
 package com.talkswithtanha.twt.features.feed
 
+import androidx.compose.material.icons.outlined.Image
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -187,8 +189,8 @@ fun PostDetailScreen(
             isSending = state.isSending,
             onChange = { draft = it },
             onCancelReply = { replyingTo = null },
-            onSend = {
-                viewModel.reply(draft, replyingTo?.id)
+            onSend = { photo ->
+                viewModel.reply(draft, replyingTo?.id, photo)
                 draft = ""
                 replyingTo = null
             }
@@ -252,7 +254,7 @@ private fun CommentRow(
             // A voice reply from the panel carries a placeholder line when Tanha
             // said nothing in writing; the player is the reply then.
             val placeholder = comment.audioUrl != null && comment.text == "🎙 Voice reply"
-            if (!placeholder) {
+            if (!placeholder && comment.text.isNotBlank()) {
                 Text(
                     text = comment.text,
                     color = Color.White.copy(alpha = 0.92f),
@@ -265,6 +267,16 @@ private fun CommentRow(
                 Box(Modifier.padding(top = 6.dp)) {
                     VoiceNote(url, "Voice reply", comment.audioDurationSec, null)
                 }
+            }
+            comment.imageUrl?.let { url ->
+                var viewing by remember { mutableStateOf(false) }
+                if (viewing) com.talkswithtanha.twt.core.designsystem.components.ImageViewer(images = listOf(url), startIndex = 0, onDismiss = { viewing = false })
+                coil3.compose.AsyncImage(
+                    model = url,
+                    contentDescription = "Photo",
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier.padding(top = 6.dp).fillMaxWidth(0.75f).height(180.dp).clip(RoundedCornerShape(12.dp)).clickable { viewing = true }
+                )
             }
 
             Row(
@@ -298,9 +310,12 @@ private fun ReplyBar(
     isSending: Boolean,
     onChange: (String) -> Unit,
     onCancelReply: () -> Unit,
-    onSend: () -> Unit
+    onSend: (photo: ByteArray?) -> Unit
 ) {
-    val canSend = value.isNotBlank() && !isSending
+    // A photo from the gallery, shown small above the box until it is sent.
+    var photo by remember { mutableStateOf<ByteArray?>(null) }
+    val pickPhoto = com.talkswithtanha.twt.core.designsystem.components.rememberGalleryPhotoPicker { photo = it }
+    val canSend = (value.isNotBlank() || photo != null) && !isSending
 
     Column(
         Modifier
@@ -333,6 +348,18 @@ private fun ReplyBar(
             }
         }
 
+        photo?.let { bytes ->
+            val bitmap = remember(bytes) { android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap() }
+            Row(Modifier.padding(start = 16.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                bitmap?.let {
+                    androidx.compose.foundation.Image(it, "Photo to send", contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier.size(64.dp).clip(RoundedCornerShape(10.dp)))
+                }
+                Spacer(Modifier.width(10.dp))
+                Text("Remove", color = IosColors.SellRed, fontSize = 13.sp, modifier = Modifier.clickable { photo = null })
+            }
+        }
+
         Row(
             Modifier
                 .fillMaxWidth()
@@ -340,6 +367,13 @@ private fun ReplyBar(
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            // Gallery: a photo with the comment.
+            Box(
+                Modifier.size(40.dp).clip(CircleShape).background(Color(0xFF1C1C1C)).clickable(enabled = !isSending) { pickPhoto() },
+                contentAlignment = Alignment.Center
+            ) {
+                androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.Image, "Add a photo", tint = IosColors.TextSecondary, modifier = Modifier.size(20.dp))
+            }
             Box(
                 Modifier
                     .weight(1f)
@@ -364,7 +398,7 @@ private fun ReplyBar(
                     .size(40.dp)
                     .clip(CircleShape)
                     .background(if (canSend) IosColors.Accent else Color(0xFF2A2A2A))
-                    .clickable(enabled = canSend, onClick = onSend),
+                    .clickable(enabled = canSend) { onSend(photo); photo = null },
                 contentAlignment = Alignment.Center
             ) {
                 if (isSending) {

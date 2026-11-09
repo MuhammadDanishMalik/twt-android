@@ -122,6 +122,7 @@ sealed class AppRoute(val route: String) {
     // depends on the areas Tanha has given them — see `StaffArea`.
     data object AdminHome : AppRoute("admin")
     data object AdminPostSignal : AppRoute("admin/postSignal")
+    data object AdminPostAnalysis : AppRoute("admin/postAnalysis")
     data object AdminSignals : AppRoute("admin/signals")
     data object AdminDeals : AppRoute("admin/deals")
     data object AdminBanners : AppRoute("admin/banners")

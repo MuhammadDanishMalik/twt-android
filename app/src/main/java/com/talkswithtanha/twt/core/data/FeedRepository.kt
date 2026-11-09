@@ -96,7 +96,7 @@ interface FeedRepository {
     /** Sets, changes or clears a reaction. Passing the kind they already have clears it. */
     suspend fun react(postId: String, userId: String, kind: Reaction?, previous: Reaction?)
 
-    suspend fun comment(postId: String, text: String, parentId: String?, author: User, asAuthor: Boolean = false): String
+    suspend fun comment(postId: String, text: String, parentId: String?, author: User, asAuthor: Boolean = false, imageUrl: String? = null): String
     suspend fun deleteComment(postId: String, commentId: String)
 }
 
@@ -337,7 +337,7 @@ class FirebaseFeedRepository @Inject constructor(
         runCatching { posts.document(postId).update(changes).await() }
     }
 
-    override suspend fun comment(postId: String, text: String, parentId: String?, author: User, asAuthor: Boolean): String {
+    override suspend fun comment(postId: String, text: String, parentId: String?, author: User, asAuthor: Boolean, imageUrl: String?): String {
         val document = comments(postId).document()
         document.set(
             buildMap {
@@ -350,6 +350,7 @@ class FirebaseFeedRepository @Inject constructor(
                 put(C.REPLY_COUNT, 0)
                 // Only staff may set this; the rules refuse it from anyone else.
                 if (asAuthor) put("isAuthorReply", true)
+                imageUrl?.let { put("imageUrl", it) }
             }
         ).await()
 
@@ -457,7 +458,8 @@ class FirebaseFeedRepository @Inject constructor(
             replyCount = (document.getLong(C.REPLY_COUNT) ?: 0L).toInt(),
             isAuthorReply = document.getBoolean("isAuthorReply") == true,
             audioUrl = document.getString("audioUrl")?.takeIf { it.isNotBlank() },
-            audioDurationSec = (document.getLong("audioDurationSec") ?: 0L).toInt()
+            audioDurationSec = (document.getLong("audioDurationSec") ?: 0L).toInt(),
+            imageUrl = document.getString("imageUrl")?.takeIf { it.isNotBlank() }
         )
     }
 }

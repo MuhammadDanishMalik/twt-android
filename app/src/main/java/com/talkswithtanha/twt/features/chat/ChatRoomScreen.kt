@@ -352,11 +352,11 @@ fun ChatRoomScreen(
                     viewModel.startEdit(message)
                 }
             } else null,
-            onDelete = if (message.isCurrentUser) {
+            onDelete = if (message.isCurrentUser || viewModel.canModerate) {
                 {
                     actionsFor = null
                     viewModel.delete(message)
-                    toast("Message deleted")
+                    toast(if (message.isCurrentUser) "Message deleted" else "Removed for everyone")
                 }
             } else null,
             onReact = { emoji ->

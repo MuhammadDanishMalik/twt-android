@@ -260,6 +260,11 @@ class FeedViewModel @Inject constructor(
      * rather than when Post is tapped, so the wait happens while Tanha types
      * the title. The local file is deleted either way.
      */
+    /** A picture from the gallery, uploaded for the post; never a pasted link. */
+    fun uploadImage(bytes: ByteArray, onDone: (url: String?) -> Unit) = viewModelScope.launch {
+        onDone(runCatching { uploader.uploadImageOrThrow(bytes) }.getOrNull())
+    }
+
     fun uploadVoice(file: File, onDone: (url: String?, error: String?) -> Unit) = viewModelScope.launch {
         when (val result = uploader.uploadVoiceNote(file)) {
             is UploadResult.Success -> {
@@ -313,6 +318,7 @@ class PostDetailViewModel @Inject constructor(
     private val signalRepository: SignalRepository,
     private val tracker: FollowedSignalTracker,
     private val session: SessionRepository,
+    private val uploader: com.talkswithtanha.twt.core.images.CloudinaryUploader,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -407,12 +413,15 @@ class PostDetailViewModel @Inject constructor(
         if (next == Reaction.TOOK) state.value.signal?.let { if (!state.value.isFollowingSignal) tracker.follow(it) }
     }
 
-    fun reply(text: String, parentId: String?) = viewModelScope.launch {
+    fun reply(text: String, parentId: String?, photo: ByteArray? = null) = viewModelScope.launch {
         val user = session.currentUser.value ?: return@launch
-        if (text.isBlank()) return@launch
+        if (text.isBlank() && photo == null) return@launch
         sending.value = true
         // Staff answering is Tanha's answer, badged as his.
-        runCatching { repository.comment(postId, text, parentId, user, asAuthor = state.value.canModerate) }
+        runCatching {
+            val imageUrl = photo?.let { uploader.uploadImageOrThrow(it) }
+            repository.comment(postId, text, parentId, user, asAuthor = state.value.canModerate, imageUrl = imageUrl)
+        }
         sending.value = false
     }
 

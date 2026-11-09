@@ -222,7 +222,10 @@ private fun CommentRow(
             .fillMaxWidth()
             .padding(start = if (indent) 56.dp else 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp)
     ) {
-        MemberAvatar(
+        // Tanha's answers carry his photo; everyone else their own.
+        if (comment.isAuthorReply) {
+            com.talkswithtanha.twt.core.designsystem.components.TanhaAvatar(if (indent) 28.dp else 34.dp)
+        } else MemberAvatar(
             photoUrl = comment.authorPhoto,
             name = comment.authorName,
             size = if (indent) 28.dp else 34.dp

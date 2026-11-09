@@ -271,12 +271,7 @@ private fun PostHeader(post: FeedPost, unread: Boolean, updated: Boolean, canMod
     val clipboard = LocalClipboardManager.current
 
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier.size(40.dp).clip(CircleShape).background(Color(0xFF0B0B0B)),
-            contentAlignment = Alignment.Center
-        ) {
-            Image(painterResource(R.drawable.twt_logo), contentDescription = post.authorName, modifier = Modifier.size(36.dp))
-        }
+        com.talkswithtanha.twt.core.designsystem.components.TanhaAvatar(40.dp)
         Column(Modifier.weight(1f).padding(start = 10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(post.authorName, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, fontFamily = WebFonts.Body, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))

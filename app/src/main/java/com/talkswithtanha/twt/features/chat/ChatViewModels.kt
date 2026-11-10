@@ -69,15 +69,17 @@ class ChatListViewModel @Inject constructor(
         .map { user ->
             buildList {
                 // No community room: members talk under Tanha's posts in the
-                // Feed, where only he and the team post and everybody comments.
-                user?.let {
+                // Feed. The direct chat with Tanha is off for members for now;
+                // tickets and the exchange desk remain. Staff get the team's
+                // own room — Tanha, the desk and everyone on the team.
+                if (user?.isStaff == true) {
                     add(
                         ChatRoomSummary(
-                            roomId = FirestorePaths.ChatRoom.support(it.id),
-                            title = "Talks with Tanha",
-                            subtitle = "Ask about your access, signals or your account",
+                            roomId = FirestorePaths.ChatRoom.TEAM,
+                            title = "TWT Team",
+                            subtitle = "Tanha, Rafiullah and the team",
                             requiresAccess = false,
-                            initials = "TT",
+                            initials = "TW",
                             crowned = true
                         )
                     )
@@ -208,6 +210,7 @@ class ChatRoomViewModel @Inject constructor(
     val roomTitle: String = when (roomId) {
         FirestorePaths.ChatRoom.PREMIUM -> "Premium Community"
         FirestorePaths.ChatRoom.COMMUNITY -> "Community"
+        FirestorePaths.ChatRoom.TEAM -> "TWT Team"
         else -> "Talks with Tanha"
     }
 

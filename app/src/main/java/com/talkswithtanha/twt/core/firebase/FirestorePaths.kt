@@ -98,6 +98,9 @@ object FirestorePaths {
     object ChatRoom {
         const val COMMUNITY = "community"
 
+        /** The team's own room: Tanha, the desk and every staff member. Staff only. */
+        const val TEAM = "team"
+
         /**
          * A second room rather than a permission flag on the first, because the
          * security rules gate by room id and Firestore cannot hide a subset of a

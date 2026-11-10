@@ -113,7 +113,7 @@ fun ChatRoomScreen(
     val tanhaPhoto by viewModel.tanhaPhoto.collectAsStateWithLifecycle()
     // Photos go both ways in the two private threads; the community keeps to
     // notes. In the dealer's chat a photo is the only thing to attach.
-    val photosAllowed = viewModel.isSellerChat || viewModel.isSupportRoom
+    val photosAllowed = viewModel.isSellerChat || viewModel.isSupportRoom || viewModel.roomId == com.talkswithtanha.twt.core.firebase.FirestorePaths.ChatRoom.TEAM
     var attachMenu by remember { mutableStateOf(false) }
     val photoContext = androidx.compose.ui.platform.LocalContext.current
     val photoScope = androidx.compose.runtime.rememberCoroutineScope()

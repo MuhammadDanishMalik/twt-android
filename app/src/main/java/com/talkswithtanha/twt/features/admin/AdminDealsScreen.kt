@@ -394,8 +394,8 @@ private fun TeamChatRow(onClick: () -> Unit) {
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text("Tanha · TWT team", color = IosColors.TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            Text("Your direct line to Tanha and Hafiz Sadiq", color = IosColors.TextSecondary, fontSize = 13.sp, maxLines = 1)
+            Text("TWT Team", color = IosColors.TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text("Tanha, Hafiz Sadiq and the whole team", color = IosColors.TextSecondary, fontSize = 13.sp, maxLines = 1)
         }
         Text("📌", fontSize = 14.sp)
     }

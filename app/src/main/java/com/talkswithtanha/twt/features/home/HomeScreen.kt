@@ -108,7 +108,7 @@ fun HomeScreen(
             deskMode = true,
             userInitial = me?.fullName?.trim()?.firstOrNull()?.uppercase().orEmpty(),
             onOpenSettings = onOpenSettings,
-            onOpenTeamChat = { me?.id?.let { onOpenRoom(com.talkswithtanha.twt.core.firebase.FirestorePaths.ChatRoom.support(it)) } }
+            onOpenTeamChat = { onOpenRoom(com.talkswithtanha.twt.core.firebase.FirestorePaths.ChatRoom.TEAM) }
         )
         return
     }

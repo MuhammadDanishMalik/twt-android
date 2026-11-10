@@ -106,9 +106,9 @@ fun ChatListScreen(
             contentPadding = PaddingValues(horizontal = 20.dp),
             modifier = Modifier.padding(bottom = 100.dp)
         ) {
-            item { ChatSectionHeader("Private") }
+            if (rooms.isNotEmpty()) item { ChatSectionHeader("Team") }
 
-            item {
+            if (rooms.isNotEmpty()) item {
                 SettingsCard {
                     rooms.forEachIndexed { index, room ->
                         val locked = room.requiresAccess && user?.hasAppAccess != true

@@ -171,30 +171,8 @@ class FirebaseAdminRepository @Inject constructor(
             )
         ).await()
 
-        // Into the feed, where members already are. Best effort on purpose: a
-        // feed that refuses the post must not lose the trade, which is already
-        // written and already visible in the Signals tab.
-        if (author != null && draft.isPublished && !draft.isAnalysis) {
-            runCatching {
-                feed.shareSignal(
-                    Signal(
-                        id = document.id,
-                        pair = draft.pair.trim().uppercase(),
-                        type = draft.type,
-                        entryPrice = draft.entryPrice,
-                        stopLoss = draft.stopLoss,
-                        notes = draft.notes.trim().ifEmpty { null }
-                    ),
-                    author
-                )
-            }.onSuccess { postId ->
-                // Written back so the panel's publish toggle knows this trade
-                // has already been shared. The two sides share one feed, and
-                // without this a signal made here and re-published there would
-                // appear twice.
-                runCatching { document.update("feedPostId", postId).await() }
-            }
-        }
+        // Not into the Feed: the desk posts a trade there itself when it wants
+        // to. Members hear about the signal by push.
 
         return document.id
     }

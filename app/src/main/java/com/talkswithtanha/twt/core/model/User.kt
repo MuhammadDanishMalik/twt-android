@@ -60,6 +60,8 @@ data class User(
     val profileSetupAt: Date? = null,
     /** Agreed to the exchange desk's rules ([ExchangeRules]), before their first deal. */
     val exchangeRulesAcceptedAt: Date? = null,
+    /** The test account (set from the server only): also sees test signals. */
+    val isTester: Boolean = false,
     val createdAt: Date = Date(),
     val updatedAt: Date = Date()
 ) {

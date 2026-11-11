@@ -180,6 +180,12 @@ class ChatRoomViewModel @Inject constructor(
     val deskMemberId: String = roomId.removePrefix(FirestorePaths.ChatRoom.DEALER_PREFIX)
 
     private suspend fun afterDeskReply(preview: String) {
+        // The member's own deal chat: tell the dealer, and only the dealer (W9).
+        val me = session.currentUser.value
+        if (isDealerRoom && me != null && roomId == FirestorePaths.ChatRoom.dealer(me.id)) {
+            desk.notifyDealer(roomId, preview)
+            return
+        }
         if (!isDeskView) return
         runCatching { desk.markReplied(roomId, preview) }
         desk.notifyMember(roomId, preview, seller.value.displayName)

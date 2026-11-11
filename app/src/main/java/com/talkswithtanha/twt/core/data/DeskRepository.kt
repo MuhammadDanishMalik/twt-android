@@ -326,6 +326,25 @@ class DeskRepository @Inject constructor(
     }
 
     /**
+     * A member wrote in their own deal chat: the panel pushes the dealer, and
+     * only the dealer (W9). Best effort; the message is already sent.
+     */
+    suspend fun notifyDealer(roomId: String, preview: String) = withContext(Dispatchers.IO) {
+        val base = BuildConfig.ADMIN_API_BASE.trimEnd('/')
+        if (base.isBlank()) return@withContext
+        runCatching {
+            val token = FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.await()?.token ?: return@runCatching
+            val body = JSONObject()
+                .put("idToken", token)
+                .put("roomId", roomId)
+                .put("preview", preview.take(140))
+                .toString()
+                .toRequestBody("application/json".toMediaType())
+            http.newCall(Request.Builder().url("$base/api/deal-chat/notify").post(body).build()).execute().close()
+        }
+    }
+
+    /**
      * Pushes the desk's reply to the member, unless their chat is open — the
      * panel's /api/support/notify, which decides that on the server.
      */

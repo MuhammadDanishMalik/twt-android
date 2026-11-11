@@ -64,10 +64,21 @@ class FirebaseSignalRepository @Inject constructor(
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     override fun observeSignals(limit: Long): Flow<Snapshot<List<Signal>>> =
         session.currentUser
-            .map { user -> user == null || user.hasAppAccess || user.isStaff }
+            .map { user -> (user == null || user.hasAppAccess || user.isStaff) to (user?.isTester == true) }
             .distinctUntilChanged()
-            .flatMapLatest { full ->
-                if (full) {
+            .flatMapLatest { (full, tester) ->
+                if (full && tester) {
+                    // The test account (W8): the published signals plus the
+                    // test ones, which are never published.
+                    val tests = signals.whereEqualTo("isTest", true).limit(limit).snapshotFlow()
+                    kotlinx.coroutines.flow.combine(publishedQuery(limit).snapshotFlow(), tests) { a, b ->
+                        val left = a.toSignals()
+                        val right = b.toSignals()
+                        if (left is Snapshot.Data && right is Snapshot.Data) {
+                            Snapshot.Data((left.value + right.value).distinctBy { it.id }.sortedByDescending { it.timestamp })
+                        } else left
+                    }
+                } else if (full) {
                     publishedQuery(limit).snapshotFlow().map { snapshot -> snapshot.toSignals() }
                 } else {
                     val analysis = signals

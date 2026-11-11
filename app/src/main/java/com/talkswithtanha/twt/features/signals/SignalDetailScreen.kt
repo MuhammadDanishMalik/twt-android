@@ -326,7 +326,17 @@ fun SignalDetailScreen(
                     DetailDivider()
                     DetailRow(Icons.Filled.Schedule, "Timeframe", signal.timeframe)
                     DetailDivider()
-                    DetailRow(Icons.Filled.Scale, "Risk / reward", signal.riskReward, numeric = true)
+                    signal.orderLabel?.let { label ->
+                        DetailRow(Icons.Filled.Bolt, "Order type", label.lowercase().replaceFirstChar { it.uppercase() } + if (signal.status == com.talkswithtanha.twt.core.model.SignalStatus.PENDING) " · waiting" else "")
+                        DetailDivider()
+                    }
+                    // Per target, from Entry 1: "TP1 1:0.48 · TP2 1:1.30".
+                    val perTarget = signal.riskRewardPerTarget
+                    if (perTarget != null && signal.takeProfits.size > 1) {
+                        DetailRow(Icons.Filled.Scale, "Risk / reward", perTarget)
+                    } else {
+                        DetailRow(Icons.Filled.Scale, "Risk / reward", signal.riskReward, numeric = true)
+                    }
                     DetailDivider()
                     DetailRow(Icons.Filled.CalendarMonth, "Posted", postedUtc(signal))
                     Spacer(Modifier.height(14.dp))
@@ -581,7 +591,9 @@ private fun DetailRow(
                 text = value,
                 style = valueStyle,
                 color = Color.White,
-                maxLines = 1
+                // Long values (a second entry's note, per-target R:R) wrap
+                // rather than being cut.
+                maxLines = 4
             )
         }
     }

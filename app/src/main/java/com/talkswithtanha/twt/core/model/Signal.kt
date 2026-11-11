@@ -47,8 +47,38 @@ data class Signal(
     /** An optional second entry for a second lot, and the desk's note on it.
      *  Absent on every signal written before it existed. */
     val entry2: String? = null,
-    val entry2Note: String? = null
+    val entry2Note: String? = null,
+    /** How it is entered: "market" for every signal from before pending orders. */
+    val orderType: String = "market",
+    /** "pending", "triggered" or "cancelled"; null on a market order. */
+    val orderState: String? = null
 ) {
+    /** "BUY LIMIT", "SELL STOP" for a pending order; null for a market one. */
+    val orderLabel: String?
+        get() = when (orderType) {
+            "buy_limit" -> "BUY LIMIT"
+            "sell_limit" -> "SELL LIMIT"
+            "buy_stop" -> "BUY STOP"
+            "sell_stop" -> "SELL STOP"
+            else -> null
+        }
+
+    /**
+     * Risk to reward for each target, measured from Entry 1: "TP1 1:0.48 ·
+     * TP2 1:1.30". Null when the levels cannot be read as numbers.
+     */
+    val riskRewardPerTarget: String?
+        get() {
+            val e = entryPriceValue.takeIf { it > 0 } ?: entryPrice.replace(",", "").toDoubleOrNull() ?: return null
+            val s = stopLossValue.takeIf { it > 0 } ?: stopLoss.replace(",", "").toDoubleOrNull() ?: return null
+            val risk = kotlin.math.abs(e - s).takeIf { it > 0 } ?: return null
+            val parts = takeProfits.mapNotNull { tp ->
+                val t = tp.price.replace(",", "").toDoubleOrNull() ?: return@mapNotNull null
+                "${tp.label} 1:${"%.2f".format(kotlin.math.abs(t - e) / risk)}"
+            }
+            return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
+        }
+
     /**
      * The chart and the screenshots as one list, chart first — what the detail
      * screen shows under "From the team".

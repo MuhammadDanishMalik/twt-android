@@ -186,6 +186,11 @@ fun SignalTicketCard(
             }
         }
 
+        // A pending order: how far price still has to come to fill it.
+        if (signal.status == com.talkswithtanha.twt.core.model.SignalStatus.PENDING) {
+            PendingDistance(signal)
+        }
+
         Spacer(Modifier.height(16.dp))
 
         // ── Identity + performance ───────────────────────────────────────
@@ -204,7 +209,7 @@ fun SignalTicketCard(
                     maxLines = 1
                 )
                 Text(
-                    text = "${signal.type.stored} · ${signal.timeframe}",
+                    text = "${signal.orderLabel ?: signal.type.stored} · ${signal.timeframe}",
                     color = Color.White.copy(alpha = 0.45f),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium
@@ -360,4 +365,40 @@ fun Signal.tradingViewUrl(): String? {
     val symbol = pair.uppercase().filter { it.isLetterOrDigit() }
     return if (symbol.isEmpty()) null
     else "https://www.tradingview.com/chart/?symbol=$symbol"
+}
+
+
+/**
+ * "Waiting for price to reach 4065.00 · 82 pips away", from the live quote,
+ * refreshed every 15 seconds while the card is on screen. Without a quote it
+ * says only what it is waiting for.
+ */
+@Composable
+private fun PendingDistance(signal: Signal) {
+    val inst = remember(signal.pair) { com.talkswithtanha.twt.core.data.LiveApi.find(signal.pair) }
+    var price by remember { mutableStateOf<Double?>(null) }
+    LaunchedEffect(inst?.key) {
+        val key = inst?.key ?: return@LaunchedEffect
+        while (true) {
+            com.talkswithtanha.twt.core.data.LiveApi.quote(key)?.takeIf { !it.closed }?.let { price = it.price }
+            kotlinx.coroutines.delay(15_000)
+        }
+    }
+    val entry = signal.entryPrice.replace(",", "").toDoubleOrNull()
+    val pips = if (inst != null && entry != null) price?.let { p ->
+        val pip = when (inst.kind) {
+            com.talkswithtanha.twt.core.data.LiveApi.Kind.FX -> Math.pow(10.0, -(inst.decimals - 1).toDouble())
+            com.talkswithtanha.twt.core.data.LiveApi.Kind.METAL -> if (inst.key == "XAGUSD") 0.01 else 0.1
+            com.talkswithtanha.twt.core.data.LiveApi.Kind.ENERGY -> 0.01
+            else -> 1.0
+        }
+        kotlin.math.round(kotlin.math.abs(p - entry) / pip).toInt()
+    } else null
+    Text(
+        text = "Waiting for price to reach ${signal.entryPrice}" + (pips?.let { " · $it ${if (inst?.kind == com.talkswithtanha.twt.core.data.LiveApi.Kind.FX || inst?.kind == com.talkswithtanha.twt.core.data.LiveApi.Kind.METAL || inst?.kind == com.talkswithtanha.twt.core.data.LiveApi.Kind.ENERGY) "pips" else "points"} away" } ?: ""),
+        color = com.talkswithtanha.twt.core.designsystem.TwtColors.Warning,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Medium,
+        modifier = Modifier.padding(top = 10.dp)
+    )
 }

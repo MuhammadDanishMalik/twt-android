@@ -168,7 +168,9 @@ class FirebaseSignalRepository @Inject constructor(
             isEdited = document.getBoolean(F.IS_EDITED) ?: false,
             isAnalysis = document.getBoolean(F.IS_ANALYSIS) ?: false,
             entry2 = document.get("entry2").asNonBlankString(),
-            entry2Note = document.get("entry2Note").asNonBlankString()
+            entry2Note = document.get("entry2Note").asNonBlankString(),
+            orderType = document.getString("orderType")?.takeIf { it.isNotBlank() } ?: "market",
+            orderState = document.getString("orderState")?.takeIf { it.isNotBlank() }
         )
     }
 

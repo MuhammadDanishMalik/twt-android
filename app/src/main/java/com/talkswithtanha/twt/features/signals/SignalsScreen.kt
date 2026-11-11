@@ -110,7 +110,10 @@ fun SignalsScreen(
     // belong in a list of them — a ticket drawn with empty levels is a number
     // somebody could act on by mistake.
     val trades = shown.filter { !it.isAnalysis }
-    val active = trades.filter { it.status.isOngoing }
+    // Running trades and pending orders apart: an order nobody's price has
+    // reached yet is not a trade in progress.
+    val active = trades.filter { it.status.isOngoing && it.status != com.talkswithtanha.twt.core.model.SignalStatus.PENDING }
+    val pendingOrders = trades.filter { it.status == com.talkswithtanha.twt.core.model.SignalStatus.PENDING }
     val closed = trades.filter { !it.status.isOngoing }
     val today = closed.filter { isToday(it.timestamp.time) }
     val older = closed.filterNot { isToday(it.timestamp.time) }
@@ -190,7 +193,7 @@ fun SignalsScreen(
             item {
                 SectionLabel(
                     title = "Active Trades",
-                    subtitle = if (isPro) "${active.size} signals running" else "For Pro members",
+                    subtitle = if (isPro) "${active.size} signal${if (active.size == 1) "" else "s"} running" else "For Pro members",
                     icon = Icons.Filled.ShowChart
                 )
             }
@@ -223,6 +226,29 @@ fun SignalsScreen(
                 }
 
                 else -> itemsIndexed(active, key = { _, it -> it.id }) { index, signal ->
+                    SignalTicketCard(
+                        signal = signal,
+                        isFollowing = signal.id in state.followedSignalIds,
+                        modifier = Modifier
+                            .animateItem()
+                            .padding(horizontal = 16.dp)
+                            .staggeredAppear(index),
+                        onOpen = { onOpenSignal(signal.id) },
+                        onFollow = { viewModel.follow(signal) },
+                        onRequestUnfollow = { viewModel.unfollow(signal.id) }
+                    )
+                }
+            }
+
+            if (isPro && pendingOrders.isNotEmpty()) {
+                item {
+                    SectionLabel(
+                        title = "Pending orders",
+                        subtitle = "${pendingOrders.size} waiting for price",
+                        icon = Icons.Filled.ShowChart
+                    )
+                }
+                itemsIndexed(pendingOrders, key = { _, it -> "pending-" + it.id }) { index, signal ->
                     SignalTicketCard(
                         signal = signal,
                         isFollowing = signal.id in state.followedSignalIds,

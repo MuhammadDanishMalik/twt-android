@@ -247,7 +247,12 @@ fun SignalTicketCard(
 
         // ── Levels ───────────────────────────────────────────────────────
         Row(modifier = Modifier.fillMaxWidth()) {
-            TicketLevel("ENTRY PRICE", signal.entryPrice, Modifier.weight(1f))
+            // "4077 · 2nd 4068" when there is a second entry.
+            TicketLevel(
+                "ENTRY PRICE",
+                signal.entry2?.let { "${signal.entryPrice} · 2nd $it" } ?: signal.entryPrice,
+                Modifier.weight(1f)
+            )
             TicketLevel(
                 "TARGET",
                 signal.takeProfits.lastOrNull()?.price ?: "—",

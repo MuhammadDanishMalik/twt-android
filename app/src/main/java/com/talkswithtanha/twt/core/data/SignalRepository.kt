@@ -166,7 +166,9 @@ class FirebaseSignalRepository @Inject constructor(
                 .orEmpty()
                 .mapNotNull { it.asNonBlankString() },
             isEdited = document.getBoolean(F.IS_EDITED) ?: false,
-            isAnalysis = document.getBoolean(F.IS_ANALYSIS) ?: false
+            isAnalysis = document.getBoolean(F.IS_ANALYSIS) ?: false,
+            entry2 = document.get("entry2").asNonBlankString(),
+            entry2Note = document.get("entry2Note").asNonBlankString()
         )
     }
 

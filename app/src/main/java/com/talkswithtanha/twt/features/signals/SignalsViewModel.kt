@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.signals
 
+import kotlinx.coroutines.flow.catch
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.talkswithtanha.twt.core.data.SignalRepository
@@ -67,6 +68,10 @@ class SignalsViewModel @Inject constructor(
 }
 
 data class SignalDetailUiState(
+    /** The desk's updates on this trade, newest first. */
+    val updates: List<com.talkswithtanha.twt.core.model.SignalUpdate> = emptyList(),
+    /** When the member last opened this trade before now: newer updates get a dot. */
+    val lastSeenAt: Long = 0L,
     val signal: Signal? = null,
     val follow: SignalFollow? = null,
     val isLoading: Boolean = true,
@@ -91,11 +96,22 @@ class SignalDetailViewModel @Inject constructor(
     private val signalRepository: SignalRepository,
     private val tracker: FollowedSignalTracker,
     activity: com.talkswithtanha.twt.core.analytics.ActivityTracker,
+    feed: com.talkswithtanha.twt.core.data.FeedRepository,
+    @dagger.hilt.android.qualifiers.ApplicationContext context: android.content.Context,
     savedStateHandle: androidx.lifecycle.SavedStateHandle
 ) : ViewModel() {
 
     private val signalId: String =
         checkNotNull(savedStateHandle[com.talkswithtanha.twt.core.navigation.AppRoute.SignalDetail.ARG])
+
+    // When this trade was last opened on this phone, read before it is moved
+    // on to now, so updates since then keep their dot for this visit.
+    private val seenPrefs = context.getSharedPreferences("trade_updates_seen", android.content.Context.MODE_PRIVATE)
+    private val lastSeenAt: Long = seenPrefs.getLong(signalId, 0L).also {
+        seenPrefs.edit().putLong(signalId, System.currentTimeMillis()).apply()
+    }
+    private val updates = feed.observeSignalUpdates(signalId)
+        .catch { emit(emptyList()) }
 
     init {
         // A line in the member's timeline on the admin panel.
@@ -104,10 +120,13 @@ class SignalDetailViewModel @Inject constructor(
 
     val state: StateFlow<SignalDetailUiState> = combine(
         signalRepository.observeSignal(signalId),
-        tracker.follows.map { follows -> follows.firstOrNull { it.signalId == signalId } }
-    ) { snapshot, follow ->
+        tracker.follows.map { follows -> follows.firstOrNull { it.signalId == signalId } },
+        updates
+    ) { snapshot, follow, ups ->
         when (snapshot) {
             is Snapshot.Data -> SignalDetailUiState(
+                updates = ups,
+                lastSeenAt = lastSeenAt,
                 signal = snapshot.value,
                 follow = follow,
                 isLoading = false,

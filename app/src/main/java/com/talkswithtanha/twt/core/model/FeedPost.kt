@@ -157,6 +157,9 @@ data class SignalUpdate(
             "closed" -> "Closed"
             "stopped" -> "Stopped out"
             "cancelled" -> "Cancelled"
+            "entry2_filled" -> "Entry 2 filled"
+            "sl_moved" -> "Stop moved"
+            "partial_close" -> "Partial close"
             else -> "Update"
         }
 }

@@ -43,7 +43,11 @@ data class Signal(
     /** Posted from the panel's Analysis page: a chart and the read behind it,
      *  with no levels. Belongs in the Analysis tab and nowhere else — and it is
      *  kept out of the win rate, because there was no trade to win. */
-    val isAnalysis: Boolean = false
+    val isAnalysis: Boolean = false,
+    /** An optional second entry for a second lot, and the desk's note on it.
+     *  Absent on every signal written before it existed. */
+    val entry2: String? = null,
+    val entry2Note: String? = null
 ) {
     /**
      * The chart and the screenshots as one list, chart first — what the detail

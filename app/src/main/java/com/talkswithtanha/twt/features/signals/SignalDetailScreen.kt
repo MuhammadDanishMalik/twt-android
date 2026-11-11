@@ -1,5 +1,6 @@
 package com.talkswithtanha.twt.features.signals
 
+import androidx.compose.material.icons.filled.Login
 import com.talkswithtanha.twt.core.model.liveProgress
 import com.talkswithtanha.twt.core.data.LiveApi
 import com.talkswithtanha.twt.features.signals.live.LiveCandleChart
@@ -316,6 +317,11 @@ fun SignalDetailScreen(
 
             Reveal(3) {
                 DetailCard(title = "Details") {
+                    signal.entry2?.let { e2 ->
+                        // The second entry, with the desk's note on it.
+                        DetailRow(Icons.Filled.Login, "Entry 2", signal.entry2Note?.let { "$e2 · $it" } ?: e2, numeric = signal.entry2Note == null)
+                        DetailDivider()
+                    }
                     DetailRow(Icons.Filled.Bolt, "Trade style", signal.tradeStyle.stored)
                     DetailDivider()
                     DetailRow(Icons.Filled.Schedule, "Timeframe", signal.timeframe)
@@ -341,6 +347,19 @@ fun SignalDetailScreen(
                             fontSize = 15.sp,
                             lineHeight = 21.sp
                         )
+                    }
+                }
+            }
+
+            // Right under the note: every update the desk made, newest first.
+            // Hidden until there is one.
+            if (state.updates.isNotEmpty()) {
+                Reveal(4) {
+                    DetailCard(title = "Trade updates") {
+                        state.updates.forEachIndexed { i, u ->
+                            if (i > 0) DetailDivider()
+                            TradeUpdateRow(u, isNew = state.lastSeenAt > 0 && u.at.time > state.lastSeenAt)
+                        }
                     }
                 }
             }
@@ -650,3 +669,34 @@ private fun postedUtc(signal: Signal): String =
     SimpleDateFormat("d MMM, HH:mm 'UTC'", Locale.US)
         .apply { timeZone = TimeZone.getTimeZone("UTC") }
         .format(signal.timestamp)
+
+
+/** One update: when (UTC, as the desk writes it), what, and a dot if it is new to this member. */
+@Composable
+private fun TradeUpdateRow(u: com.talkswithtanha.twt.core.model.SignalUpdate, isNew: Boolean) {
+    val fmt = remember {
+        java.text.SimpleDateFormat("d MMM, HH:mm 'UTC'", java.util.Locale.ENGLISH).apply {
+            timeZone = java.util.TimeZone.getTimeZone("UTC")
+        }
+    }
+    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.Top) {
+        Box(
+            Modifier.padding(top = 6.dp).size(8.dp).clip(CircleShape)
+                .background(if (isNew) com.talkswithtanha.twt.core.designsystem.IosColors.Accent else Color.Transparent)
+        )
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(u.label, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text(fmt.format(u.at), color = Color.White.copy(alpha = 0.45f), fontSize = 12.sp)
+            }
+            val text = u.note.ifBlank { u.transcript.orEmpty() }
+            if (text.isNotBlank()) {
+                Text(text, color = Color.White.copy(alpha = 0.85f), fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(top = 3.dp))
+            }
+            u.price?.takeIf { it.isNotBlank() }?.let {
+                Text("at $it", color = Color.White.copy(alpha = 0.5f), fontSize = 12.5.sp, modifier = Modifier.padding(top = 2.dp))
+            }
+        }
+    }
+}

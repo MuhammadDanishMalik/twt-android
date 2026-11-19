@@ -84,7 +84,7 @@ data class Signal(
      * screen shows under "From the team".
      */
     val teamImages: List<String>
-        get() = listOfNotNull(chartImageUrl) + screenshots
+        get() = (listOfNotNull(chartImageUrl) + screenshots).distinct()
 
     /**
      * Which market this trade belongs to, for the filter on the Signals tab.

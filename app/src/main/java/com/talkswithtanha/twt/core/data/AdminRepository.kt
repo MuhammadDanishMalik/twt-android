@@ -160,7 +160,9 @@ class FirebaseAdminRepository @Inject constructor(
                 S.IS_PUBLISHED to draft.isPublished,
                 S.TRADE_STYLE to draft.tradeStyle.stored,
                 S.CHART_IMAGE_URL to draft.chartImageUrl,
-                S.SCREENSHOTS to listOfNotNull(draft.chartImageUrl),
+                // The chart lives in CHART_IMAGE_URL only. Writing it here too made the detail
+                // screen list it twice; screenshots are the extras.
+                S.SCREENSHOTS to emptyList<String>(),
                 com.talkswithtanha.twt.core.firebase.FirestorePaths.SignalField.IS_ANALYSIS to draft.isAnalysis,
                 // Server time, not the phone's: a device with a wrong clock
                 // would otherwise pin the signal to the top of every feed.

@@ -258,10 +258,13 @@ fun SignalTicketCard(
                 signal.entry2?.let { "${signal.entryPrice} · 2nd $it" } ?: signal.entryPrice,
                 Modifier.weight(1f)
             )
+            // Every target, as the desk set them: "3783, 3793". Showing only the last
+            // one hid TP1 from members on a trade that had not reached it yet.
+            val targets = signal.takeProfits.map { it.price }.filter { it.isNotBlank() }
             TicketLevel(
                 "TARGET",
-                signal.takeProfits.lastOrNull()?.price ?: "—",
-                Modifier.weight(1f),
+                targets.joinToString(", ").ifEmpty { "—" },
+                Modifier.weight(if (targets.size > 2) 1.6f else if (targets.size == 2) 1.25f else 1f),
                 Alignment.CenterHorizontally
             )
             TicketLevel("STOP", signal.stopLoss, Modifier.weight(1f), Alignment.End)
